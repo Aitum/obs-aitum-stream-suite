@@ -14,8 +14,12 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 	if (!file || !file->buffer.num)
 		return true;
 
-	
 
+
+	if (version_update_info) {
+		update_info_destroy(version_update_info);
+		version_update_info = nullptr;
+	}
 	return true;
 }
 
@@ -26,4 +30,12 @@ bool obs_module_load(void)
 	version_update_info = update_info_create_single("[Aitum Live]", "OBS", "https://api.aitum.tv/plugin/live",
 							version_info_downloaded, nullptr);
 	return true;
+}
+
+void obs_module_unload()
+{
+	if (version_update_info) {
+		update_info_destroy(version_update_info);
+		version_update_info = nullptr;
+	}
 }
