@@ -3,7 +3,7 @@
 #include <QListView>
 #include <QListWidget>
 #include <QGroupBox>
-#include "../utils/widgets/flowlayout.hpp"
+#include "../utils/widgets/switching-splitter.hpp"
 #include <obs-module.h>
 
 CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
@@ -11,11 +11,9 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 	  preview(new OBSQTDisplay(this))
 {
 	UNUSED_PARAMETER(settings);
-
-;
 	setObjectName(QStringLiteral("contextContainer"));
 	setContentsMargins(0, 0, 0, 0);
-	auto split = new QSplitter(this);
+	auto split = new SwitchingSplitter;
 	auto l = new QBoxLayout(QBoxLayout::TopToBottom, this);
 	setLayout(l);
 	l->addWidget(split);
@@ -43,10 +41,10 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 
 	//obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
 
-	auto panels = new QWidget;
+	auto panels = new SwitchingSplitter;
 	//auto panelsLayout = new QVBoxLayout();
-	auto panelsLayout = new FlowLayout();
-	panels->setLayout(panelsLayout);
+	//auto panelsLayout = new FlowLayout();
+	//panels->setLayout(panelsLayout);
 	auto scenesGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Scenes")));
 	auto scenesGroupLayout = new QVBoxLayout();
 	scenesGroup->setLayout(scenesGroupLayout);
@@ -63,7 +61,9 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 	sceneList->addItem("Scene 4");
 	sceneList->addItem("Scene 5");
 	scenesGroupLayout->addWidget(sceneList);
-	panelsLayout->addWidget(scenesGroup);
+
+	panels->addWidget(scenesGroup);
+	//panelsLayout->addWidget(scenesGroup);
 
 	auto sourcesGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Sources")));
 	auto sourcesGroupLayout = new QVBoxLayout();
@@ -80,7 +80,8 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 	sourceList->addItem("Source 5");
 	sourcesGroupLayout->addWidget(sourceList);
 
-	panelsLayout->addWidget(sourcesGroup);
+	panels->addWidget(sourcesGroup);
+	//panelsLayout->addWidget(sourcesGroup);
 	split->addWidget(panels);
 }
 

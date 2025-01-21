@@ -69,12 +69,12 @@ target_sources(${PROJECT_NAME} PRIVATE
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/utils/file-download.c
-  src/utils/widgets/flowlayout.cpp
   src/utils/widgets/hotkey-edit.cpp
+  src/utils/widgets/switching-splitter.cpp
   src/utils/widgets/qt-display.cpp
   src/utils/file-download.h
-  src/utils/widgets/flowlayout.hpp
   src/utils/widgets/hotkey-edit.hpp
+  src/utils/widgets/switching-splitter.hpp
   src/utils/widgets/qt-display.hpp)
 
 if(BUILD_OUT_OF_TREE)
