@@ -1,17 +1,11 @@
 #include "switching-splitter.hpp"
 
+SwitchingSplitter::SwitchingSplitter(QWidget *parent) : QSplitter(parent) {}
+SwitchingSplitter::SwitchingSplitter(Qt::Orientation o, QWidget *parent) : QSplitter(o, parent) {}
+SwitchingSplitter::~SwitchingSplitter() {}
 
-SwitchingSplitter::SwitchingSplitter(QWidget *parent): QSplitter(parent) {
-
-}
-SwitchingSplitter::SwitchingSplitter(Qt::Orientation o, QWidget *parent) : QSplitter(parent) {
-
-}
-SwitchingSplitter::~SwitchingSplitter() {
-
-}
-
-void SwitchingSplitter::resizeEvent(QResizeEvent* re) {
+void SwitchingSplitter::resizeEvent(QResizeEvent *re)
+{
 	QSplitter::resizeEvent(re);
 	auto s = size();
 	bool horizontal = s.width() > s.height();
