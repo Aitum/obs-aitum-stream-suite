@@ -6,8 +6,8 @@
 extern "C" {
 #endif
 
-struct update_info;
-typedef struct update_info update_info_t;
+struct download_info;
+typedef struct download_info download_info_t;
 
 struct file_download_data {
 	const char *name;
@@ -18,9 +18,9 @@ struct file_download_data {
 
 typedef bool (*confirm_file_callback_t)(void *param, struct file_download_data *file);
 
-update_info_t *update_info_create_single(const char *log_prefix, const char *user_agent, const char *file_url,
+download_info_t *download_info_create_single(const char *log_prefix, const char *user_agent, const char *file_url,
 					 confirm_file_callback_t confirm_callback, void *param);
-void update_info_destroy(update_info_t *info);
+void download_info_destroy(download_info_t *info);
 
 #ifdef __cplusplus
 }

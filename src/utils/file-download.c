@@ -1,4 +1,4 @@
-#include "file-updater.h"
+#include "file-download.h"
 #include <curl/curl.h>
 #include <obs-data.h>
 #include <util/darray.h>
@@ -25,7 +25,7 @@
 #define warn(msg, ...) blog(LOG_WARNING, "%s" msg, info->log_prefix, ##__VA_ARGS__)
 #define info(msg, ...) blog(LOG_WARNING, "%s" msg, info->log_prefix, ##__VA_ARGS__)
 
-struct update_info {
+struct download_info {
 	char error[CURL_ERROR_SIZE];
 	struct curl_slist *header;
 	DARRAY(uint8_t) file_data;
@@ -41,7 +41,7 @@ struct update_info {
 	char *log_prefix;
 };
 
-void update_info_destroy(struct update_info *info)
+void download_info_destroy(struct download_info *info)
 {
 	if (!info)
 		return;
@@ -64,7 +64,7 @@ void update_info_destroy(struct update_info *info)
 static size_t http_write(void *ptr, size_t size, size_t nmemb, void *uinfo)
 {
 	size_t total = size * nmemb;
-	struct update_info *info = (struct update_info *)uinfo;
+	struct download_info *info = (struct download_info *)uinfo;
 
 	if (total)
 		da_push_back_array(info->file_data, ptr, total);
@@ -72,7 +72,7 @@ static size_t http_write(void *ptr, size_t size, size_t nmemb, void *uinfo)
 	return total;
 }
 
-static bool do_http_request(struct update_info *info, const char *url, long *response_code)
+static bool do_http_request(struct download_info *info, const char *url, long *response_code)
 {
 	CURLcode code;
 	uint8_t null_terminator = 0;
@@ -116,7 +116,7 @@ struct file_update_data {
 
 static void *single_file_thread(void *data)
 {
-	struct update_info *info = data;
+	struct download_info *info = data;
 	struct file_download_data download_data;
 	long response_code;
 
@@ -139,10 +139,10 @@ static void *single_file_thread(void *data)
 	return NULL;
 }
 
-update_info_t *update_info_create_single(const char *log_prefix, const char *user_agent, const char *file_url,
+download_info_t *download_info_create_single(const char *log_prefix, const char *user_agent, const char *file_url,
 					 confirm_file_callback_t confirm_callback, void *param)
 {
-	struct update_info *info;
+	struct download_info *info;
 
 	if (!log_prefix)
 		log_prefix = "";

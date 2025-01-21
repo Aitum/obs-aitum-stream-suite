@@ -48,10 +48,26 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_SOUR
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/aitum-live.cpp
-  src/utils/file-updater.c
   resources.qrc
-  src/utils/file-updater.h
   src/version.h)
+
+target_sources(${PROJECT_NAME} PRIVATE
+  src/docks/canvas-dock.cpp
+  src/docks/canvas-dock.hpp)
+
+target_sources(${PROJECT_NAME} PRIVATE
+  src/dialogs/name-dialog.cpp
+  src/dialogs/name-dialog.hpp)
+
+target_sources(${PROJECT_NAME} PRIVATE
+  src/utils/file-download.c
+  src/utils/widgets/flowlayout.cpp
+  src/utils/widgets/hotkey-edit.cpp
+  src/utils/widgets/qt-display.cpp
+  src/utils/file-download.h
+  src/utils/widgets/flowlayout.hpp
+  src/utils/widgets/hotkey-edit.hpp
+  src/utils/widgets/qt-display.hpp)
 
 if(BUILD_OUT_OF_TREE)
 	set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
