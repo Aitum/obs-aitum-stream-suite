@@ -86,6 +86,8 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 
 void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 {
+	UNUSED_PARAMETER(cx);
+	UNUSED_PARAMETER(cy);
 	CanvasDock *window = static_cast<CanvasDock *>(data);
 	if (!window)
 		return;
