@@ -9,6 +9,10 @@
     <file>media/backtrack_on.svg</file>
     <file>media/virtual_cam_off.svg</file>
     <file>media/virtual_cam_on.svg</file>
+    <file>media/studio_mode_off.svg</file>
+    <file>media/studio_mode_on.svg</file>
+    <file>media/linked.svg</file>
+    <file>media/unlinked.svg</file>
 	<file>media/facebook.png</file>
 	<file>media/tiktok.png</file>
 	<file>media/trovo.png</file>

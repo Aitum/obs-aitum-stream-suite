@@ -27,16 +27,15 @@ endif()
 
 if(BUILD_OUT_OF_TREE)
   find_qt(COMPONENTS Widgets Core)
-  if(OS_LINUX OR OS_FREEBSD OR OS_OPENBSD)
-    find_package(Qt6 REQUIRED Gui)
-  endif()
 else()
   find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt::Core Qt::Widgets)
 
 if(OS_LINUX OR OS_FREEBSD OR OS_OPENBSD)
+if(Qt_VERSION VERSION_LESS "6.9.0")
 	target_link_libraries(${PROJECT_NAME} PRIVATE Qt::GuiPrivate)
+endif()
 endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>)
@@ -55,27 +54,41 @@ target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h)
 
 target_sources(${PROJECT_NAME} PRIVATE
-  src/aitum-live.cpp
+  src/aitum-stream-suite.cpp
   resources.qrc
   src/version.h)
 
 target_sources(${PROJECT_NAME} PRIVATE
+  src/docks/browser-dock.cpp
+  src/docks/browser-dock.hpp
   src/docks/canvas-dock.cpp
-  src/docks/canvas-dock.hpp)
+  src/docks/canvas-dock.hpp
+  src/docks/canvas-clone-dock.cpp
+  src/docks/canvas-clone-dock.hpp
+  src/docks/output-dock.cpp
+  src/docks/output-dock.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
+  src/dialogs/config-dialog.cpp
+  src/dialogs/config-dialog.hpp
   src/dialogs/name-dialog.cpp
   src/dialogs/name-dialog.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/utils/file-download.c
   src/utils/widgets/hotkey-edit.cpp
+  src/utils/widgets/locked-checkbox.cpp
+  src/utils/widgets/source-tree.cpp
   src/utils/widgets/switching-splitter.cpp
   src/utils/widgets/qt-display.cpp
+  src/utils/widgets/visibility-checkbox.cpp
   src/utils/file-download.h
   src/utils/widgets/hotkey-edit.hpp
+  src/utils/widgets/locked-checkbox.hpp
+  src/utils/widgets/source-tree.hpp
   src/utils/widgets/switching-splitter.hpp
-  src/utils/widgets/qt-display.hpp)
+  src/utils/widgets/qt-display.hpp
+  src/utils/widgets/visibility-checkbox.hpp)
 
 if(BUILD_OUT_OF_TREE)
 	set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

@@ -1,0 +1,7 @@
+@OBSThemeMeta {
+    name: 'Default';
+    id: 'com.obsproject.Aitum.Original';
+    extends: 'com.obsproject.Aitum';
+    author: 'Aitum';
+    dark: 'true';
+}

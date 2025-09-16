@@ -33,11 +33,11 @@
     },
     "platformConfig": {
         "macos": {
-            "bundleId": "tv.aitum.live"
+            "bundleId": "tv.aitum.streamsuite"
         }
     },
-    "name": "aitum-live",
-    "displayName": "Aitum Live",
+    "name": "aitum-stream-suite",
+    "displayName": "Aitum Stream Suite",
     "version": "0.0.1",
     "author": "Aitum",
     "website": "https://aitum.tv",

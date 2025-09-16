@@ -32,8 +32,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "..\release\Package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\theme\*"; DestDir: "{app}\data\obs-studio\themes"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\LICENSE"; Flags: dontcopy
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+
+[Ini]
+filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original;
+filename: {commonappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original;
 
 [Icons]
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
