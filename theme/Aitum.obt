@@ -383,9 +383,6 @@ QMenuBar{
     background-color:var(--blueDark);
 }
 
-
-
-
 /* macOS Separator Fix */
 
 QMainWindow::separator {
@@ -863,9 +860,10 @@ QToolBarExtension {
     qproperty-icon: url(theme:Aitum/dots-vert.svg);
 }
 
-
 /* Tab Widget */
-
+QTabBar{
+    padding:0;
+}
 QTabWidget::pane { /* The tab widget frame */
     border-top: 4px solid var(--tab_bg);
 }
@@ -893,11 +891,14 @@ QTabBar::tab {
     background: var(--tab_bg);
     color: var(--text);
     border: none;
-    padding: 8px 12px;
+    padding: 5px 12px;
     min-width: 50px;
-    margin: 1px 0px;
-    margin-right: 2px;
-    border: 1px solid var(--tab_border);
+    margin: 1px 3px;
+    border: 1px solid transparent;
+}
+
+QTabBar::tab::first-child{
+    margin-left:0;
 }
 
 QTabBar::tab:pressed {
@@ -1644,39 +1645,41 @@ QGroupBox::indicator {
 }
 
 QGroupBox::indicator {
-    margin-left: 2px;
+    margin-left: 3px;
 }
 
 QCheckBox::indicator:unchecked,
 QGroupBox::indicator:unchecked {
-    image: url(theme:Yami/checkbox_unchecked.svg);
+    image: url(theme:Aitum/checkbox_unchecked.svg);
 }
 
 QCheckBox::indicator:unchecked:hover,
 QGroupBox::indicator:unchecked:hover {
     border: none;
-    image: url(theme:Yami/checkbox_unchecked_focus.svg);
+    image: url(theme:Aitum/checkbox_unchecked_focus.svg);
 }
 
 QCheckBox::indicator:checked,
 QGroupBox::indicator:checked {
-    image: url(theme:Yami/checkbox_checked.svg);
+    image: url(theme:Aitum/checkbox_checked.svg);
 }
 
 QCheckBox::indicator:checked:hover,
 QGroupBox::indicator:checked:hover {
-    image: url(theme:Yami/checkbox_checked_focus.svg);
+    image: url(theme:Aitum/checkbox_checked_focus.svg);
 }
 
 QCheckBox::indicator:checked:disabled,
 QGroupBox::indicator:checked:disabled {
-    image: url(theme:Yami/checkbox_checked_disabled.svg);
+    image: url(theme:Aitum/checkbox_checked_disabled.svg);
 }
 
 QCheckBox::indicator:unchecked:disabled,
 QGroupBox::indicator:unchecked:disabled {
-    image: url(theme:Yami/checkbox_unchecked_disabled.svg);
+    image: url(theme:Aitum/checkbox_unchecked_disabled.svg);
 }
+
+
 
 /* Locked CheckBox */
 
@@ -1816,13 +1819,13 @@ QCheckBox[sourceTreeSubItem=true]::indicator {
     margin-left: -1px;
 }
 
-QCheckBox[sourceTreeSubItem=true]::indicator:checked,
-QCheckBox[sourceTreeSubItem=true]::indicator:checked:hover {
+.indicator-expand::indicator:checked,
+.indicator-expand::indicator:checked:hover{
     image: url(theme:Aitum/expand.svg);
 }
 
-QCheckBox[sourceTreeSubItem=true]::indicator:unchecked,
-QCheckBox[sourceTreeSubItem=true]::indicator:unchecked:hover {
+.indicator-expand::indicator:unchecked,
+.indicator-expand::indicator:unchecked:hover{
     image: url(theme:Aitum/collapse.svg);
 }
 
@@ -2125,4 +2128,44 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
 #previewYScrollBar {
     width: 20px;
     margin-left:5px;
+}
+
+/* Top Toolbar */
+QMainWindow > QToolBar {
+    padding:10px;
+}
+QMainWindow > QToolBar QTabBar{
+    qproperty-drawBase: 0;
+    border-right:1px solid #333333;
+    padding:15px;
+}
+QMainWindow > QToolBar QTabWidget::pane{
+    border:0px solid transparent
+}
+QMainWindow > QButtonGroup{
+    background:#FFFFFF;
+}
+
+
+QMainWindow > QToolBar QTabBar::tab::top {
+    padding: 8px 12px;
+    margin:0 8px 0 0;
+    border-radius:5px;
+    background:var(--button_bg);
+    border:1px solid transparent;
+}
+
+QMainWindow > QToolBar QTabBar::tab::top:selected, 
+QMainWindow>QToolBar QTabBar::tab::top:hover{
+    background: var(--button_bg_hover);
+    border: 1px solid var(--tab_border_hover);
+    color: var(--text);
+    qproperty-setCursor: pointing_hand;
+}
+
+QMainWindow > QToolBar > QAbstractButton{
+    width:15px;
+    height:15px;
+    padding:8px 10px;
+    margin:0 0 2px 8px;
 }
