@@ -1,4 +1,3 @@
-#include "../../aitum-multistream/config-utils.hpp"
 #include "dialogs/config-dialog.hpp"
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
@@ -307,6 +306,7 @@ void save_current_profile_config()
 
 static void frontend_event(enum obs_frontend_event event, void *private_data)
 {
+	UNUSED_PARAMETER(private_data);
 	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED || event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGING) {

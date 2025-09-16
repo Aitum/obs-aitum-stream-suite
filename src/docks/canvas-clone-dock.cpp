@@ -315,23 +315,24 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 
 		bool change_source = false;
 		std::pair<bool *, CanvasCloneDock *> p = {&change_source, this};
-		obs_scene_enum_items(scene,
-				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
-					std::pair<bool *, CanvasCloneDock *> *p =
-						(std::pair<bool *, CanvasCloneDock *> *)param;
-					CanvasCloneDock *ccd = p->second;
-					bool *change_source = p->first;
-					if (ccd->replace_sources.find(obs_sceneitem_get_source(item)) != ccd->replace_sources.end()) {
-						*change_source = true;
-						return true;
-					}
+		obs_scene_enum_items(
+			scene,
+			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+				UNUSED_PARAMETER(scene);
+				std::pair<bool *, CanvasCloneDock *> *p = (std::pair<bool *, CanvasCloneDock *> *)param;
+				CanvasCloneDock *ccd = p->second;
+				bool *change_source = p->first;
+				if (ccd->replace_sources.find(obs_sceneitem_get_source(item)) != ccd->replace_sources.end()) {
+					*change_source = true;
 					return true;
-				},
+				}
+				return true;
+			},
 			&p);
 		if (!change_source) {
 			duplicate = obs_source_get_ref(source);
-		}else if (current && source &&
-		    (current == source || strcmp(obs_source_get_name(current), obs_source_get_name(source)) == 0)) {
+		} else if (current && source &&
+			   (current == source || strcmp(obs_source_get_name(current), obs_source_get_name(source)) == 0)) {
 			duplicate = obs_source_get_ref(current);
 		} else {
 			//duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
@@ -349,6 +350,7 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			obs_scene_enum_items(
 				scene2,
 				[](obs_scene_t *scene2, obs_sceneitem_t *item, void *param) {
+					UNUSED_PARAMETER(scene2);
 					obs_scene_t *scene = (obs_scene_t *)param;
 					//if (!obs_scene_find_sceneitem_by_id(scene, obs_sceneitem_get_id(item))) {
 					//	obs_sceneitem_remove(item);
@@ -365,6 +367,7 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			obs_scene_enum_items(
 				scene,
 				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+					UNUSED_PARAMETER(scene);
 					std::pair<obs_scene_t *, CanvasCloneDock *> *p =
 						(std::pair<obs_scene_t *, CanvasCloneDock *> *)param;
 					CanvasCloneDock *ccd = p->second;
