@@ -15,6 +15,7 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
+#include <QPlainTextEdit>
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -31,6 +32,7 @@ QAction *studioModeAction = nullptr;
 QAction *virtualCameraAction = nullptr;
 
 OBSBasicSettings *configDialog = nullptr;
+OutputDock *output_dock = nullptr;
 
 QIcon create2StateIcon(QString fileOn, QString fileOff)
 {
@@ -47,25 +49,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 	if (!file || !file->buffer.num)
 		return true;
 
-	auto d = obs_data_create_from_json((const char *)file->buffer.array);
-	if (d) {
-
-		auto data_obj = obs_data_get_obj(d, "data");
-		obs_data_release(d);
-		if (data_obj) {
-			auto version = obs_data_get_string(data_obj, "version");
-			int major;
-			int minor;
-			int patch;
-			if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-				auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
-				if (sv >
-				    MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
-				}
-			}
-			obs_data_release(data_obj);
-		}
-	}
+	QMetaObject::invokeMethod(output_dock, "ApiInfo", Q_ARG(QString, QString::fromUtf8((const char *)file->buffer.array)));
 
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
@@ -119,6 +103,12 @@ void reset_live_dock_state()
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -273,6 +263,14 @@ void load_current_profile_config()
 		modesTab = -1;
 		modesTabBar->setCurrentIndex(index);
 	}
+
+	QMetaObject::invokeMethod(
+		output_dock,
+		[] {
+			if (output_dock)
+				output_dock->LoadSettings();
+		},
+		Qt::QueuedConnection);
 }
 
 void save_current_profile_config()
@@ -317,6 +315,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_data_release(current_profile_config);
 			current_profile_config = nullptr;
 		}
+		output_dock->Exiting();
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
@@ -337,10 +336,12 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		if (!streamAction->isChecked()) {
 			streamAction->setChecked(true);
 		}
+		output_dock->UpdateMainStreamStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING || event == OBS_FRONTEND_EVENT_STREAMING_STOPPED) {
 		if (streamAction->isChecked()) {
 			streamAction->setChecked(false);
 		}
+		output_dock->UpdateMainStreamStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STARTING || event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
 		if (!recordAction->isChecked()) {
 			recordAction->setChecked(true);
@@ -388,6 +389,11 @@ bool obs_module_load(void)
 {
 	blog(LOG_INFO, "[Aitum Stream Suite] loaded version %s", PROJECT_VERSION);
 
+	QFontDatabase::addApplicationFont(":/aitum/media/Roboto.ttf");
+	QFontDatabase::addApplicationFont(":/aitum/media/Roboto-Italic.ttf");
+	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed.ttf");
+	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed-Italic.ttf");
+
 	obs_frontend_add_event_callback(frontend_event, nullptr);
 
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -396,13 +402,14 @@ bool obs_module_load(void)
 	auto tb = new TabToolBar(modesTabBar);
 	main_window->addToolBar(tb);
 	tb->setFloatable(false);
-	tb->setMovable(false);
-	tb->setAllowedAreas(Qt::ToolBarArea::TopToolBarArea);
+	//tb->setMovable(false);
+	//tb->setAllowedAreas(Qt::ToolBarArea::TopToolBarArea);
 
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
 	tb->addWidget(modesTabBar);
+	tb->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
 		save_dock_state(modesTab);
@@ -415,6 +422,7 @@ bool obs_module_load(void)
 	aitumSettingsAction->setProperty("class", "icon-gear");
 	tb->widgetForAction(aitumSettingsAction)->setProperty("themeID", "configIconSmall");
 	tb->widgetForAction(aitumSettingsAction)->setProperty("class", "icon-gear");
+	tb->widgetForAction(aitumSettingsAction)->setObjectName("AitumStreamSuiteSettingsButton");
 	QObject::connect(aitumSettingsAction, &QAction::triggered, [] {
 		if (!configDialog)
 			configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
@@ -439,15 +447,21 @@ bool obs_module_load(void)
 	});
 
 	// Contribute Button
-	auto contributeButton = tb->addAction(QString::fromUtf8(obs_module_text("Donate")));
-	contributeButton->setIcon(generateEmojiQIcon("❤️"));
+	auto contributeButton = tb->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
+	contributeButton->setProperty("themeID", "icon-aitum-donate");
+	contributeButton->setProperty("class", "icon-aitum-donate");
+	tb->widgetForAction(contributeButton)->setProperty("themeID", "icon-aitum-donate");
+	tb->widgetForAction(contributeButton)->setProperty("class", "icon-aitum-donate");
 	contributeButton->setToolTip(QString::fromUtf8(obs_module_text("AitumStreamSuiteDonate")));
 	QAction::connect(contributeButton, &QAction::triggered,
 			 [] { QDesktopServices::openUrl(QUrl("https://aitum.tv/contribute")); });
 
 	// Aitum Button
-	auto aitumButton = tb->addAction(QString::fromUtf8(obs_module_text("Aitum")));
-	aitumButton->setIcon(QIcon(":/aitum/media/aitum.png"));
+	auto aitumButton = tb->addAction(QIcon(":/aitum/media/aitum.png"), QString::fromUtf8(obs_module_text("Aitum")));
+	aitumButton->setProperty("themeID", "icon-aitum");
+	aitumButton->setProperty("class", "icon-aitum");
+	tb->widgetForAction(aitumButton)->setProperty("themeID", "icon-aitum");
+	tb->widgetForAction(aitumButton)->setProperty("class", "icon-aitum");
 	aitumButton->setToolTip(QString::fromUtf8("https://aitum.tv"));
 	QAction::connect(aitumButton, &QAction::triggered, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
 
@@ -509,7 +523,8 @@ bool obs_module_load(void)
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::CameraWeb));
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::EditUndo));
 
-	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), new OutputDock(main_window));
+	output_dock = new OutputDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
 
 	version_download_info = download_info_create_single(
 		"[Aitum Stream Suite]", "OBS", "https://api.aitum.tv/plugin/streamsuite", version_info_downloaded, nullptr);
@@ -586,6 +601,9 @@ void obs_module_unload()
 	if (current_profile_config) {
 		obs_data_release(current_profile_config);
 		current_profile_config = nullptr;
+	}
+	if (output_dock) {
+		delete output_dock;
 	}
 }
 

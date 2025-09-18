@@ -353,6 +353,20 @@
     qproperty-icon: url(theme:Aitum/media/media_previous.svg);
 }
 
+/* Aitum icons */
+
+.icon-aitum {
+    qproperty-icon: url(theme:Aitum/aitum.svg);
+}
+
+.icon-aitum-donate {
+    qproperty-icon: url(theme:Aitum/support.svg);
+}
+
+#AitumStreamSuiteSettingsButton {
+    qproperty-icon: url(theme:Aitum/aitum-settings.svg);
+}
+
 /* Default widget style, we override only what is needed. */
 
 

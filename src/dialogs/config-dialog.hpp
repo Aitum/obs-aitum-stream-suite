@@ -41,11 +41,12 @@ private:
 	QIcon GetAdvancedIcon() const;
 
 	void AddCanvas(QFormLayout *canvasLayout, obs_data_t *settings, obs_data_array_t *canvas);
+	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs);
 	void AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout);
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
 
 	obs_data_t *main_settings = nullptr;
-	obs_data_array_t *vertical_outputs = nullptr;
+	obs_data_array_t *extra_outputs = nullptr;
 
 	std::map<obs_property_t *, QWidget *> encoder_property_widgets;
 	std::map<QWidget *, obs_properties_t *> video_encoder_properties;
@@ -79,8 +80,6 @@ public:
 	~OBSBasicSettings();
 
 	void LoadSettings(obs_data_t *settings);
-	void LoadVerticalSettings(bool load);
-	void SaveVerticalSettings();
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
 	void SetNewerVersion(QString newer_version_available);
 
