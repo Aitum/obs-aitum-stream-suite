@@ -1,4 +1,5 @@
 #include "config-dialog.hpp"
+#include "output-dialog.hpp"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -314,7 +315,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	outputsLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
 
 	auto output_title_layout = new QHBoxLayout;
-	auto output_title = new QLabel(QString::fromUtf8(obs_module_text("VerticalCanvas")));
+	auto output_title = new QLabel(QString::fromUtf8(obs_module_text("Outputs")));
 	output_title->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
 	output_title_layout->addWidget(output_title, 0, Qt::AlignLeft);
 	//auto guide_link = new QLabel(QString::fromUtf8("<a href=\"https://l.aitum.tv/vh-streaming-settings\">") + QString::fromUtf8(obs_module_text("ViewGuide")) + QString::fromUtf8("</a>"));
@@ -332,44 +333,66 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	//		obs_data_release(s);
 	//	});
 
-	outputAddButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddOutput")));
+	outputAddButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddStreamOutput")));
 	outputAddButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	outputAddButton->setProperty("class", "icon-plus");
 
 	connect(outputAddButton, &QPushButton::clicked, [this] {
 		QStringList otherNames;
 		obs_data_array_enum(
-			vertical_outputs,
+			extra_outputs,
 			[](obs_data_t *data2, void *param) {
 				((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
 			},
 			&otherNames);
 		otherNames.removeDuplicates();
-		/* auto outputDialog = new OutputDialog(this, otherNames);
+		auto outputDialog = new OutputDialog(this, otherNames);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
 
 		if (outputDialog->exec() == QDialog::Accepted) {
 			// create a new output
-			if (!vertical_outputs)
+			if (!extra_outputs)
 				return;
 			auto s = obs_data_create();
 			obs_data_set_bool(s, "enabled", true);
 			obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
-			obs_data_array_push_back(vertical_outputs, s);
-			AddServer(outputsLayout, s, vertical_outputs);
+			obs_data_array_push_back(extra_outputs, s);
+			AddOutput(outputsLayout, s, extra_outputs);
 			obs_data_release(s);
 		}
 
-		delete outputDialog;*/
+		delete outputDialog;
 	});
 
 	output_title_layout->addWidget(outputAddButton, 0, Qt::AlignRight);
 
 	outputsLayout->addRow(output_title_layout);
+
+	auto outputGroup = new QGroupBox;
+	outputGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+	outputGroup->setStyleSheet(QString("QGroupBox{background-color: %1; padding-top: 4px;}")
+					   .arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb)));
+
+	auto outputLayout = new QFormLayout;
+	outputLayout->setContentsMargins(9, 2, 9, 9);
+	outputLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+	outputLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+
+	auto mainTitle2 = new QLabel(QString::fromUtf8(obs_module_text("SettingsMainOutputTitle")));
+	mainTitle2->setStyleSheet("font-weight: bold;");
+	outputLayout->addRow(mainTitle2);
+
+	auto mainDescription2 = new QLabel(QString::fromUtf8(obs_module_text("SettingsMainOutputDescription")));
+	//	mainTitle->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
+	outputLayout->addRow(mainDescription2);
+
+	outputGroup->setLayout(outputLayout);
+
+	outputsLayout->addRow(outputGroup);
 
 	outputsPage->setLayout(outputsLayout);
 
@@ -443,8 +466,8 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 
 OBSBasicSettings::~OBSBasicSettings()
 {
-	if (vertical_outputs)
-		obs_data_array_release(vertical_outputs);
+	if (extra_outputs)
+		obs_data_array_release(extra_outputs);
 	for (auto it = video_encoder_properties.begin(); it != video_encoder_properties.end(); it++)
 		obs_properties_destroy(it->second);
 	for (auto it = audio_encoder_properties.begin(); it != audio_encoder_properties.end(); it++)
@@ -770,49 +793,6 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	canvasesLayout->addRow(canvasGroup);
 }
 
-void OBSBasicSettings::LoadVerticalSettings(bool load)
-{
-	while (outputsLayout->rowCount() > 1) {
-		auto i = outputsLayout->takeRow(1).fieldItem;
-		RemoveLayoutItem(i);
-		outputsLayout->removeRow(1);
-	}
-	if (load) {
-		auto ph = obs_get_proc_handler();
-		struct calldata cd;
-		calldata_init(&cd);
-		if (!proc_handler_call(ph, "aitum_vertical_get_stream_settings", &cd)) {
-			// Disable button if we don't have vertical
-			outputAddButton->setEnabled(false);
-			calldata_free(&cd);
-			return;
-		}
-		if (vertical_outputs)
-			obs_data_array_release(vertical_outputs);
-		vertical_outputs = (obs_data_array_t *)calldata_ptr(&cd, "outputs");
-		calldata_free(&cd);
-	}
-	obs_data_array_enum(
-		vertical_outputs,
-		[](obs_data_t *data2, void *param) {
-			auto d = (OBSBasicSettings *)param;
-			d->AddCanvas(d->outputsLayout, data2, d->vertical_outputs);
-		},
-		this);
-}
-
-void OBSBasicSettings::SaveVerticalSettings()
-{
-	if (!vertical_outputs)
-		return;
-	auto ph = obs_get_proc_handler();
-	struct calldata cd;
-	calldata_init(&cd);
-	calldata_set_ptr(&cd, "outputs", vertical_outputs);
-	proc_handler_call(ph, "aitum_vertical_set_stream_settings", &cd);
-	calldata_free(&cd);
-}
-
 void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 {
 	while (canvasLayout->rowCount() > 2) {
@@ -822,8 +802,6 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 	}
 	main_settings = settings;
 	auto canvas = obs_data_get_array(settings, "canvas");
-
-	//todo remove canvas that is not configured.
 
 	obs_data_array_enum(
 		canvas,
@@ -838,6 +816,27 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		},
 		this);
 	obs_data_array_release(canvas);
+
+	while (outputsLayout->rowCount() > 2) {
+		auto i = outputsLayout->takeRow(2).fieldItem;
+		RemoveLayoutItem(i);
+		outputsLayout->removeRow(2);
+	}
+	obs_data_array_release(extra_outputs);
+	extra_outputs = obs_data_get_array(settings, "outputs");
+	if (!extra_outputs) {
+		extra_outputs = obs_data_array_create();
+		obs_data_set_array(settings, "outputs", extra_outputs);
+	}
+	obs_data_array_enum(
+		extra_outputs,
+		[](obs_data_t *data2, void *param) {
+			auto d = (OBSBasicSettings *)param;
+			auto outputs2 = obs_data_get_array(d->main_settings, "outputs");
+			d->AddOutput(d->outputsLayout, data2, outputs2);
+			obs_data_array_release(outputs2);
+		},
+		this);
 }
 
 void OBSBasicSettings::AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings,
@@ -1260,4 +1259,552 @@ void OBSBasicSettings::SetNewerVersion(QString newer_version_available)
 		return;
 	newVersion->setText(QString::fromUtf8(obs_module_text("NewVersion")).arg(newer_version_available));
 	newVersion->setVisible(true);
+}
+
+QIcon getPlatformIconFromEndpoint(QString endpoint);
+
+void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs)
+{
+	auto outputGroup = new QGroupBox;
+	outputGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+	outputGroup->setProperty("altColor", QVariant(true));
+	outputGroup->setProperty("customTitle", QVariant(true));
+	outputGroup->setStyleSheet(
+		QString("QGroupBox[altColor=\"true\"]{background-color: %1;} QGroupBox[customTitle=\"true\"]{padding-top: 4px;}")
+			.arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb)));
+
+	auto outputLayout = new QFormLayout;
+	outputLayout->setContentsMargins(9, 2, 9, 2);
+
+	outputLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+	outputLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+
+	// Title
+	auto output_title_layout = new QHBoxLayout;
+
+	auto platformIconLabel = new QLabel;
+	auto platformIcon = getPlatformIconFromEndpoint(QString::fromUtf8(obs_data_get_string(settings, "stream_server")));
+	platformIconLabel->setPixmap(platformIcon.pixmap(36, 36));
+	output_title_layout->addWidget(platformIconLabel, 0);
+
+	//auto streaming_title = new QLabel(QString::fromUtf8(obs_data_get_string(settings, "name")));
+	auto streaming_title = new QToolButton;
+	streaming_title->setText(QString::fromUtf8(obs_data_get_string(settings, "name")));
+	streaming_title->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	streaming_title->setArrowType(Qt::ArrowType::RightArrow);
+	streaming_title->setCheckable(true);
+	streaming_title->setChecked(false);
+	streaming_title->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
+	output_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
+
+	auto canvasCombo = new QComboBox;
+	obs_enum_canvases(
+		[](void *param, obs_canvas_t *canvas) {
+			auto c = (QComboBox *)param;
+			c->addItem(QString::fromUtf8(obs_canvas_get_name(canvas)));
+			return true;
+		},
+		canvasCombo);
+	canvasCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(settings, "canvas")));
+
+	auto advancedGroup = new QGroupBox(QString::fromUtf8(obs_module_text("AdvancedGroupHeader")));
+	advancedGroup->setContentsMargins(0, 4, 0, 0);
+
+	advancedGroup->setProperty("customTitle", QVariant(true));
+	advancedGroup->setStyleSheet(
+		"QGroupBox[customTitle=\"true\"]::title { subcontrol-origin: margin; subcontrol-position: top right; padding: 12px 18px 0 0; }"
+		"QGroupBox[customTitle=\"true\"] { padding-top: 4px; padding-bottom: 0;}");
+
+	auto advancedGroupLayout = new QVBoxLayout;
+	advancedGroup->setLayout(advancedGroupLayout);
+
+	// Tab widget
+	// 1 = bg for active tab + pane, 2 = inactive tabs, 3 = tab text colour, 4 = border colour for pane
+	auto tabStyles =
+		QString("QTabWidget::pane {  background: %1; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; border-top-right-radius: 4px; margin-top: -1px; padding-top: 8px; border: 1px solid %4; } QTabWidget::tab-bar { margin-bottom: 0; padding-bottom: 0; border-color: %4; } QTabBar::tab { color: %3; padding: 10px; margin-bottom: 0; border: 1px solid %4; } QTabBar::tab:selected { background: %1; font-weight: bold; border-bottom: none; } QTabBar::tab:!selected { background: %2; }")
+			.arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Light).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Text).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Light).name(QColor::HexRgb));
+
+	auto advancedTabWidget = new QTabWidget;
+	advancedTabWidget->setContentsMargins(0, 0, 0, 0);
+	advancedTabWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	advancedTabWidget->setStyleSheet(tabStyles);
+	//	advancedTabWidget->setStyleSheet("QTabWidget::tab-bar { border: 1px solid gray; }"
+	//									 "QTabBar::tab { background: gray; color: white; padding: 10px; }"
+	//									 "QTabBar::tab:selected { background: lightgray; }"
+	//									 "QTabWidget::pane { border: none; background: pink; }");
+
+	//	auto pageStyle = QString("QWidget[page=\"true\"] { border: 1px solid %1; padding-top: 0; margin-top: 0; }")
+	//					.arg(QPalette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb));
+	//
+	auto videoPage = new QWidget;
+	videoPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	//	videoPage->setStyleSheet(pageStyle);
+	//	videoPage->setProperty("page", true);
+	auto videoPageLayout = new QFormLayout;
+	videoPage->setLayout(videoPageLayout);
+
+	auto audioPage = new QWidget;
+	audioPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	//	audioPage->setStyleSheet(pageStyle);
+	//	audioPage->setProperty("page", true);
+	auto audioPageLayout = new QFormLayout;
+	audioPage->setLayout(audioPageLayout);
+
+	auto outputVideoEncoder = new QComboBox;
+	outputVideoEncoder->addItem(QString::fromUtf8(obs_module_text("None")), QVariant(QString::fromUtf8("")));
+	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("OutputVideoEncoder")), outputVideoEncoder);
+
+	// VIDEO ENCODER
+	auto videoEncoder = new QComboBox;
+	videoEncoder->addItem(QString::fromUtf8(obs_module_text("DefaultEncoder")), QVariant(QString::fromUtf8("")));
+	videoEncoder->setCurrentIndex(0);
+	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("VideoEncoder")), videoEncoder);
+
+	bool allEmpty = false;
+	QComboBox *videoEncoderIndex = nullptr;
+
+	videoEncoderIndex = new QComboBox;
+	for (int i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
+		QString settingName = QString::fromUtf8("video_encoder_description") + QString::number(i);
+		auto description = obs_data_get_string(main_settings, settingName.toUtf8().constData());
+		if (!description || description[0] == '\0') {
+			if (i != 0 && !allEmpty) {
+				break;
+			}
+			allEmpty = true;
+		}
+		videoEncoderIndex->addItem(QString::number(i + 1) + " " + description);
+	}
+	videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+
+	connect(videoEncoderIndex, &QComboBox::currentIndexChanged, [videoEncoderIndex, settings] {
+		if (videoEncoderIndex->currentIndex() >= 0)
+			obs_data_set_int(settings, "video_encoder_index", videoEncoderIndex->currentIndex());
+	});
+	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("VideoEncoderIndex")), videoEncoderIndex);
+
+	if (videoEncoderIndex->currentIndex() < 0 &&
+	    !config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo"))
+		videoPageLayout->setRowVisible(videoEncoderIndex, false);
+
+	connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, outputVideoEncoder, settings, outputs] {
+		obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
+		auto canvas_name = obs_data_get_string(settings, "canvas");
+		auto canvas = obs_get_canvas_by_name(canvas_name);
+		auto main_canvas = obs_get_main_canvas();
+		outputVideoEncoder->clear();
+		outputVideoEncoder->addItem(QString::fromUtf8(obs_module_text("None")), QVariant(QString::fromUtf8("")));
+		if (!canvas || main_canvas == canvas) {
+			outputVideoEncoder->addItem(QString::fromUtf8(obs_module_text("MainEncoder")),
+						    QVariant(QString::fromUtf8("MainEncoder")));
+		}
+		auto count = obs_data_array_count(outputs);
+		for (size_t i = 0; i < count; i++) {
+			auto output = obs_data_array_item(outputs, i);
+			auto name = obs_data_get_string(output, "name");
+			if (name && name[0] != '\0' && strcmp(obs_data_get_string(settings, "name"), name) != 0) {
+				auto cn = obs_data_get_string(output, "canvas");
+				if (cn[0] == '\0' || strcmp(cn, canvas_name) == 0) {
+					outputVideoEncoder->addItem(QString::fromUtf8(name), QVariant(QString::fromUtf8(name)));
+				}
+			}
+			obs_data_release(output);
+		}
+		obs_canvas_release(main_canvas);
+		obs_canvas_release(canvas);
+	});
+
+	auto videoEncoderGroup = new QWidget();
+	videoEncoderGroup->setProperty("altColor", QVariant(true));
+	auto videoEncoderGroupLayout = new QFormLayout();
+	videoEncoderGroup->setLayout(videoEncoderGroupLayout);
+	videoPageLayout->addRow(videoEncoderGroup);
+
+	struct obs_video_info ovi;
+	obs_get_video_info(&ovi);
+	double fps = ovi.fps_den > 0 ? (double)ovi.fps_num / (double)ovi.fps_den : 0.0;
+	auto fpsDivisor = new QComboBox;
+	auto frd = obs_data_get_int(settings, "frame_rate_divisor");
+	for (int i = 1; i <= 10; i++) {
+		if (i == 1) {
+			fpsDivisor->addItem(QString::number(fps, 'g', 3) + " " + QString::fromUtf8(obs_module_text("Original")), i);
+			fpsDivisor->setCurrentIndex(0);
+		} else {
+			fpsDivisor->addItem(QString::number(fps / i, 'g', 3), i);
+			if (frd == i) {
+				fpsDivisor->setCurrentIndex(fpsDivisor->count() - 1);
+			}
+		}
+	}
+	connect(fpsDivisor, &QComboBox::currentIndexChanged,
+		[fpsDivisor, settings] { obs_data_set_int(settings, "frame_rate_divisor", fpsDivisor->currentData().toInt()); });
+
+	videoEncoderGroupLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.FPS")), fpsDivisor);
+	//obs_encoder_get_frame_rate_divisor
+
+	auto scale = new QGroupBox(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Adv.Rescale")));
+	scale->setCheckable(true);
+	scale->setChecked(obs_data_get_bool(settings, "scale"));
+
+	connect(scale, &QGroupBox::toggled, [scale, settings] { obs_data_set_bool(settings, "scale", scale->isChecked()); });
+
+	auto scaleLayout = new QFormLayout();
+	scale->setLayout(scaleLayout);
+
+	auto downscale = new QComboBox;
+
+	auto downscale_type = obs_data_get_int(settings, "scale_type");
+	if (downscale_type == OBS_SCALE_DISABLE) {
+		downscale_type = OBS_SCALE_BILINEAR;
+		obs_data_set_int(settings, "scale_type", downscale_type);
+	}
+	downscale->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.DownscaleFilter.Bilinear")),
+			   OBS_SCALE_BILINEAR);
+	if (downscale_type == OBS_SCALE_BILINEAR)
+		downscale->setCurrentIndex(0);
+	downscale->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.DownscaleFilter.Area")),
+			   OBS_SCALE_AREA);
+	if (downscale_type == OBS_SCALE_AREA)
+		downscale->setCurrentIndex(1);
+	downscale->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.DownscaleFilter.Bicubic")),
+			   OBS_SCALE_BICUBIC);
+	if (downscale_type == OBS_SCALE_BICUBIC)
+		downscale->setCurrentIndex(2);
+	downscale->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.DownscaleFilter.Lanczos")),
+			   OBS_SCALE_LANCZOS);
+	if (downscale_type == OBS_SCALE_LANCZOS)
+		downscale->setCurrentIndex(3);
+
+	connect(downscale, &QComboBox::currentIndexChanged,
+		[downscale, settings] { obs_data_set_int(settings, "scale_type", downscale->currentData().toInt()); });
+
+	scaleLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.DownscaleFilter")), downscale);
+
+	auto resolution = new QComboBox;
+	resolution->setEditable(true);
+	resolution->addItem("1280x720");
+	resolution->addItem("1920x1080");
+	resolution->addItem("2560x1440");
+	resolution->addItem("720x1280");
+	resolution->addItem("1080x1920");
+	resolution->addItem("1440x2560");
+
+	resolution->setCurrentText(QString::number(obs_data_get_int(settings, "width")) + "x" +
+				   QString::number(obs_data_get_int(settings, "height")));
+	if (resolution->currentText() == "0x0")
+		resolution->setCurrentText(QString::number(ovi.output_width) + "x" + QString::number(ovi.output_height));
+
+	connect(resolution, &QComboBox::currentTextChanged, [settings, resolution] {
+		const auto res = resolution->currentText();
+		uint32_t width, height;
+		if (sscanf(res.toUtf8().constData(), "%dx%d", &width, &height) == 2 && width > 0 && height > 0) {
+			obs_data_set_int(settings, "width", width);
+			obs_data_set_int(settings, "height", height);
+		}
+	});
+
+	scaleLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.ScaledResolution")), resolution);
+
+	videoEncoderGroupLayout->addRow(scale);
+
+	connect(outputVideoEncoder, &QComboBox::currentTextChanged,
+		[settings, outputVideoEncoder, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoPageLayout] {
+			obs_data_set_string(settings, "output_video_encoder",
+					    outputVideoEncoder->currentData().toString().toUtf8().constData());
+			auto ove = obs_data_get_string(settings, "output_video_encoder");
+			if (!ove || ove[0] == '\0') {
+				videoPageLayout->setRowVisible(videoEncoder, true);
+				QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+			} else if (strcmp(ove, "MainEncoder") == 0) {
+				videoEncoder->setCurrentIndex(0);
+				QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+			} else {
+				videoPageLayout->setRowVisible(videoEncoder, false);
+				videoPageLayout->setRowVisible(videoEncoderIndex, false);
+				videoEncoderGroup->setVisible(false);
+			}
+		});
+
+	connect(videoEncoder, &QComboBox::currentIndexChanged,
+		[this, outputGroup, advancedGroupLayout, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup,
+		 videoEncoderGroupLayout, settings, videoPage] {
+			auto encoder_string = videoEncoder->currentData().toString().toUtf8();
+			auto encoder = encoder_string.constData();
+			const bool encoder_changed = strcmp(obs_data_get_string(settings, "video_encoder"), encoder) != 0;
+			if (encoder_changed)
+				obs_data_set_string(settings, "video_encoder", encoder);
+			if (!encoder || encoder[0] == '\0') {
+				if (!videoEncoderIndex) {
+				} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+					videoPageLayout->setRowVisible(videoEncoderIndex, true);
+				} else {
+					videoPageLayout->setRowVisible(videoEncoderIndex, false);
+					if (videoEncoderIndex->currentIndex() != 0)
+						videoEncoderIndex->setCurrentIndex(0);
+				}
+				videoEncoderGroup->setVisible(false);
+			} else {
+				if (videoEncoderIndex)
+					videoPageLayout->setRowVisible(videoEncoderIndex, false);
+				if (!videoEncoderGroup->isVisibleTo(videoPage))
+					videoEncoderGroup->setVisible(true);
+				auto t = video_encoder_properties.find(outputGroup);
+				if (t != video_encoder_properties.end()) {
+					obs_properties_destroy(t->second);
+					video_encoder_properties.erase(t);
+				}
+				for (int i = videoEncoderGroupLayout->rowCount() - 1; i >= 2; i--) {
+					videoEncoderGroupLayout->removeRow(i);
+				}
+				auto ves = encoder_changed ? nullptr : obs_data_get_obj(settings, "video_encoder_settings");
+				if (!ves) {
+					auto defaults = obs_encoder_defaults(encoder);
+					if (defaults) {
+						ves = obs_data_get_defaults(defaults);
+						obs_data_release(defaults);
+					} else {
+						ves = obs_data_create();
+					}
+					obs_data_set_obj(settings, "video_encoder_settings", ves);
+				}
+				auto stream_encoder_properties = obs_get_encoder_properties(encoder);
+				video_encoder_properties[outputGroup] = stream_encoder_properties;
+
+				obs_property_t *property = obs_properties_first(stream_encoder_properties);
+				while (property) {
+					AddProperty(stream_encoder_properties, property, ves, videoEncoderGroupLayout);
+					obs_property_next(&property);
+				}
+				obs_data_release(ves);
+			}
+		});
+
+	const char *current_type = obs_data_get_string(settings, "video_encoder");
+	const char *type;
+	size_t idx = 0;
+	while (obs_enum_encoder_types(idx++, &type)) {
+		if (obs_get_encoder_type(type) != OBS_ENCODER_VIDEO)
+			continue;
+		uint32_t caps = obs_get_encoder_caps(type);
+		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
+			continue;
+		const char *codec = obs_get_encoder_codec(type);
+		if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
+			continue;
+		videoEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
+		if (strcmp(type, current_type) == 0)
+			videoEncoder->setCurrentIndex(videoEncoder->count() - 1);
+	}
+	if (videoEncoder->currentIndex() <= 0)
+		videoEncoderGroup->setVisible(false);
+
+	auto audioEncoder = new QComboBox;
+	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
+
+	auto audioTrack = new QComboBox;
+	for (int i = 0; i < 6; i++) {
+		auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
+		auto trackName = QString::fromUtf8(
+			config_get_string(obs_frontend_get_profile_config(), "AdvOut", trackConfigName.toUtf8().constData()));
+		if (trackName.isEmpty()) {
+			auto trackTranslationName =
+				QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
+			trackName = QString::fromUtf8(obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+		}
+		if (trackName.isEmpty())
+			trackName = QString::number(i + 1);
+		audioTrack->addItem(trackName);
+	}
+	audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
+	connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
+		if (audioTrack->currentIndex() >= 0)
+			obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
+	});
+	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
+
+	auto audioEncoderGroup = new QWidget();
+	audioEncoderGroup->setProperty("altColor", QVariant(true));
+	auto audioEncoderGroupLayout = new QFormLayout();
+	audioEncoderGroup->setLayout(audioEncoderGroupLayout);
+	audioPageLayout->addRow(audioEncoderGroup);
+
+	int audio_encoder_index = 0;
+	current_type = obs_data_get_string(settings, "audio_encoder");
+	idx = 0;
+	while (obs_enum_encoder_types(idx++, &type)) {
+		if (obs_get_encoder_type(type) != OBS_ENCODER_AUDIO)
+			continue;
+		uint32_t caps = obs_get_encoder_caps(type);
+		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
+			continue;
+		const char *codec = obs_get_encoder_codec(type);
+		if (astrcmpi(codec, "aac") != 0 && astrcmpi(codec, "opus") != 0)
+			continue;
+		audioEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
+		if (strcmp(type, current_type) == 0)
+			audio_encoder_index = audioEncoder->count() - 1;
+	}
+
+	connect(audioEncoder, &QComboBox::currentIndexChanged,
+		[this, outputGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup, audioEncoderGroupLayout,
+		 audioTrack, settings, audioPage] {
+			auto encoder_string = audioEncoder->currentData().toString().toUtf8();
+			auto encoder = encoder_string.constData();
+			const bool encoder_changed = !encoder_string.isEmpty() &&
+						     strcmp(obs_data_get_string(settings, "audio_encoder"), encoder) != 0;
+			if (encoder_changed)
+				obs_data_set_string(settings, "audio_encoder", encoder);
+
+			auto t = audio_encoder_properties.find(outputGroup);
+			if (t != audio_encoder_properties.end()) {
+				obs_properties_destroy(t->second);
+				audio_encoder_properties.erase(t);
+			}
+			for (int i = audioEncoderGroupLayout->rowCount() - 1; i >= 0; i--) {
+				audioEncoderGroupLayout->removeRow(i);
+			}
+			auto aes = encoder_changed ? nullptr : obs_data_get_obj(settings, "audio_encoder_settings");
+			if (!aes) {
+				auto defaults = obs_encoder_defaults(encoder);
+				if (defaults) {
+					aes = obs_data_get_defaults(defaults);
+					obs_data_release(defaults);
+				} else {
+					aes = obs_data_create();
+				}
+				obs_data_set_obj(settings, "audio_encoder_settings", aes);
+			}
+			auto stream_encoder_properties = obs_get_encoder_properties(encoder);
+			audio_encoder_properties[outputGroup] = stream_encoder_properties;
+
+			obs_property_t *property = obs_properties_first(stream_encoder_properties);
+			while (property) {
+				AddProperty(stream_encoder_properties, property, aes, audioEncoderGroupLayout);
+				obs_property_next(&property);
+			}
+			obs_data_release(aes);
+		});
+
+	if (audio_encoder_index == audioEncoder->currentIndex())
+		audioEncoder->setCurrentIndex(-1);
+	audioEncoder->setCurrentIndex(audio_encoder_index);
+
+	const bool expanded = obs_data_get_bool(settings, "expanded");
+	const bool advanced = obs_data_get_bool(settings, "advanced");
+
+	auto advancedButton = new QCheckBox(QString::fromUtf8(obs_module_text("CustomEncoderSettings")));
+	advancedButton->setCheckable(true);
+	advancedButton->setChecked(advanced);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(advancedButton, &QCheckBox::checkStateChanged, [advancedButton, advancedGroup, settings] {
+#else
+	connect(advancedButton, &QCheckBox::stateChanged, [advancedButton, advancedGroup, settings] {
+#endif
+		const bool is_advanced = advancedButton->isChecked();
+		const bool expanded = obs_data_get_bool(settings, "expanded");
+		advancedGroup->setVisible(is_advanced && expanded);
+		obs_data_set_bool(settings, "advanced", is_advanced);
+	});
+
+	connect(streaming_title, &QToolButton::toggled,
+		[advancedGroup, advancedButton, streaming_title, settings, canvasCombo, outputLayout](bool checked) {
+			const bool advanced = obs_data_get_bool(settings, "advanced");
+			advancedButton->setVisible(checked);
+			outputLayout->setRowVisible(canvasCombo, checked);
+			advancedGroup->setVisible(checked && advanced);
+			obs_data_set_bool(settings, "expanded", checked);
+			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
+		});
+
+	if (expanded) {
+		streaming_title->setArrowType(Qt::ArrowType::DownArrow);
+		if (!advanced)
+			advancedGroup->setVisible(false);
+	} else {
+		advancedButton->setVisible(false);
+		advancedGroup->setVisible(false);
+	}
+
+	// Hook up
+	advancedTabWidget->addTab(videoPage, QString::fromUtf8(obs_module_text("VideoEncoderSettings")));
+	advancedTabWidget->addTab(audioPage, QString::fromUtf8(obs_module_text("AudioEncoderSettings")));
+	advancedGroupLayout->addWidget(advancedTabWidget, 1);
+
+	// Remove button
+	auto removeButton =
+		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
+	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
+	removeButton->setProperty("class", "icon-minus");
+	connect(removeButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, settings, outputs] {
+		outputsLayout->removeWidget(outputGroup);
+		RemoveWidget(outputGroup);
+		auto count = obs_data_array_count(outputs);
+		for (size_t i = 0; i < count; i++) {
+			auto item = obs_data_array_item(outputs, i);
+			if (item == settings) {
+				obs_data_array_erase(outputs, i);
+				obs_data_release(item);
+				break;
+			}
+			obs_data_release(item);
+		}
+	});
+
+	// Edit button
+	auto editButton = new QPushButton(QString::fromUtf8(obs_module_text("EditServerSettings")));
+	editButton->setProperty("themeID", "configIconSmall");
+	editButton->setProperty("class", "icon-gear");
+
+	connect(editButton, &QPushButton::clicked, [this, settings, outputs] {
+		QStringList otherNames;
+		obs_data_array_enum(
+			outputs,
+			[](obs_data_t *data2, void *param) {
+				((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+			},
+			&otherNames);
+		otherNames.removeDuplicates();
+		otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
+		auto outputDialog = new OutputDialog(this, obs_data_get_string(settings, "name"),
+						     obs_data_get_string(settings, "stream_server"),
+						     obs_data_get_string(settings, "stream_key"), otherNames);
+
+		outputDialog->setWindowModality(Qt::WindowModal);
+		outputDialog->setModal(true);
+
+		if (outputDialog->exec() == QDialog::Accepted) { // edit an output
+			if (!settings)
+				return;
+
+			obs_data_set_bool(settings, "enabled", true);
+			// Set the info from the output dialog
+			obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
+			obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
+			obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
+
+			// Reload
+			LoadSettings(main_settings);
+		}
+
+		delete outputDialog;
+	});
+
+	// Buttons to layout
+	output_title_layout->addWidget(editButton, 0, Qt::AlignRight);
+	output_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
+
+	outputLayout->addRow(output_title_layout);
+	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasCombo);
+	if (!expanded)
+		outputLayout->setRowVisible(canvasCombo, false);
+	outputLayout->addWidget(advancedButton);
+
+	outputLayout->addRow(advancedGroup);
+
+	outputGroup->setLayout(outputLayout);
+
+	outputsLayout->addRow(outputGroup);
 }

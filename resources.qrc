@@ -21,5 +21,9 @@
 	<file>media/unknown.png</file>
 	<file>media/youtube.png</file>
 	<file>media/kick.png</file>
+  <file>media/Roboto.ttf</file>
+  <file>media/Roboto-Italic.ttf</file>
+  <file>media/RobotoCondensed.ttf</file>
+  <file>media/RobotoCondensed-Italic.ttf</file>
   </qresource>
 </RCC>
