@@ -398,6 +398,14 @@ bool obs_module_load(void)
 
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 
+	auto user_config = obs_frontend_get_user_config();
+	if (user_config) {
+		const char* theme = config_get_string(user_config,"Appearance","Theme");
+		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
+			main_window->setContentsMargins(10, 10, 10, 10);
+		}
+	}
+
 	modesTabBar = new QTabBar();
 	auto tb = new TabToolBar(modesTabBar);
 	main_window->addToolBar(tb);

@@ -150,7 +150,7 @@ QComboBox *OutputDialog::generateOutputServerCombo(std::string service, QPushBut
 	// If we're edit, look up the current value for outputServer and try to set the index
 	if (edit) {
 		auto selectionIndex = combo->findData(outputServer);
-		//		blog(LOG_WARNING, "[Aitum Multistream] edit selection %i for value %s", selectionIndex, outputServer.toStdString().c_str());
+		//		blog(LOG_WARNING, "[Aitum Stream Suite] edit selection %i for value %s", selectionIndex, outputServer.toStdString().c_str());
 		if (selectionIndex != -1) {
 			combo->setCurrentIndex(selectionIndex);
 		}
@@ -261,7 +261,7 @@ obs_data_t *OutputDialog::getService(std::string serviceName)
 
 	for (size_t idx = 0; idx < total; idx++) {
 		auto item = obs_data_array_item(servicesData, idx);
-		//		blog(LOG_WARNING, "[Aitum Multistream] %s", obs_data_get_string(item, "name"));
+		//		blog(LOG_WARNING, "[Aitum Stream Suite] %s", obs_data_get_string(item, "name"));
 
 		if (serviceName == obs_data_get_string(item, "name")) {
 			return item;
@@ -824,7 +824,7 @@ QWidget *OutputDialog::WizardInfoTwitch(bool edit)
 		connect(stackedWidget, &QStackedWidget::currentChanged,
 			[this, outputNameField, serverSelection, outputKeyField, confirmButton] {
 				if (stackedWidget->currentIndex() == 5) {
-					blog(LOG_WARNING, "[Aitum Multistream] default outputname %s ",
+					blog(LOG_WARNING, "[Aitum Stream Suite] default outputname %s ",
 					     outputNameField->text().toUtf8().constData());
 					outputName = outputNameField->text();
 					outputServer = serverSelection->currentData().toString();
