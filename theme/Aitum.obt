@@ -126,12 +126,16 @@
 
     /* Layout */
     /* Configurable Values */
-    --font_base_value: 10;   /* TODO: Min 8, Max 12, Step 1 */
-    --spacing_base_value:4; /* TODO: Min 2, Max 7, Step 1 */
-    --padding_base_value: 6; /* TODO: Min 0.25, Max 10, Step 2 */
+    --font_base_value: var(--obsFontScale);
+    --padding_base_value: var(--obsPadding);
+    --spacing_base_value: calc(5 + calc(var(--obsPadding) / 1));
 
-    --border_highlight: "transparent"; /* TODO: Better Accessibility focus state */
+    --highlight_width: 1px;
+    --highlight_color: var(--primary_lighter);
+
+    /* TODO: Better Accessibility focus state */
     /* TODO: Move Accessibilty Colors to Theme config system */
+    --border_highlight: "transparent";
 
     /* OS Fixes */
     --os_mac_font_base_value: 12;
@@ -142,6 +146,8 @@
     --font_xlarge: calc(1.5pt * var(--font_base_value));
 
     --font_heading: calc(2.5pt * var(--font_base_value));
+
+    --title_base: calc(1.1pt * var(--font_base_value));
 
     --icon_base: calc(6px + var(--font_base_value));
 
@@ -353,6 +359,20 @@
     qproperty-icon: url(theme:Aitum/media/media_previous.svg);
 }
 
+/* Aitum icons */
+
+.icon-aitum {
+    qproperty-icon: url(theme:Aitum/aitum.svg);
+}
+
+.icon-aitum-donate {
+    qproperty-icon: url(theme:Aitum/support.svg);
+}
+
+#AitumStreamSuiteSettingsButton {
+    qproperty-icon: url(theme:Aitum/aitum-settings.svg);
+}
+
 /* Default widget style, we override only what is needed. */
 
 
@@ -362,7 +382,7 @@ QWidget {
     selection-background-color: var(--primary);
     selection-color: var(--text);
     font-size: var(--font_base);
-    font-family: 'Open Sans', '.AppleSystemUIFont', Helvetica, Arial, 'MS Shell Dlg', sans-serif;
+    font-family: 'Roboto', '.AppleSystemUIFont', Helvetica, Arial, 'MS Shell Dlg', sans-serif;
 }
 
 QWidget:disabled {
@@ -380,7 +400,20 @@ QMenu {
 }
 
 QMenuBar{
-    background-color:var(--blueDark);
+    background-color:transparent;
+    max-height:50px;
+    margin:0 0 0px;
+    padding:5px 0;
+}
+
+QMenuBar::item{
+    padding:2px 10px 3px;
+    margin:0;
+    border-radius:3px;
+    max-height:22px;
+}
+QMenu{
+    border-radius:5px;
 }
 
 /* macOS Separator Fix */
@@ -404,12 +437,14 @@ QGroupBox,
 QCheckBox {
     background: transparent;
 }
+QLabel{}
 
 QComboBox,
 QCheckBox,
 QPushButton,
 QSpinBox,
-QDoubleSpinBox {
+QDoubleSpinBox, 
+QLabel{
     margin-top: var(--spacing_input);
     margin-bottom: var(--spacing_input);
 }
@@ -616,16 +651,18 @@ OBSDock QLabel {
 }
 
 QDockWidget {
-    font-size: var(--font_base);
-    font-weight: bold;
+    font-size: var(--title_base);
     titlebar-close-icon: url(theme:Aitum/close.svg);
     titlebar-normal-icon: url(theme:Aitum/popout.svg);
+    font-family: "Roboto Condensed", sans-serif;
+    text-transform: uppercase;
+    font-weight:600;
+    color:#EFEFEF;
 }
 
 QDockWidget::title {
-    text-align: center;
+    text-align:left;
     background-color: var(--blueMed);
-    padding: var(--padding_large);
     border-bottom:1px solid var(--aitumBorder);
     border-top-left-radius: var(--border_radius);
     border-top-right-radius: var(--border_radius);
@@ -633,6 +670,7 @@ QDockWidget::title {
     background-color:#1a1d23;
     background-repeat:no-repeat;
     background-position:left top;
+    padding:10px;
 }
 
 QDockWidget::close-button,
@@ -640,7 +678,8 @@ QDockWidget::float-button {
     border: none;
     border-radius: var(--border_radius);
     background: transparent;
-    margin-right: 1px;
+    margin-right: 10px;}
+QDockWidget::close-button{
 }
 
 
@@ -657,16 +696,14 @@ QScrollArea {
  * oversize it and use margin to crunch it back down
  */
 OBSBasicStatusBar {
-    margin-top: 4px;
-    border-top: 1px solid var(--border_color);
-    background: var(--bg_base);
+    margin:5px 0;
+    padding:0;
+    spacing:10;
+    background:var(--blueMed);
 }
 
 StatusBarWidget > QFrame {
-    margin-top: 1px;
-    border: 0px solid var(--border_color);
-    border-left-width: 1px;
-    padding: 0px 8px 2px;
+    padding: 0 0 0 10px;
 }
 
 /* Group Box */
@@ -794,8 +831,13 @@ QToolBar {
     background-color: transparent;
     border: none;
     margin: 0;
-    padding:0 10px 10px;
-    
+    padding:0 10px 10px;   
+}
+
+QToolBar::separator {
+    background: #333;
+    width: 1px;
+    margin: 0 5px;
 }
 
 * [themeID="addIconSmall"] {
@@ -1574,6 +1616,7 @@ QFrame [noticeFrame="true"] QLabel {
 
 OBSQTDisplay {
     qproperty-displayBackgroundColor: var(--bg_preview);
+    
 }
 
 /* Filters Window */
@@ -2083,7 +2126,6 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
 #previewScalePercent,
 #previewScalingMode {
     background: transparent;
-    color: var(--text_muted);
     font-size: var(--font_xsmall);
     height: 14px;
     max-height: 14px;
@@ -2099,6 +2141,12 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
 
 #previewScalingMode {
     border: 1px solid var(--grey6);
+    background:var(--blueMed);
+    margin:0 10px;
+}
+
+#previewScalingMode:hover{
+    background:var(--blueCool);
 }
 
 #previewScalingMode:hover,
@@ -2109,54 +2157,104 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
 #previewXScrollBar,
 #previewYScrollBar {
     background: transparent;
+    margin:0;
+    padding:0;
 }
 
 #previewXScrollBar {
-    border-left: none;
-    height: 20px;
-    margin:2px 0 2px 5px;
-    box-sizing:content-box;
-    border-radius:20px;
-}
-
-#previewXScrollBar::handle,
-#previewYScrollBar::handle {
-    background:var(--blueMed)!important;
-    border:var(--blueMed)!important;
+    height: 14px;
 }
 
 #previewYScrollBar {
-    width: 20px;
-    margin-left:5px;
+    width: 18px;
+    margin-left: 5px;
 }
+
+#previewXScrollBar::handle:hover,
+#previewYScrollBar::handle:hover{
+    background:var(--aitumPurple);
+}
+#previewXScrollBar::handle,
+#previewYScrollBar::handle {
+    background:var(--blueLight)!important;
+    border:var(--blueLight)!important;
+    border-radius: 4px !important;
+}
+#previewYScrollBar::handle {
+    border-radius: 4px !important;
+    width:20px;
+}
+
+
+
 
 /* Top Toolbar */
-QMainWindow > QToolBar {
-    padding:10px;
+QMainWindow>QToolBar{
+    background:var(--blueMed);
+    border-radius:5px;
+    spacing: 4;
 }
-QMainWindow > QToolBar QTabBar{
-    qproperty-drawBase: 0;
-    border-right:1px solid #333333;
+QMainWindow>QToolBar::Horizontal {
+    margin: 5px 0;
+    padding: 5px;
+}
+QMainWindow>QToolBar::Horizontal  > *{
+    margin:0;
+}
+QMainWindow>QToolBar::Vertical{
+    margin:0 5px;
     padding:15px;
 }
-QMainWindow > QToolBar QTabWidget::pane{
-    border:0px solid transparent
+
+
+QMainWindow > QToolBar::handle {
+    background: transparent;
+    margin: 0;
+    padding: 0;
 }
-QMainWindow > QButtonGroup{
-    background:#FFFFFF;
+
+QMainWindow > QToolBar::handle::horizontal{
+    margin:0 2px 0 0;
+    width:10px;
+    image: url(theme:Aitum/backgrounds/toolbar-move-vert.svg);
+}
+
+QMainWindow > QToolBar::handle::vertical{
+    height:10px;
+    margin:0px 0 0px 0;
+    image: url(theme:Aitum/backgrounds/toolbar-move-hor.svg);
 }
 
 
-QMainWindow > QToolBar QTabBar::tab::top {
-    padding: 8px 12px;
-    margin:0 8px 0 0;
+QMainWindow > QToolBar QTabBar{
+    qproperty-drawBase: 0;
+    margin:0;
+    padding:0;
+}
+QMainWindow>QToolBar QTabBar::tab::top, 
+QMainWindow > QToolBar QTabBar::tab::bottom{
+    padding: 10px 12px;
+    margin:5px 0 5px 8px;
     border-radius:5px;
     background:var(--button_bg);
     border:1px solid transparent;
 }
 
-QMainWindow > QToolBar QTabBar::tab::top:selected, 
-QMainWindow>QToolBar QTabBar::tab::top:hover{
+
+QMainWindow > QToolBar QTabBar::tab::left, 
+QMainWindow > QToolBar QTabBar::tab::right{
+    padding: 8px 12px;
+    margin:10px 0 0;
+    border-radius:5px;
+    background:var(--button_bg);
+    border:1px solid transparent;
+    width:16px;
+    min-width:0;
+    min-height:50px;
+}
+
+QMainWindow > QToolBar QTabBar::tab:selected, 
+QMainWindow>QToolBar QTabBar::tab:hover{
     background: var(--button_bg_hover);
     border: 1px solid var(--tab_border_hover);
     color: var(--text);
@@ -2164,8 +2262,141 @@ QMainWindow>QToolBar QTabBar::tab::top:hover{
 }
 
 QMainWindow > QToolBar > QAbstractButton{
-    width:15px;
-    height:15px;
-    padding:8px 10px;
-    margin:0 0 2px 8px;
+    width:12px;
+    height:12px;
+    padding:10px 12px;
+    margin:0;
+    qproperty-sourceSize:10px;
 }
+
+
+QMainWindow > QToolBar::separator{
+    background:#333333!important;
+    border-left:1px solid #222222;
+    width:1px;
+    height:1px;
+    margin:10px;
+}
+
+
+QMainWindow>QToolBar::Vertical::right{
+    margin-right:0;
+}
+
+QMainWindow>QToolBar::Vertical::left {
+    margin-left: 0;
+}
+
+QMainWindow>QToolBar::left > * {
+    margin:4px 4px 4px 0;
+}
+QMainWindow>QToolBar::right > * {
+    margin: 4px 0px 4px 4px;
+}
+
+
+QMainWindow>QToolBar QTabBar::tab::left{
+    margin-left:3px;
+    margin-right:2px;
+
+}
+QMainWindow>QToolBar QTabBar::tab::right {
+    margin-right: 3px;
+    margin-left: 2px;
+}
+
+
+#previewXContainer{
+    background:transparent;
+    padding:10px 0;
+    min-height:20px;
+}
+
+#previewZoomOutButton, 
+#previewZoomInButton{
+    background:var(--blueMed);
+    border-color:var(--aitumBorder);
+    border-radius:3px;
+    padding:5px;
+    margin:0;
+    qproperty-iconSize:15px;
+    max-width:none;
+    max-height:none;
+    height:15px;
+    min-height:0;
+    font-size:20px;
+}
+#previewZoomOutButton:hover,
+#previewZoomInButton:hover {
+    background: var(--blueCool);
+}
+
+
+
+
+
+/*LAYOUT*/
+/* 
+> QBoxLayout
+> QButtonGroup
+> QFormLayout
+> QGraphicsAnchor
+> QGraphicsAnchorLayout
+> QGridLayout
+> QGroupBox
+> QHBoxLayout
+> QLayout
+> QLayoutItem
+> QSizePolicy
+> QSpacerItem
+> QStackedLayout
+> QStackedWidget
+> QVBoxLayout
+> QWidgetItem 
+*/
+
+
+/*WIDGETS*/
+/* 
+>QAbstractScrollArea
+>QCheckBox
+>QColumnView
+>QComboBox
+>QDateEdit
+>QDateTimeEdit
+>QDialog
+>QDialogButtonBox
+>QDockWidget
+>QDoubleSpinBox
+>QFrame
+>QGroupBox
+>QHeaderView
+>QLabel
+>QLineEdit
+>QListView
+>QListWidget
+>QMainWindow
+>QMenu
+>QMenuBar
+>QMessageBox
+>QProgressBar
+>QScrollBar
+>QSizeGrip
+>QSlider
+>QSpinBox
+>QSplitter
+>QStatusBar
+>QTabBar
+>QTabWidget
+>QTableView
+>QTableWidget
+>QTextEdit
+>QTimeEdit
+>QToolBar
+>QToolButton
+>QToolBox
+>QToolTip
+>QTreeView
+>QTreeWidget
+> QWidget 
+*/
