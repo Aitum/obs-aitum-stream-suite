@@ -71,7 +71,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/docks/canvas-clone-dock.cpp
   src/docks/canvas-clone-dock.hpp
   src/docks/output-dock.cpp
-  src/docks/output-dock.hpp)
+  src/docks/output-dock.hpp
+  src/docks/properties-dock.cpp
+  src/docks/properties-dock.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/config-dialog.cpp

@@ -773,6 +773,8 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 	gs_viewport_pop();
 }
 
+
+
 CanvasDock::~CanvasDock()
 {
 	SaveSettings();

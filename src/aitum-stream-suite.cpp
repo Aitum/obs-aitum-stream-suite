@@ -3,6 +3,7 @@
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
 #include "docks/output-dock.hpp"
+#include "docks/properties-dock.hpp"
 #include "utils/file-download.h"
 #include "version.h"
 #include <obs-frontend-api.h>
@@ -12,10 +13,10 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QPainter>
+#include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
-#include <QPlainTextEdit>
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -400,9 +401,10 @@ bool obs_module_load(void)
 
 	auto user_config = obs_frontend_get_user_config();
 	if (user_config) {
-		const char* theme = config_get_string(user_config,"Appearance","Theme");
+		const char *theme = config_get_string(user_config, "Appearance", "Theme");
 		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
 			main_window->setContentsMargins(10, 10, 10, 10);
+			main_window->findChild<QWidget *>("centralwidget")->setContentsMargins(0, 0, 0, 0);
 		}
 	}
 
@@ -533,6 +535,8 @@ bool obs_module_load(void)
 
 	output_dock = new OutputDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"),
+				    new PropertiesDock(main_window));
 
 	version_download_info = download_info_create_single(
 		"[Aitum Stream Suite]", "OBS", "https://api.aitum.tv/plugin/streamsuite", version_info_downloaded, nullptr);
