@@ -6,6 +6,7 @@
 #include <QFormLayout>
 #include <QFrame>
 #include <QLabel>
+#include <obs-frontend-api.h>
 
 class PropertiesDock : public QFrame {
 	Q_OBJECT

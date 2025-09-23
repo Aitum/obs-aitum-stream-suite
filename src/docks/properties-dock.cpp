@@ -1,6 +1,5 @@
 #include "properties-dock.hpp"
 #include <obs.h>
-#include <obs-frontend-api.h>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QDesktopServices>
@@ -120,16 +119,18 @@ void PropertiesDock::canvas_destroy(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
-	//this_->canvasCombo->removeItem();
+	auto idx = this_->canvasCombo->findText(QString::fromUtf8(obs_canvas_get_name(canvas)));
+	if (idx >= 0)
+		this_->canvasCombo->removeItem(idx);
 }
 
 void PropertiesDock::canvas_channel_change(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 
-	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
+	//auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
 	auto channel = calldata_int(cd, "channel");
-	auto prev_source = (obs_source_t *)calldata_ptr(cd, "prev_source");
+	//auto prev_source = (obs_source_t *)calldata_ptr(cd, "prev_source");
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	auto source_type = obs_source_get_type(source);
 	if (channel != 0)
@@ -180,6 +181,7 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 	obs_scene_enum_items(
 		obs_scene_from_source(scene),
 		[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+			UNUSED_PARAMETER(scene);
 			auto this_ = static_cast<PropertiesDock *>(param);
 			if (!obs_sceneitem_selected(item))
 				return true;
@@ -285,6 +287,7 @@ void PropertiesDock::SourceChanged(OBSSource source)
 	obs_source_enum_filters(
 		source,
 		[](obs_source_t *parent, obs_source_t *filter, void *param) {
+			UNUSED_PARAMETER(parent);
 			auto this_ = static_cast<PropertiesDock *>(param);
 			this_->filterCombo->addItem(QString::fromUtf8(obs_source_get_name(filter)));
 		},
@@ -825,13 +828,18 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 			if (type == OBS_BUTTON_URL && !savedUrl.isEmpty()) {
 				QUrl url(savedUrl, QUrl::StrictMode);
 				if (url.isValid() && (url.scheme().compare("http") == 0 || url.scheme().compare("https") == 0)) {
-					QString msg(QString::fromUtf8(obs_frontend_get_locale_string("Basic.PropertiesView.UrlButton.Text")));
+					QString msg(QString::fromUtf8(
+						obs_frontend_get_locale_string("Basic.PropertiesView.UrlButton.Text")));
 					msg += "\n\n";
-					msg += QString::fromUtf8(obs_frontend_get_locale_string("Basic.PropertiesView.UrlButton.Text.Url")).arg(savedUrl);
+					msg += QString::fromUtf8(
+						       obs_frontend_get_locale_string("Basic.PropertiesView.UrlButton.Text.Url"))
+						       .arg(savedUrl);
 
-					QMessageBox::StandardButton button = QMessageBox::question(
-						this, QString::fromUtf8(obs_frontend_get_locale_string("Basic.PropertiesView.UrlButton.OpenUrl")), msg,
-						QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+					QMessageBox::StandardButton button =
+						QMessageBox::question(this,
+								      QString::fromUtf8(obs_frontend_get_locale_string(
+									      "Basic.PropertiesView.UrlButton.OpenUrl")),
+								      msg, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
 					if (button == QMessageBox::Yes)
 						QDesktopServices::openUrl(url);
