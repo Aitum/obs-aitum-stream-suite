@@ -31,7 +31,8 @@
 CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
 	  preview(new OBSQTDisplay(this)),
-	  settings(settings_)
+	  settings(settings_),
+	  eventFilter(BuildEventFilter())
 {
 	obs_enter_graphics();
 
@@ -46,7 +47,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	setObjectName(QStringLiteral("contextContainer"));
 	setContentsMargins(0, 0, 0, 0);
-	
+
 	canvas_split = new SwitchingSplitter;
 	canvas_split->setContentsMargins(0, 0, 0, 0);
 	auto l = new QBoxLayout(QBoxLayout::TopToBottom, this);
@@ -75,8 +76,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	} else {
 		canvas = obs_get_canvas_by_name(canvas_name.c_str());
 	}
-	if (canvas)
-	{
+	if (canvas) {
 		obs_video_info ovi;
 		if (obs_canvas_get_video_info(canvas, &ovi)) {
 			if (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
@@ -101,8 +101,10 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			obs_data_set_int(settings, "height", canvas_height);
 		}
 	}
-
-	canvas_split->addWidget(preview);
+	auto canvas_preview = new QWidget;
+	auto cwl = new QVBoxLayout;
+	canvas_preview->setLayout(cwl);
+	cwl->addWidget(preview);
 
 	//setLayout(mainLayout);
 
@@ -116,11 +118,30 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	preview->setMouseTracking(true);
 	preview->setFocusPolicy(Qt::StrongFocus);
-	//preview->installEventFilter(eventFilter.get());
+	preview->installEventFilter(eventFilter.get());
 
 	preview->show();
 	connect(preview, &OBSQTDisplay::DisplayCreated,
 		[this]() { obs_display_add_draw_callback(preview->GetDisplay(), DrawPreview, this); });
+
+	previewDisabledWidget = new QFrame;
+	auto lv = new QVBoxLayout;
+
+	auto enablePreviewButton =
+		new QPushButton(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.PreviewConextMenu.Enable")));
+	connect(enablePreviewButton, &QPushButton::clicked, [this] {
+		preview_disabled = false;
+		obs_display_set_enabled(preview->GetDisplay(), true);
+		preview->setVisible(true);
+		previewDisabledWidget->setVisible(false);
+	});
+	lv->addWidget(enablePreviewButton);
+
+	previewDisabledWidget->setLayout(lv);
+
+	previewDisabledWidget->setVisible(preview_disabled);
+	cwl->addWidget(previewDisabledWidget);
+	canvas_split->addWidget(canvas_preview);
 
 	//obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
 
@@ -171,7 +192,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		const auto item = sceneList->currentItem();
 		if (!item)
 			return;
-		obs_source_t *source = obs_get_source_by_name(item->text().toUtf8().constData());
+		obs_source_t *source = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 		if (!source)
 			return;
 		std::string name = obs_source_get_name(source);
@@ -181,7 +202,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SceneName")), name)) {
 				break;
 			}
-			s = obs_get_source_by_name(name.c_str());
+			s = obs_canvas_get_source_by_name(canvas, name.c_str());
 			if (s)
 				continue;
 			obs_source_set_name(source, name.c_str());
@@ -224,7 +245,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 				       auto item = sceneList->currentItem();
 				       if (!item)
 					       return;
-				       auto s = obs_get_source_by_name(item->text().toUtf8().constData());
+				       auto s = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 				       if (!s)
 					       return;
 				       obs_frontend_open_source_filters(s);
@@ -280,6 +301,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		obs_source_t *source = obs_source_get_ref(obs_sceneitem_get_source(sceneItem));
 		if (!source)
 			return;
+		obs_canvas_t *canvas = obs_source_get_canvas(source);
 		std::string name = obs_source_get_name(source);
 		obs_source_t *s = nullptr;
 		do {
@@ -287,7 +309,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SourceName")), name)) {
 				break;
 			}
-			s = obs_get_source_by_name(name.c_str());
+
+			s = canvas ? obs_canvas_get_source_by_name(canvas, name.c_str()) : obs_get_source_by_name(name.c_str());
 			if (s)
 				continue;
 			obs_source_set_name(source, name.c_str());
@@ -660,6 +683,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	connect(canvas_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
 	connect(panel_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
+
+	LoadScenes();
 }
 
 void CanvasDock::GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale)
@@ -773,10 +798,9 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 	gs_viewport_pop();
 }
 
-
-
 CanvasDock::~CanvasDock()
 {
+	obs_display_remove_draw_callback(preview->GetDisplay(), DrawPreview, this);
 	SaveSettings();
 	obs_data_release(settings);
 	obs_enter_graphics();
@@ -1727,7 +1751,7 @@ QIcon create2StateIcon(QString fileOn, QString fileOff);
 void CanvasDock::AddScene(QString duplicate, bool ask_name)
 {
 	std::string name = duplicate.isEmpty() ? obs_module_text("Scene") : duplicate.toUtf8().constData();
-	obs_source_t *s = obs_get_source_by_name(name.c_str());
+	obs_source_t *s = obs_canvas_get_source_by_name(canvas, name.c_str());
 	int i = 0;
 	while (s) {
 		obs_source_release(s);
@@ -1735,20 +1759,20 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 		name = obs_module_text("Scene");
 		name += " ";
 		name += std::to_string(i);
-		s = obs_get_source_by_name(name.c_str());
+		s = obs_canvas_get_source_by_name(canvas, name.c_str());
 	}
 	do {
 		obs_source_release(s);
 		if (ask_name && !NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SceneName")), name)) {
 			break;
 		}
-		s = obs_get_source_by_name(name.c_str());
+		s = obs_canvas_get_source_by_name(canvas, name.c_str());
 		if (s)
 			continue;
 
 		obs_source_t *new_scene = nullptr;
 		if (!duplicate.isEmpty()) {
-			auto origSceneSource = obs_get_source_by_name(duplicate.toUtf8().constData());
+			auto origSceneSource = obs_canvas_get_source_by_name(canvas, duplicate.toUtf8().constData());
 			if (origSceneSource) {
 				auto origScene = obs_scene_from_source(origSceneSource);
 				if (origScene) {
@@ -1758,27 +1782,17 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 				obs_source_release(origSceneSource);
 				if (new_scene) {
 					obs_source_save(new_scene);
-					obs_data_t *settings = obs_source_get_settings(new_scene);
-					obs_data_set_bool(settings, "custom_size", true);
-					obs_data_set_int(settings, "cx", canvas_width);
-					obs_data_set_int(settings, "cy", canvas_height);
 					obs_source_load(new_scene);
-					obs_data_release(settings);
 				}
 			}
 		}
 		if (!new_scene) {
-			obs_data_t *settings = obs_data_create();
-			obs_data_set_bool(settings, "custom_size", true);
-			obs_data_set_int(settings, "cx", canvas_width);
-			obs_data_set_int(settings, "cy", canvas_height);
-			obs_data_array_t *items = obs_data_array_create();
-			obs_data_set_array(settings, "items", items);
-			obs_data_array_release(items);
-			new_scene = obs_source_create("scene", name.c_str(), settings, nullptr);
-			obs_canvas_move_scene(obs_scene_from_source(new_scene), canvas);
-			obs_data_release(settings);
+			obs_scene_t *ns = obs_canvas_scene_create(canvas, name.c_str());
+			new_scene = obs_scene_get_source(ns);
 			obs_source_load(new_scene);
+			auto sh = obs_source_get_signal_handler(new_scene);
+			signal_handler_connect(sh, "rename", source_rename, this);
+			signal_handler_connect(sh, "remove", source_remove, this);
 		}
 		auto sn = QString::fromUtf8(obs_source_get_name(new_scene));
 		//if (scenesCombo)
@@ -1789,23 +1803,12 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 
 		SwitchScene(sn);
 		obs_source_release(new_scene);
-
-		auto sl = GetGlobalScenesList();
-
-		if (hideScenes) {
-			for (int j = 0; j < sl->count(); j++) {
-				auto item = sl->item(j);
-				if (item->text() == sn) {
-					item->setHidden(true);
-				}
-			}
-		}
 	} while (ask_name && s);
 }
 
 void CanvasDock::RemoveScene(const QString &sceneName)
 {
-	auto s = obs_get_source_by_name(sceneName.toUtf8().constData());
+	auto s = obs_canvas_get_source_by_name(canvas, sceneName.toUtf8().constData());
 	if (!s)
 		return;
 	if (!obs_source_is_scene(s)) {
@@ -1827,7 +1830,7 @@ void CanvasDock::RemoveScene(const QString &sceneName)
 
 void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 {
-	auto s = scene_name.isEmpty() ? nullptr : obs_get_source_by_name(scene_name.toUtf8().constData());
+	auto s = scene_name.isEmpty() ? nullptr : obs_canvas_get_source_by_name(canvas, scene_name.toUtf8().constData());
 	if (s == obs_scene_get_source(scene) || (!obs_source_is_scene(s) && !scene_name.isEmpty())) {
 		obs_source_release(s);
 		return;
@@ -2250,7 +2253,9 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		if (!item)
 			return;
 		std::string name = item->text().toUtf8().constData();
-		obs_source_t *source = obs_get_source_by_name(name.c_str());
+		obs_source_t *source = obs_canvas_get_source_by_name(canvas, name.c_str());
+		if (!source)
+			source = obs_get_source_by_name(name.c_str());
 		if (!source)
 			return;
 		obs_source_t *s = nullptr;
@@ -2259,7 +2264,9 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SceneName")), name)) {
 				break;
 			}
-			s = obs_get_source_by_name(name.c_str());
+			s = obs_canvas_get_source_by_name(canvas, name.c_str());
+			if (!s)
+				s = obs_get_source_by_name(name.c_str());
 			if (s)
 				continue;
 			obs_source_set_name(source, name.c_str());
@@ -2280,7 +2287,7 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		auto item = sceneList->currentItem();
 		if (!item)
 			return;
-		auto s = obs_get_source_by_name(item->text().toUtf8().constData());
+		auto s = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 		if (s) {
 			obs_frontend_take_source_screenshot(s);
 			obs_source_release(s);
@@ -2290,7 +2297,7 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		auto item = sceneList->currentItem();
 		if (!item)
 			return;
-		auto s = obs_get_source_by_name(item->text().toUtf8().constData());
+		auto s = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 		if (s) {
 			obs_frontend_open_source_filters(s);
 			obs_source_release(s);
@@ -2299,7 +2306,7 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 
 	auto tom = menu.addMenu(QString::fromUtf8(obs_frontend_get_locale_string("TransitionOverride")));
 	std::string scene_name = widget_item->text().toUtf8().constData();
-	OBSSourceAutoRelease scene_source = obs_get_source_by_name(scene_name.c_str());
+	OBSSourceAutoRelease scene_source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 	OBSDataAutoRelease private_settings = obs_source_get_private_settings(scene_source);
 	obs_data_set_default_int(private_settings, "transition_duration", 300);
 	const char *curTransition = obs_data_get_string(private_settings, "transition");
@@ -2312,8 +2319,8 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	duration->setSingleStep(50);
 	duration->setValue(curDuration);
 
-	connect(duration, (void(QSpinBox::*)(int)) & QSpinBox::valueChanged, [scene_name](int dur) {
-		OBSSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
+	connect(duration, (void(QSpinBox::*)(int)) & QSpinBox::valueChanged, [this, scene_name](int dur) {
+		OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 		OBSDataAutoRelease ps = obs_source_get_private_settings(source);
 
 		obs_data_set_int(ps, "transition_duration", dur);
@@ -2322,8 +2329,8 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	auto action = tom->addAction(QString::fromUtf8(obs_frontend_get_locale_string("None")));
 	action->setCheckable(true);
 	action->setChecked(!curTransition || !strlen(curTransition));
-	connect(action, &QAction::triggered, [scene_name] {
-		OBSSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
+	connect(action, &QAction::triggered, [this, scene_name] {
+		OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 		OBSDataAutoRelease ps = obs_source_get_private_settings(source);
 		obs_data_set_string(ps, "transition", "");
 	});
@@ -2338,8 +2345,8 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		auto a2 = tom->addAction(QString::fromUtf8(name));
 		a2->setCheckable(true);
 		a2->setChecked(match);
-		connect(a, &QAction::triggered, [scene_name, a2] {
-			OBSSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
+		connect(a, &QAction::triggered, [this, scene_name, a2] {
+			OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 			OBSDataAutoRelease ps = obs_source_get_private_settings(source);
 			obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
 		});
@@ -2359,63 +2366,70 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		for (size_t i = 0; i < scenes.sources.num; i++) {
 			obs_source_t *src = scenes.sources.array[i];
 			obs_data_t *settings = obs_source_get_settings(src);
-			if (!obs_data_get_bool(settings, "custom_size")) {
-				auto name = QString::fromUtf8(obs_source_get_name(src));
-				auto *checkBox = new QCheckBox(name, linkedScenesMenu);
+
+			auto name = QString::fromUtf8(obs_source_get_name(src));
+			auto *checkBox = new QCheckBox(name, linkedScenesMenu);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-				connect(checkBox, &QCheckBox::checkStateChanged, [this, src, checkBox] {
+			connect(checkBox, &QCheckBox::checkStateChanged, [this, src, checkBox] {
 #else
 				connect(checkBox, &QCheckBox::stateChanged, [this, src, checkBox] {
 #endif
-					SetLinkedScene(src, checkBox->isChecked() ? sceneList->currentItem()->text() : "");
-				});
-				auto *checkableAction = new QWidgetAction(linkedScenesMenu);
-				checkableAction->setDefaultWidget(checkBox);
-				linkedScenesMenu->addAction(checkableAction);
+				SetLinkedScene(src, checkBox->isChecked() ? sceneList->currentItem()->text() : "");
+			});
+			auto *checkableAction = new QWidgetAction(linkedScenesMenu);
+			checkableAction->setDefaultWidget(checkBox);
+			linkedScenesMenu->addAction(checkableAction);
 
-				auto c = obs_data_get_array(settings, "canvas");
-				if (c) {
-					const auto count = obs_data_array_count(c);
+			auto c = obs_data_get_array(settings, "canvas");
+			if (c) {
+				const auto count = obs_data_array_count(c);
 
-					for (size_t j = 0; j < count; j++) {
-						auto item = obs_data_array_item(c, j);
-						if (!item)
-							continue;
-						if (obs_data_get_int(item, "width") == canvas_width &&
-						    obs_data_get_int(item, "height") == canvas_height) {
-							auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
-							if (sn == sceneList->currentItem()->text()) {
-								checkBox->setChecked(true);
-							}
+				for (size_t j = 0; j < count; j++) {
+					auto item = obs_data_array_item(c, j);
+					if (!item)
+						continue;
+					if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(canvas)) == 0) {
+						auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+						if (sn == sceneList->currentItem()->text()) {
+							checkBox->setChecked(true);
 						}
-						obs_data_release(item);
+					} else if (strcmp(obs_data_get_string(item, "name"), "") == 0 &&
+						   obs_data_get_int(item, "width") == canvas_width &&
+						   obs_data_get_int(item, "height") == canvas_height) {
+						obs_data_set_string(item, "name", obs_canvas_get_name(canvas));
+						auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+						if (sn == sceneList->currentItem()->text()) {
+							checkBox->setChecked(true);
+						}
 					}
-
-					obs_data_array_release(c);
+					obs_data_release(item);
 				}
+
+				obs_data_array_release(c);
 			}
+
 			obs_data_release(settings);
 		}
 		obs_frontend_source_list_free(&scenes);
 	});
-	if (hideScenes) {
-		menu.addAction(QString::fromUtf8(obs_module_text("OnMainCanvas")), [this] {
-			auto item = sceneList->currentItem();
-			if (!item)
-				return;
-			auto s = obs_get_source_by_name(item->text().toUtf8().constData());
-			if (!s)
-				return;
 
-			if (obs_frontend_preview_program_mode_active())
-				obs_frontend_set_current_preview_scene(s);
-			else
-				obs_frontend_set_current_scene(s);
-			obs_source_release(s);
-		});
-	}
-	a = menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("ShowInMultiview")), [scene_name](bool checked) {
-		OBSSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
+	menu.addAction(QString::fromUtf8(obs_module_text("OnMainCanvas")), [this] {
+		auto item = sceneList->currentItem();
+		if (!item)
+			return;
+		auto s = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
+		if (!s)
+			return;
+
+		if (obs_frontend_preview_program_mode_active())
+			obs_frontend_set_current_preview_scene(s);
+		else
+			obs_frontend_set_current_scene(s);
+		obs_source_release(s);
+	});
+
+	a = menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("ShowInMultiview")), [this, scene_name](bool checked) {
+		OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 		OBSDataAutoRelease ps = obs_source_get_private_settings(source);
 		obs_data_set_bool(ps, "show_in_multiview", checked);
 	});
@@ -2455,7 +2469,15 @@ void CanvasDock::SetLinkedScene(obs_source_t *scene_, const QString &linkedScene
 		auto item = obs_data_array_item(c, i);
 		if (!item)
 			continue;
-		if (obs_data_get_int(item, "width") == canvas_width && obs_data_get_int(item, "height") == canvas_height) {
+		if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(canvas)) == 0) {
+			found = item;
+			if (linkedScene.isEmpty()) {
+				obs_data_array_erase(c, i);
+			}
+			break;
+		} else if (strcmp(obs_data_get_string(item, "name"), "") == 0 && obs_data_get_int(item, "width") == canvas_width &&
+			   obs_data_get_int(item, "height") == canvas_height) {
+			obs_data_set_string(item, "name", obs_canvas_get_name(canvas));
 			found = item;
 			if (linkedScene.isEmpty()) {
 				obs_data_array_erase(c, i);
@@ -2471,6 +2493,7 @@ void CanvasDock::SetLinkedScene(obs_source_t *scene_, const QString &linkedScene
 				obs_data_set_array(ss, "canvas", c);
 			}
 			found = obs_data_create();
+			obs_data_set_string(found, "name", obs_canvas_get_name(canvas));
 			obs_data_set_int(found, "width", canvas_width);
 			obs_data_set_int(found, "height", canvas_height);
 			obs_data_array_push_back(c, found);
@@ -2499,6 +2522,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		obs_source_t *item_source = obs_source_get_ref(obs_sceneitem_get_source(sceneItem));
 		if (!item_source)
 			return;
+		obs_canvas_t *canvas = obs_source_get_canvas(item_source);
 		std::string name = obs_source_get_name(item_source);
 		obs_source_t *s = nullptr;
 		do {
@@ -2506,7 +2530,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SourceName")), name)) {
 				break;
 			}
-			s = obs_get_source_by_name(name.c_str());
+			s = canvas ? obs_canvas_get_source_by_name(canvas, name.c_str()) : obs_get_source_by_name(name.c_str());
 			if (s)
 				continue;
 			obs_source_set_name(item_source, name.c_str());
@@ -3053,4 +3077,1577 @@ void CanvasDock::AddProjectorMenuMonitors(QMenu *parent, QObject *target, const 
 		QAction *a = parent->addAction(str, target, slot);
 		a->setProperty("monitor", i);
 	}
+}
+
+void CanvasDock::LoadScenes()
+{
+	/* for (uint32_t i = MAX_CHANNELS - 1; i > 0; i--) {
+		auto s = obs_get_output_source(i);
+		if (s == nullptr) {
+			obs_set_output_source(i, transitionAudioWrapper);
+			break;
+		}
+		obs_source_release(s);
+	}*/
+
+	sceneList->clear();
+
+	obs_canvas_enum_scenes(
+		canvas,
+		[](void *param, obs_source_t *src) {
+			auto t = (CanvasDock *)param;
+			auto sh = obs_source_get_signal_handler(src);
+			signal_handler_connect(sh, "rename", source_rename, t);
+			signal_handler_connect(sh, "remove", source_remove, t);
+			QString name = QString::fromUtf8(obs_source_get_name(src));
+			auto sli = new QListWidgetItem(name, t->sceneList);
+			sli->setIcon(create2StateIcon(":/aitum/media/linked.svg", ":/aitum/media/unlinked.svg"));
+			t->sceneList->addItem(sli);
+			obs_data_t *settings = obs_source_get_settings(src);
+			if ((t->currentSceneName.isEmpty() && obs_data_get_bool(settings, "canvas_active")) ||
+			    name == t->currentSceneName) {
+				for (int j = 0; j < t->sceneList->count(); j++) {
+					auto item = t->sceneList->item(j);
+					if (item->text() != name)
+						continue;
+					t->sceneList->setCurrentItem(item);
+				}
+			}
+			obs_data_release(settings);
+			return true;
+		},
+		this);
+
+	if (sceneList->count() == 0) {
+		AddScene("", false);
+	}
+
+	if (sceneList->currentRow() < 0)
+		sceneList->setCurrentRow(0);
+}
+
+void CanvasDock::source_rename(void *data, calldata_t *calldata)
+{
+	const auto d = static_cast<CanvasDock *>(data);
+	const auto prev_name = QString::fromUtf8(calldata_string(calldata, "prev_name"));
+	const auto new_name = QString::fromUtf8(calldata_string(calldata, "new_name"));
+	auto source = (obs_source_t *)calldata_ptr(calldata, "source");
+	if (!source || !obs_source_is_scene(source))
+		return;
+
+	struct obs_frontend_source_list scenes = {};
+	obs_frontend_get_scenes(&scenes);
+	for (size_t i = 0; i < scenes.sources.num; i++) {
+		const obs_source_t *src = scenes.sources.array[i];
+		auto ss = obs_source_get_settings(src);
+		auto c = obs_data_get_array(ss, "canvas");
+		obs_data_release(ss);
+		if (!c)
+			continue;
+		const auto count = obs_data_array_count(c);
+		for (size_t j = 0; j < count; j++) {
+			auto item = obs_data_array_item(c, j);
+			auto n = QString::fromUtf8(obs_data_get_string(item, "scene"));
+			if (n == prev_name) {
+				obs_data_set_string(item, "scene", calldata_string(calldata, "new_name"));
+			}
+			obs_data_release(item);
+		}
+		obs_data_array_release(c);
+	}
+	obs_frontend_source_list_free(&scenes);
+
+	for (int i = 0; i < d->sceneList->count(); i++) {
+		const auto item = d->sceneList->item(i);
+		if (item->text() != prev_name)
+			continue;
+		item->setText(new_name);
+	}
+}
+
+void CanvasDock::source_remove(void *data, calldata_t *calldata)
+{
+	const auto d = static_cast<CanvasDock *>(data);
+	const auto source = (obs_source_t *)calldata_ptr(calldata, "source");
+	if (!obs_source_is_scene(source))
+		return;
+	const auto canvas = obs_source_get_canvas(source);
+	obs_canvas_release(canvas);
+	if (!canvas || canvas != d->canvas)
+		return;
+	if (obs_weak_source_references_source(d->source, source) || source == obs_scene_get_source(d->scene)) {
+		QMetaObject::invokeMethod(d, "SwitchScene", Q_ARG(QString, ""), Q_ARG(bool, false));
+	}
+	const auto name = QString::fromUtf8(obs_source_get_name(source));
+	if (name.isEmpty())
+		return;
+	QMetaObject::invokeMethod(d, "SceneRemoved", Q_ARG(QString, name));
+}
+
+void CanvasDock::SceneRemoved(const QString name)
+{
+	for (int i = 0; i < sceneList->count(); i++) {
+		auto item = sceneList->item(i);
+		if (item->text() != name)
+			continue;
+		sceneList->takeItem(i);
+	}
+	auto r = sceneList->currentRow();
+	auto c = sceneList->count();
+	if ((r < 0 && c > 0) || r >= c) {
+		sceneList->setCurrentRow(0);
+	}
+}
+
+void CanvasDock::AddSceneItem(OBSSceneItem item)
+{
+	obs_scene_t *add_scene = obs_sceneitem_get_scene(item);
+
+	if (scene == add_scene)
+		sourceList->Add(item);
+
+	obs_scene_enum_items(add_scene, select_one, (obs_sceneitem_t *)item);
+}
+
+bool CanvasDock::select_one(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	obs_sceneitem_t *selectedItem = reinterpret_cast<obs_sceneitem_t *>(param);
+	if (obs_sceneitem_is_group(item))
+		obs_sceneitem_group_enum_items(item, select_one, param);
+
+	obs_sceneitem_select(item, (selectedItem == item));
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+void CanvasDock::RefreshSources(OBSScene refresh_scene)
+{
+	if (refresh_scene != scene || sourceList->IgnoreReorder())
+		return;
+
+	sourceList->RefreshItems();
+}
+
+void CanvasDock::ReorderSources(OBSScene order_scene)
+{
+	if (order_scene != scene || sourceList->IgnoreReorder())
+		return;
+
+	sourceList->ReorderItems();
+}
+
+void CanvasDock::SwitchBackToSelectedTransition()
+{
+	auto tn = transition->currentText().toUtf8();
+	auto transition = GetTransition(tn.constData());
+	SwapTransition(transition);
+}
+
+OBSEventFilter *CanvasDock::BuildEventFilter()
+{
+	return new OBSEventFilter([this](QObject *obj, QEvent *event) {
+		UNUSED_PARAMETER(obj);
+
+		if (!scene)
+			return false;
+		switch (event->type()) {
+		case QEvent::MouseButtonPress:
+			return this->HandleMousePressEvent(static_cast<QMouseEvent *>(event));
+		case QEvent::MouseButtonRelease:
+			return this->HandleMouseReleaseEvent(static_cast<QMouseEvent *>(event));
+		//case QEvent::MouseButtonDblClick:			return this->HandleMouseClickEvent(				static_cast<QMouseEvent *>(event));
+		case QEvent::MouseMove:
+			return this->HandleMouseMoveEvent(static_cast<QMouseEvent *>(event));
+		//case QEvent::Enter:
+		case QEvent::Leave:
+			return this->HandleMouseLeaveEvent(static_cast<QMouseEvent *>(event));
+		case QEvent::Wheel:
+			return this->HandleMouseWheelEvent(static_cast<QWheelEvent *>(event));
+		//case QEvent::FocusIn:
+		//case QEvent::FocusOut:
+		case QEvent::KeyPress:
+			return this->HandleKeyPressEvent(static_cast<QKeyEvent *>(event));
+		case QEvent::KeyRelease:
+			return this->HandleKeyReleaseEvent(static_cast<QKeyEvent *>(event));
+		default:
+			return false;
+		}
+	});
+}
+
+
+bool CanvasDock::HandleMousePressEvent(QMouseEvent *event)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	QPointF pos = event->position();
+#else
+	QPointF pos = event->localPos();
+#endif
+
+	if (scrollMode && IsFixedScaling() && event->button() == Qt::LeftButton) {
+		setCursor(Qt::ClosedHandCursor);
+		scrollingFrom.x = (float)pos.x();
+		scrollingFrom.y = (float)pos.y();
+		return true;
+	}
+
+	if (event->button() == Qt::RightButton) {
+		scrollMode = false;
+		setCursor(Qt::ArrowCursor);
+	}
+
+	if (locked)
+		return false;
+
+	//float pixelRatio = 1.0f;
+	//float x = pos.x() - main->previewX / pixelRatio;
+	//float y = pos.y() - main->previewY / pixelRatio;
+	Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+	bool altDown = (modifiers & Qt::AltModifier);
+	bool shiftDown = (modifiers & Qt::ShiftModifier);
+	bool ctrlDown = (modifiers & Qt::ControlModifier);
+
+	if (event->button() != Qt::LeftButton && event->button() != Qt::RightButton)
+		return false;
+
+	if (event->button() == Qt::LeftButton)
+		mouseDown = true;
+
+	{
+		std::lock_guard<std::mutex> lock(selectMutex);
+		selectedItems.clear();
+	}
+
+	if (altDown)
+		cropping = true;
+
+	if (altDown || shiftDown || ctrlDown) {
+		vec2 s;
+		SceneFindBoxData sfbd(s, s);
+
+		obs_scene_enum_items(scene, FindSelected, &sfbd);
+
+		std::lock_guard<std::mutex> lock(selectMutex);
+		selectedItems = sfbd.sceneItems;
+	}
+	startPos = GetMouseEventPos(event);
+
+	//vec2_set(&startPos, mouseEvent.x, mouseEvent.y);
+	//GetStretchHandleData(startPos, false);
+
+	//vec2_divf(&startPos, &startPos, main->previewScale / pixelRatio);
+	startPos.x = std::round(startPos.x);
+	startPos.y = std::round(startPos.y);
+
+	mouseOverItems = SelectedAtPos(scene, startPos);
+	vec2_zero(&lastMoveOffset);
+
+	mousePos = startPos;
+
+	return true;
+}
+
+vec2 CanvasDock::GetMouseEventPos(QMouseEvent *event)
+{
+
+	auto s = obs_weak_source_get_source(source);
+	uint32_t sourceCX = obs_source_get_width(s);
+	if (sourceCX <= 0)
+		sourceCX = 1;
+	uint32_t sourceCY = obs_source_get_height(s);
+	if (sourceCY <= 0)
+		sourceCY = 1;
+	obs_source_release(s);
+
+	int x, y;
+	float scale;
+
+	auto size = preview->size();
+
+	GetScaleAndCenterPos(sourceCX, sourceCY, size.width(), size.height(), x, y, scale);
+	//auto newCX = scale * float(sourceCX);
+	//auto newCY = scale * float(sourceCY);
+	float pixelRatio = GetDevicePixelRatio();
+
+	QPoint qtPos = event->pos();
+
+	vec2 pos;
+	vec2_set(&pos, ((float)qtPos.x() - (float)x / pixelRatio) / scale, ((float)qtPos.y() - (float)y / pixelRatio) / scale);
+
+	return pos;
+}
+
+bool CanvasDock::SelectedAtPos(obs_scene_t *s, const vec2 &pos)
+{
+	if (!s)
+		return false;
+
+	SceneFindData sfd(pos, false);
+	obs_scene_enum_items(s, CheckItemSelected, &sfd);
+	return !!sfd.item;
+}
+
+bool CanvasDock::CheckItemSelected(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	SceneFindData *data = reinterpret_cast<SceneFindData *>(param);
+	matrix4 transform;
+	vec3 transformedPos;
+	vec3 pos3;
+
+	if (!SceneItemHasVideo(item))
+		return true;
+	if (obs_sceneitem_is_group(item)) {
+		data->group = item;
+		obs_sceneitem_group_enum_items(item, CheckItemSelected, param);
+		data->group = nullptr;
+
+		if (data->item) {
+			return false;
+		}
+	}
+
+	vec3_set(&pos3, data->pos.x, data->pos.y, 0.0f);
+
+	obs_sceneitem_get_box_transform(item, &transform);
+
+	if (data->group) {
+		matrix4 parent_transform;
+		obs_sceneitem_get_draw_transform(data->group, &parent_transform);
+		matrix4_mul(&transform, &transform, &parent_transform);
+	}
+
+	matrix4_inv(&transform, &transform);
+	vec3_transform(&transformedPos, &pos3, &transform);
+
+	if (transformedPos.x >= 0.0f && transformedPos.x <= 1.0f && transformedPos.y >= 0.0f && transformedPos.y <= 1.0f) {
+		if (obs_sceneitem_selected(item)) {
+			data->item = item;
+			return false;
+		}
+	}
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+bool CanvasDock::HandleMouseReleaseEvent(QMouseEvent *event)
+{
+	if (scrollMode)
+		setCursor(Qt::OpenHandCursor);
+
+	if (!mouseDown && event->button() == Qt::RightButton) {
+		QMenu popup(this);
+		QAction *a =
+			popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Preview.Disable")), [this] {
+				preview_disabled = !preview_disabled;
+				obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
+				preview->setVisible(!preview_disabled);
+				previewDisabledWidget->setVisible(preview_disabled);
+			});
+		auto projectorMenu = popup.addMenu(QString::fromUtf8(obs_frontend_get_locale_string("PreviewProjector")));
+		AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenPreviewProjector()));
+
+		//a = popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("PreviewWindow")), [this] { OpenProjector(-1); });
+
+		a = popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.LockPreview")), this,
+				    [this] { locked = !locked; });
+		a->setCheckable(true);
+		a->setChecked(locked);
+
+		popup.addAction(GetIconFromType(OBS_ICON_TYPE_IMAGE),
+				QString::fromUtf8(obs_frontend_get_locale_string("Screenshot")), this, [this] {
+					auto s = obs_weak_source_get_source(source);
+					obs_frontend_take_source_screenshot(s);
+					obs_source_release(s);
+				});
+
+		popup.addMenu(CreateAddSourcePopupMenu());
+
+		popup.addSeparator();
+
+		OBSSceneItem sceneItem = GetSelectedItem();
+		if (sceneItem) {
+			AddSceneItemMenuItems(&popup, sceneItem);
+		}
+		popup.exec(QCursor::pos());
+		return true;
+	}
+
+	if (locked)
+		return false;
+
+	if (!mouseDown)
+		return false;
+
+	const vec2 pos = GetMouseEventPos(event);
+
+	if (!mouseMoved)
+		ProcessClick(pos);
+
+	if (selectionBox) {
+		Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+
+		bool altDown = modifiers & Qt::AltModifier;
+		bool shiftDown = modifiers & Qt::ShiftModifier;
+		bool ctrlDown = modifiers & Qt::ControlModifier;
+
+		std::lock_guard<std::mutex> lock(selectMutex);
+		if (altDown || ctrlDown || shiftDown) {
+			for (size_t i = 0; i < selectedItems.size(); i++) {
+				obs_sceneitem_select(selectedItems[i], true);
+			}
+		}
+
+		for (size_t i = 0; i < hoveredPreviewItems.size(); i++) {
+			bool select = true;
+			obs_sceneitem_t *item = hoveredPreviewItems[i];
+
+			if (altDown) {
+				select = false;
+			} else if (ctrlDown) {
+				select = !obs_sceneitem_selected(item);
+			}
+
+			obs_sceneitem_select(hoveredPreviewItems[i], select);
+		}
+	}
+
+	if (stretchGroup) {
+		obs_sceneitem_defer_group_resize_end(stretchGroup);
+	}
+
+	stretchItem = nullptr;
+	stretchGroup = nullptr;
+	mouseDown = false;
+	mouseMoved = false;
+	cropping = false;
+	selectionBox = false;
+	unsetCursor();
+
+	OBSSceneItem item = GetItemAtPos(pos, true);
+
+	std::lock_guard<std::mutex> lock(selectMutex);
+	hoveredPreviewItems.clear();
+	hoveredPreviewItems.push_back(item);
+	selectedItems.clear();
+
+	return true;
+}
+
+void CanvasDock::ProcessClick(const vec2 &pos)
+{
+	Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+
+	if (modifiers & Qt::ControlModifier)
+		DoCtrlSelect(pos);
+	else
+		DoSelect(pos);
+}
+
+void CanvasDock::DoSelect(const vec2 &pos)
+{
+	OBSSceneItem item = GetItemAtPos(pos, true);
+	obs_scene_enum_items(scene, select_one, (obs_sceneitem_t *)item);
+}
+
+void CanvasDock::DoCtrlSelect(const vec2 &pos)
+{
+	OBSSceneItem item = GetItemAtPos(pos, false);
+	if (!item)
+		return;
+
+	bool selected = obs_sceneitem_selected(item);
+	obs_sceneitem_select(item, !selected);
+}
+
+OBSSceneItem CanvasDock::GetItemAtPos(const vec2 &pos, bool selectBelow)
+{
+	if (!scene)
+		return OBSSceneItem();
+
+	SceneFindData sfd(pos, selectBelow);
+	obs_scene_enum_items(scene, FindItemAtPos, &sfd);
+	return sfd.item;
+}
+
+bool CanvasDock::FindItemAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	SceneFindData *data = reinterpret_cast<SceneFindData *>(param);
+	matrix4 transform;
+	matrix4 invTransform;
+	vec3 transformedPos;
+	vec3 pos3;
+	vec3 pos3_;
+
+	if (!SceneItemHasVideo(item))
+		return true;
+	if (obs_sceneitem_locked(item))
+		return true;
+
+	vec3_set(&pos3, data->pos.x, data->pos.y, 0.0f);
+
+	obs_sceneitem_get_box_transform(item, &transform);
+
+	matrix4_inv(&invTransform, &transform);
+	vec3_transform(&transformedPos, &pos3, &invTransform);
+	vec3_transform(&pos3_, &transformedPos, &transform);
+
+	if (CloseFloat(pos3.x, pos3_.x) && CloseFloat(pos3.y, pos3_.y) && transformedPos.x >= 0.0f && transformedPos.x <= 1.0f &&
+	    transformedPos.y >= 0.0f && transformedPos.y <= 1.0f) {
+		if (data->selectBelow && obs_sceneitem_selected(item)) {
+			if (data->item)
+				return false;
+			else
+				data->selectBelow = false;
+		}
+
+		data->item = item;
+	}
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+bool CanvasDock::HandleMouseMoveEvent(QMouseEvent *event)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	QPointF qtPos = event->position();
+#else
+	QPointF qtPos = event->localPos();
+#endif
+
+	float pixelRatio = GetDevicePixelRatio();
+
+	if (scrollMode && event->buttons() == Qt::LeftButton) {
+		scrollingOffset.x += pixelRatio * ((float)qtPos.x() - scrollingFrom.x);
+		scrollingOffset.y += pixelRatio * ((float)qtPos.y() - scrollingFrom.y);
+		scrollingFrom.x = (float)qtPos.x();
+		scrollingFrom.y = (float)qtPos.y();
+		//emit DisplayResized();
+		return true;
+	}
+
+	if (locked)
+		return true;
+
+	bool updateCursor = false;
+
+	if (mouseDown) {
+		vec2 pos = GetMouseEventPos(event);
+
+		if (!mouseMoved && !mouseOverItems && stretchHandle == ItemHandle::None) {
+			ProcessClick(startPos);
+			mouseOverItems = SelectedAtPos(scene, startPos);
+		}
+
+		pos.x = std::round(pos.x);
+		pos.y = std::round(pos.y);
+
+		if (stretchHandle != ItemHandle::None) {
+			if (obs_sceneitem_locked(stretchItem))
+				return true;
+
+			selectionBox = false;
+
+			obs_sceneitem_t *group = obs_sceneitem_get_group(scene, stretchItem);
+			if (group) {
+				vec3 group_pos;
+				vec3_set(&group_pos, pos.x, pos.y, 0.0f);
+				vec3_transform(&group_pos, &group_pos, &invGroupTransform);
+				pos.x = group_pos.x;
+				pos.y = group_pos.y;
+			}
+
+			if (stretchHandle == ItemHandle::Rot) {
+				RotateItem(pos);
+				setCursor(Qt::ClosedHandCursor);
+			} else if (cropping)
+				CropItem(pos);
+			else
+				StretchItem(pos);
+
+		} else if (mouseOverItems) {
+			if (cursor().shape() != Qt::SizeAllCursor)
+				setCursor(Qt::SizeAllCursor);
+			selectionBox = false;
+			MoveItems(pos);
+		} else {
+			selectionBox = true;
+			if (!mouseMoved)
+				DoSelect(startPos);
+			BoxItems(startPos, pos);
+		}
+
+		mouseMoved = true;
+		mousePos = pos;
+	} else {
+		vec2 pos = GetMouseEventPos(event);
+		OBSSceneItem item = GetItemAtPos(pos, true);
+
+		std::lock_guard<std::mutex> lock(selectMutex);
+		hoveredPreviewItems.clear();
+		hoveredPreviewItems.push_back(item);
+
+		if (!mouseMoved && hoveredPreviewItems.size() > 0) {
+			mousePos = pos;
+			//float scale = GetDevicePixelRatio();
+			//float x = qtPos.x(); // - main->previewX / scale;
+			//float y = qtPos.y(); // - main->previewY / scale;
+			vec2_set(&startPos, pos.x, pos.y);
+			updateCursor = true;
+		}
+	}
+
+	if (updateCursor) {
+		GetStretchHandleData(startPos, true);
+		uint32_t stretchFlags = (uint32_t)stretchHandle;
+		UpdateCursor(stretchFlags);
+	}
+	return true;
+}
+
+void CanvasDock::RotateItem(const vec2 &pos)
+{
+	Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+	bool shiftDown = (modifiers & Qt::ShiftModifier);
+	bool ctrlDown = (modifiers & Qt::ControlModifier);
+
+	vec2 pos2;
+	vec2_copy(&pos2, &pos);
+
+	float angle = atan2(pos2.y - rotatePoint.y, pos2.x - rotatePoint.x) + RAD(90);
+
+#define ROT_SNAP(rot, thresh)                                    \
+	if (abs(angle - RAD((float)rot)) < RAD((float)thresh)) { \
+		angle = RAD((float)rot);                         \
+	}
+
+	if (shiftDown) {
+		for (int i = 0; i <= 360 / 15; i++) {
+			ROT_SNAP(i * 15 - 90, 7.5);
+		}
+	} else if (!ctrlDown) {
+		ROT_SNAP(rotateAngle, 5)
+
+		ROT_SNAP(-90, 5)
+		ROT_SNAP(-45, 5)
+		ROT_SNAP(0, 5)
+		ROT_SNAP(45, 5)
+		ROT_SNAP(90, 5)
+		ROT_SNAP(135, 5)
+		ROT_SNAP(180, 5)
+		ROT_SNAP(225, 5)
+		ROT_SNAP(270, 5)
+		ROT_SNAP(315, 5)
+	}
+#undef ROT_SNAP
+
+	vec2 pos3;
+	vec2_copy(&pos3, &offsetPoint);
+	RotatePos(&pos3, angle);
+	pos3.x += rotatePoint.x;
+	pos3.y += rotatePoint.y;
+
+	obs_sceneitem_set_rot(stretchItem, DEG(angle));
+	obs_sceneitem_set_pos(stretchItem, &pos3);
+}
+
+void CanvasDock::RotatePos(vec2 *pos, float rot)
+{
+	float cosR = cos(rot);
+	float sinR = sin(rot);
+
+	vec2 newPos;
+
+	newPos.x = cosR * pos->x - sinR * pos->y;
+	newPos.y = sinR * pos->x + cosR * pos->y;
+
+	vec2_copy(pos, &newPos);
+}
+
+static float maxfunc(float x, float y)
+{
+	return x > y ? x : y;
+}
+
+static float minfunc(float x, float y)
+{
+	return x < y ? x : y;
+}
+
+void CanvasDock::CropItem(const vec2 &pos)
+{
+	obs_bounds_type boundsType = obs_sceneitem_get_bounds_type(stretchItem);
+	uint32_t stretchFlags = (uint32_t)stretchHandle;
+	uint32_t align = obs_sceneitem_get_alignment(stretchItem);
+	vec3 tl, br, pos3;
+
+	vec3_zero(&tl);
+	vec3_set(&br, stretchItemSize.x, stretchItemSize.y, 0.0f);
+
+	vec3_set(&pos3, pos.x, pos.y, 0.0f);
+	vec3_transform(&pos3, &pos3, &screenToItem);
+
+	obs_sceneitem_crop crop = startCrop;
+	vec2 scale;
+
+	obs_sceneitem_get_scale(stretchItem, &scale);
+
+	vec2 max_tl;
+	vec2 max_br;
+
+	vec2_set(&max_tl, float(-crop.left) * scale.x, float(-crop.top) * scale.y);
+	vec2_set(&max_br, stretchItemSize.x + (float)crop.right * scale.x, stretchItemSize.y + (float)crop.bottom * scale.y);
+
+	typedef std::function<float(float, float)> minmax_func_t;
+
+	minmax_func_t min_x = scale.x < 0.0f ? maxfunc : minfunc;
+	minmax_func_t min_y = scale.y < 0.0f ? maxfunc : minfunc;
+	minmax_func_t max_x = scale.x < 0.0f ? minfunc : maxfunc;
+	minmax_func_t max_y = scale.y < 0.0f ? minfunc : maxfunc;
+
+	pos3.x = min_x(pos3.x, max_br.x);
+	pos3.x = max_x(pos3.x, max_tl.x);
+	pos3.y = min_y(pos3.y, max_br.y);
+	pos3.y = max_y(pos3.y, max_tl.y);
+
+	if (stretchFlags & ITEM_LEFT) {
+		float maxX = stretchItemSize.x - (2.0f * scale.x);
+		pos3.x = tl.x = min_x(pos3.x, maxX);
+
+	} else if (stretchFlags & ITEM_RIGHT) {
+		float minX = (2.0f * scale.x);
+		pos3.x = br.x = max_x(pos3.x, minX);
+	}
+
+	if (stretchFlags & ITEM_TOP) {
+		float maxY = stretchItemSize.y - (2.0f * scale.y);
+		pos3.y = tl.y = min_y(pos3.y, maxY);
+
+	} else if (stretchFlags & ITEM_BOTTOM) {
+		float minY = (2.0f * scale.y);
+		pos3.y = br.y = max_y(pos3.y, minY);
+	}
+
+#define ALIGN_X (ITEM_LEFT | ITEM_RIGHT)
+#define ALIGN_Y (ITEM_TOP | ITEM_BOTTOM)
+	vec3 newPos;
+	vec3_zero(&newPos);
+
+	uint32_t align_x = (align & ALIGN_X);
+	uint32_t align_y = (align & ALIGN_Y);
+	if (align_x == (stretchFlags & ALIGN_X) && align_x != 0)
+		newPos.x = pos3.x;
+	else if (align & ITEM_RIGHT)
+		newPos.x = stretchItemSize.x;
+	else if (!(align & ITEM_LEFT))
+		newPos.x = stretchItemSize.x * 0.5f;
+
+	if (align_y == (stretchFlags & ALIGN_Y) && align_y != 0)
+		newPos.y = pos3.y;
+	else if (align & ITEM_BOTTOM)
+		newPos.y = stretchItemSize.y;
+	else if (!(align & ITEM_TOP))
+		newPos.y = stretchItemSize.y * 0.5f;
+#undef ALIGN_X
+#undef ALIGN_Y
+
+	crop = startCrop;
+
+	if (stretchFlags & ITEM_LEFT)
+		crop.left += int(std::round(tl.x / scale.x));
+	else if (stretchFlags & ITEM_RIGHT)
+		crop.right += int(std::round((stretchItemSize.x - br.x) / scale.x));
+
+	if (stretchFlags & ITEM_TOP)
+		crop.top += int(std::round(tl.y / scale.y));
+	else if (stretchFlags & ITEM_BOTTOM)
+		crop.bottom += int(std::round((stretchItemSize.y - br.y) / scale.y));
+
+	vec3_transform(&newPos, &newPos, &itemToScreen);
+	newPos.x = std::round(newPos.x);
+	newPos.y = std::round(newPos.y);
+
+#if 0
+	vec3 curPos;
+	vec3_zero(&curPos);
+	obs_sceneitem_get_pos(stretchItem, (vec2*)&curPos);
+	blog(LOG_DEBUG, "curPos {%d, %d} - newPos {%d, %d}",
+			int(curPos.x), int(curPos.y),
+			int(newPos.x), int(newPos.y));
+	blog(LOG_DEBUG, "crop {%d, %d, %d, %d}",
+			crop.left, crop.top,
+			crop.right, crop.bottom);
+#endif
+
+	obs_sceneitem_defer_update_begin(stretchItem);
+	obs_sceneitem_set_crop(stretchItem, &crop);
+	if (boundsType == OBS_BOUNDS_NONE)
+		obs_sceneitem_set_pos(stretchItem, (vec2 *)&newPos);
+	obs_sceneitem_defer_update_end(stretchItem);
+}
+
+void CanvasDock::StretchItem(const vec2 &pos)
+{
+	Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+	obs_bounds_type boundsType = obs_sceneitem_get_bounds_type(stretchItem);
+	uint32_t stretchFlags = (uint32_t)stretchHandle;
+	bool shiftDown = (modifiers & Qt::ShiftModifier);
+	vec3 tl, br, pos3;
+
+	vec3_zero(&tl);
+	vec3_set(&br, stretchItemSize.x, stretchItemSize.y, 0.0f);
+
+	vec3_set(&pos3, pos.x, pos.y, 0.0f);
+	vec3_transform(&pos3, &pos3, &screenToItem);
+
+	if (stretchFlags & ITEM_LEFT)
+		tl.x = pos3.x;
+	else if (stretchFlags & ITEM_RIGHT)
+		br.x = pos3.x;
+
+	if (stretchFlags & ITEM_TOP)
+		tl.y = pos3.y;
+	else if (stretchFlags & ITEM_BOTTOM)
+		br.y = pos3.y;
+
+	if (!(modifiers & Qt::ControlModifier))
+		SnapStretchingToScreen(tl, br);
+
+	obs_source_t *s = obs_sceneitem_get_source(stretchItem);
+
+	vec2 baseSize;
+	vec2_set(&baseSize, float(obs_source_get_width(s)), float(obs_source_get_height(s)));
+
+	vec2 size;
+	vec2_set(&size, br.x - tl.x, br.y - tl.y);
+
+	if (boundsType != OBS_BOUNDS_NONE) {
+		if (shiftDown)
+			ClampAspect(tl, br, size, baseSize);
+
+		if (tl.x > br.x)
+			std::swap(tl.x, br.x);
+		if (tl.y > br.y)
+			std::swap(tl.y, br.y);
+
+		vec2_abs(&size, &size);
+
+		obs_sceneitem_set_bounds(stretchItem, &size);
+	} else {
+		obs_sceneitem_crop crop;
+		obs_sceneitem_get_crop(stretchItem, &crop);
+
+		baseSize.x -= float(crop.left + crop.right);
+		baseSize.y -= float(crop.top + crop.bottom);
+
+		if (baseSize.x > 0.0 && baseSize.y > 0.0) {
+			if (!shiftDown)
+				ClampAspect(tl, br, size, baseSize);
+
+			vec2_div(&size, &size, &baseSize);
+			obs_sceneitem_set_scale(stretchItem, &size);
+		}
+	}
+
+	pos3 = CalculateStretchPos(tl, br);
+	vec3_transform(&pos3, &pos3, &itemToScreen);
+
+	vec2 newPos;
+	vec2_set(&newPos, std::round(pos3.x), std::round(pos3.y));
+	obs_sceneitem_set_pos(stretchItem, &newPos);
+}
+
+void CanvasDock::MoveItems(const vec2 &pos)
+{
+	Qt::KeyboardModifiers modifiers = QGuiApplication::keyboardModifiers();
+
+	vec2 offset, moveOffset;
+	vec2_sub(&offset, &pos, &startPos);
+	vec2_sub(&moveOffset, &offset, &lastMoveOffset);
+
+	if (!(modifiers & Qt::ControlModifier))
+		SnapItemMovement(moveOffset);
+
+	vec2_add(&lastMoveOffset, &lastMoveOffset, &moveOffset);
+
+	obs_scene_enum_items(scene, move_items, &moveOffset);
+}
+
+bool CanvasDock::move_items(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	if (obs_sceneitem_locked(item))
+		return true;
+
+	bool selected = obs_sceneitem_selected(item);
+	vec2 *offset = reinterpret_cast<vec2 *>(param);
+
+	if (obs_sceneitem_is_group(item) && !selected) {
+		matrix4 transform;
+		vec3 new_offset;
+		vec3_set(&new_offset, offset->x, offset->y, 0.0f);
+
+		obs_sceneitem_get_draw_transform(item, &transform);
+		vec4_set(&transform.t, 0.0f, 0.0f, 0.0f, 1.0f);
+		matrix4_inv(&transform, &transform);
+		vec3_transform(&new_offset, &new_offset, &transform);
+		obs_sceneitem_group_enum_items(item, move_items, &new_offset);
+	}
+
+	if (selected) {
+		vec2 pos;
+		obs_sceneitem_get_pos(item, &pos);
+		vec2_add(&pos, &pos, offset);
+		obs_sceneitem_set_pos(item, &pos);
+	}
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+void CanvasDock::SnapItemMovement(vec2 &offset)
+{
+	SelectedItemBounds sib;
+	obs_scene_enum_items(scene, AddItemBounds, &sib);
+
+	sib.tl.x += offset.x;
+	sib.tl.y += offset.y;
+	sib.br.x += offset.x;
+	sib.br.y += offset.y;
+
+	vec3 snapOffset = GetSnapOffset(sib.tl, sib.br);
+
+	auto config = obs_frontend_get_user_config();
+	if (!config)
+		return;
+
+	const bool snap = config_get_bool(config, "BasicWindow", "SnappingEnabled");
+	const bool sourcesSnap = config_get_bool(config, "BasicWindow", "SourceSnapping");
+	if (snap == false)
+		return;
+	if (sourcesSnap == false) {
+		offset.x += snapOffset.x;
+		offset.y += snapOffset.y;
+		return;
+	}
+
+	const float clampDist = (float)config_get_double(config, "BasicWindow", "SnapDistance") / previewScale;
+
+	OffsetData offsetData;
+	offsetData.clampDist = clampDist;
+	offsetData.tl = sib.tl;
+	offsetData.br = sib.br;
+	vec3_copy(&offsetData.offset, &snapOffset);
+
+	obs_scene_enum_items(scene, GetSourceSnapOffset, &offsetData);
+
+	if (fabsf(offsetData.offset.x) > EPSILON || fabsf(offsetData.offset.y) > EPSILON) {
+		offset.x += offsetData.offset.x;
+		offset.y += offsetData.offset.y;
+	} else {
+		offset.x += snapOffset.x;
+		offset.y += snapOffset.y;
+	}
+}
+
+void CanvasDock::BoxItems(const vec2 &start_pos, const vec2 &pos)
+{
+	if (!scene)
+		return;
+
+	if (cursor().shape() != Qt::CrossCursor)
+		setCursor(Qt::CrossCursor);
+
+	SceneFindBoxData sfbd(start_pos, pos);
+	obs_scene_enum_items(scene, FindItemsInBox, &sfbd);
+
+	std::lock_guard<std::mutex> lock(selectMutex);
+	hoveredPreviewItems = sfbd.sceneItems;
+}
+
+bool CanvasDock::FindItemsInBox(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	SceneFindBoxData *data = reinterpret_cast<SceneFindBoxData *>(param);
+	matrix4 transform;
+	matrix4 invTransform;
+	vec3 transformedPos;
+	vec3 pos3;
+	vec3 pos3_;
+
+	vec2 pos_min, pos_max;
+	vec2_min(&pos_min, &data->startPos, &data->pos);
+	vec2_max(&pos_max, &data->startPos, &data->pos);
+
+	const float x1 = pos_min.x;
+	const float x2 = pos_max.x;
+	const float y1 = pos_min.y;
+	const float y2 = pos_max.y;
+
+	if (!SceneItemHasVideo(item))
+		return true;
+	if (obs_sceneitem_locked(item))
+		return true;
+	if (!obs_sceneitem_visible(item))
+		return true;
+
+	vec3_set(&pos3, data->pos.x, data->pos.y, 0.0f);
+
+	obs_sceneitem_get_box_transform(item, &transform);
+
+	matrix4_inv(&invTransform, &transform);
+	vec3_transform(&transformedPos, &pos3, &invTransform);
+	vec3_transform(&pos3_, &transformedPos, &transform);
+
+	if (CloseFloat(pos3.x, pos3_.x) && CloseFloat(pos3.y, pos3_.y) && transformedPos.x >= 0.0f && transformedPos.x <= 1.0f &&
+	    transformedPos.y >= 0.0f && transformedPos.y <= 1.0f) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (transform.t.x > x1 && transform.t.x < x2 && transform.t.y > y1 && transform.t.y < y2) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (transform.t.x + transform.x.x > x1 && transform.t.x + transform.x.x < x2 && transform.t.y + transform.x.y > y1 &&
+	    transform.t.y + transform.x.y < y2) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (transform.t.x + transform.y.x > x1 && transform.t.x + transform.y.x < x2 && transform.t.y + transform.y.y > y1 &&
+	    transform.t.y + transform.y.y < y2) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (transform.t.x + transform.x.x + transform.y.x > x1 && transform.t.x + transform.x.x + transform.y.x < x2 &&
+	    transform.t.y + transform.x.y + transform.y.y > y1 && transform.t.y + transform.x.y + transform.y.y < y2) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (transform.t.x + 0.5 * (transform.x.x + transform.y.x) > x1 &&
+	    transform.t.x + 0.5 * (transform.x.x + transform.y.x) < x2 &&
+	    transform.t.y + 0.5 * (transform.x.y + transform.y.y) > y1 &&
+	    transform.t.y + 0.5 * (transform.x.y + transform.y.y) < y2) {
+
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	if (IntersectBox(transform, x1, x2, y1, y2)) {
+		data->sceneItems.push_back(item);
+		return true;
+	}
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+bool CanvasDock::IntersectBox(matrix4 transform, float x1, float x2, float y1, float y2)
+{
+	float x3, x4, y3, y4;
+
+	x3 = transform.t.x;
+	y3 = transform.t.y;
+	x4 = x3 + transform.x.x;
+	y4 = y3 + transform.x.y;
+
+	if (IntersectLine(x1, x1, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y1, y1, y3, y4) ||
+	    IntersectLine(x2, x2, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y2, y2, y3, y4))
+		return true;
+
+	x4 = x3 + transform.y.x;
+	y4 = y3 + transform.y.y;
+
+	if (IntersectLine(x1, x1, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y1, y1, y3, y4) ||
+	    IntersectLine(x2, x2, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y2, y2, y3, y4))
+		return true;
+
+	x3 = transform.t.x + transform.x.x;
+	y3 = transform.t.y + transform.x.y;
+	x4 = x3 + transform.y.x;
+	y4 = y3 + transform.y.y;
+
+	if (IntersectLine(x1, x1, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y1, y1, y3, y4) ||
+	    IntersectLine(x2, x2, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y2, y2, y3, y4))
+		return true;
+
+	x3 = transform.t.x + transform.y.x;
+	y3 = transform.t.y + transform.y.y;
+	x4 = x3 + transform.x.x;
+	y4 = y3 + transform.x.y;
+
+	if (IntersectLine(x1, x1, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y1, y1, y3, y4) ||
+	    IntersectLine(x2, x2, x3, x4, y1, y2, y3, y4) || IntersectLine(x1, x2, x3, x4, y2, y2, y3, y4))
+		return true;
+
+	return false;
+}
+
+bool CanvasDock::CounterClockwise(float x1, float x2, float x3, float y1, float y2, float y3)
+{
+	return (y3 - y1) * (x2 - x1) > (y2 - y1) * (x3 - x1);
+}
+
+bool CanvasDock::IntersectLine(float x1, float x2, float x3, float x4, float y1, float y2, float y3, float y4)
+{
+	bool a = CounterClockwise(x1, x2, x3, y1, y2, y3);
+	bool b = CounterClockwise(x1, x2, x4, y1, y2, y4);
+	bool c = CounterClockwise(x3, x4, x1, y3, y4, y1);
+	bool d = CounterClockwise(x3, x4, x2, y3, y4, y2);
+
+	return (a != b) && (c != d);
+}
+
+void CanvasDock::GetStretchHandleData(const vec2 &pos, bool ignoreGroup)
+{
+	if (!scene)
+		return;
+
+	HandleFindData hfd(pos, previewScale);
+	obs_scene_enum_items(scene, FindHandleAtPos, &hfd);
+
+	stretchItem = std::move(hfd.item);
+	stretchHandle = hfd.handle;
+
+	rotateAngle = hfd.angle;
+	rotatePoint = hfd.rotatePoint;
+	offsetPoint = hfd.offsetPoint;
+
+	if (stretchHandle != ItemHandle::None) {
+		matrix4 boxTransform;
+		vec3 itemUL;
+		float itemRot;
+
+		stretchItemSize = GetItemSize(stretchItem);
+
+		obs_sceneitem_get_box_transform(stretchItem, &boxTransform);
+		itemRot = obs_sceneitem_get_rot(stretchItem);
+		vec3_from_vec4(&itemUL, &boxTransform.t);
+
+		/* build the item space conversion matrices */
+		matrix4_identity(&itemToScreen);
+		matrix4_rotate_aa4f(&itemToScreen, &itemToScreen, 0.0f, 0.0f, 1.0f, RAD(itemRot));
+		matrix4_translate3f(&itemToScreen, &itemToScreen, itemUL.x, itemUL.y, 0.0f);
+
+		matrix4_identity(&screenToItem);
+		matrix4_translate3f(&screenToItem, &screenToItem, -itemUL.x, -itemUL.y, 0.0f);
+		matrix4_rotate_aa4f(&screenToItem, &screenToItem, 0.0f, 0.0f, 1.0f, RAD(-itemRot));
+
+		obs_sceneitem_get_crop(stretchItem, &startCrop);
+		obs_sceneitem_get_pos(stretchItem, &startItemPos);
+
+		obs_source_t *s = obs_sceneitem_get_source(stretchItem);
+		cropSize.x = float(obs_source_get_width(s) - startCrop.left - startCrop.right);
+		cropSize.y = float(obs_source_get_height(s) - startCrop.top - startCrop.bottom);
+
+		stretchGroup = obs_sceneitem_get_group(scene, stretchItem);
+		if (stretchGroup && !ignoreGroup) {
+			obs_sceneitem_get_draw_transform(stretchGroup, &invGroupTransform);
+			matrix4_inv(&invGroupTransform, &invGroupTransform);
+			obs_sceneitem_defer_group_resize_begin(stretchGroup);
+		} else {
+			stretchGroup = nullptr;
+		}
+	}
+}
+
+void CanvasDock::UpdateCursor(uint32_t &flags)
+{
+	if (obs_sceneitem_locked(stretchItem)) {
+		unsetCursor();
+		return;
+	}
+
+	if (!flags && (cursor().shape() != Qt::OpenHandCursor || !scrollMode))
+		unsetCursor();
+	if (cursor().shape() != Qt::ArrowCursor)
+		return;
+
+	if ((flags & ITEM_LEFT && flags & ITEM_TOP) || (flags & ITEM_RIGHT && flags & ITEM_BOTTOM))
+		setCursor(Qt::SizeFDiagCursor);
+	else if ((flags & ITEM_LEFT && flags & ITEM_BOTTOM) || (flags & ITEM_RIGHT && flags & ITEM_TOP))
+		setCursor(Qt::SizeBDiagCursor);
+	else if (flags & ITEM_LEFT || flags & ITEM_RIGHT)
+		setCursor(Qt::SizeHorCursor);
+	else if (flags & ITEM_TOP || flags & ITEM_BOTTOM)
+		setCursor(Qt::SizeVerCursor);
+	else if (flags & ITEM_ROT)
+		setCursor(Qt::OpenHandCursor);
+}
+
+void CanvasDock::SnapStretchingToScreen(vec3 &tl, vec3 &br)
+{
+	uint32_t stretchFlags = (uint32_t)stretchHandle;
+	vec3 newTL = GetTransformedPos(tl.x, tl.y, itemToScreen);
+	vec3 newTR = GetTransformedPos(br.x, tl.y, itemToScreen);
+	vec3 newBL = GetTransformedPos(tl.x, br.y, itemToScreen);
+	vec3 newBR = GetTransformedPos(br.x, br.y, itemToScreen);
+	vec3 boundingTL;
+	vec3 boundingBR;
+
+	vec3_copy(&boundingTL, &newTL);
+	vec3_min(&boundingTL, &boundingTL, &newTR);
+	vec3_min(&boundingTL, &boundingTL, &newBL);
+	vec3_min(&boundingTL, &boundingTL, &newBR);
+
+	vec3_copy(&boundingBR, &newTL);
+	vec3_max(&boundingBR, &boundingBR, &newTR);
+	vec3_max(&boundingBR, &boundingBR, &newBL);
+	vec3_max(&boundingBR, &boundingBR, &newBR);
+
+	vec3 offset = GetSnapOffset(boundingTL, boundingBR);
+	vec3_add(&offset, &offset, &newTL);
+	vec3_transform(&offset, &offset, &screenToItem);
+	vec3_sub(&offset, &offset, &tl);
+
+	if (stretchFlags & ITEM_LEFT)
+		tl.x += offset.x;
+	else if (stretchFlags & ITEM_RIGHT)
+		br.x += offset.x;
+
+	if (stretchFlags & ITEM_TOP)
+		tl.y += offset.y;
+	else if (stretchFlags & ITEM_BOTTOM)
+		br.y += offset.y;
+}
+
+void CanvasDock::ClampAspect(vec3 &tl, vec3 &br, vec2 &size, const vec2 &baseSize)
+{
+	float baseAspect = baseSize.x / baseSize.y;
+	float aspect = size.x / size.y;
+	uint32_t stretchFlags = (uint32_t)stretchHandle;
+
+	if (stretchHandle == ItemHandle::TopLeft || stretchHandle == ItemHandle::TopRight ||
+	    stretchHandle == ItemHandle::BottomLeft || stretchHandle == ItemHandle::BottomRight) {
+		if (aspect < baseAspect) {
+			if ((size.y >= 0.0f && size.x >= 0.0f) || (size.y <= 0.0f && size.x <= 0.0f))
+				size.x = size.y * baseAspect;
+			else
+				size.x = size.y * baseAspect * -1.0f;
+		} else {
+			if ((size.y >= 0.0f && size.x >= 0.0f) || (size.y <= 0.0f && size.x <= 0.0f))
+				size.y = size.x / baseAspect;
+			else
+				size.y = size.x / baseAspect * -1.0f;
+		}
+
+	} else if (stretchHandle == ItemHandle::TopCenter || stretchHandle == ItemHandle::BottomCenter) {
+		if ((size.y >= 0.0f && size.x >= 0.0f) || (size.y <= 0.0f && size.x <= 0.0f))
+			size.x = size.y * baseAspect;
+		else
+			size.x = size.y * baseAspect * -1.0f;
+
+	} else if (stretchHandle == ItemHandle::CenterLeft || stretchHandle == ItemHandle::CenterRight) {
+		if ((size.y >= 0.0f && size.x >= 0.0f) || (size.y <= 0.0f && size.x <= 0.0f))
+			size.y = size.x / baseAspect;
+		else
+			size.y = size.x / baseAspect * -1.0f;
+	}
+
+	size.x = std::round(size.x);
+	size.y = std::round(size.y);
+
+	if (stretchFlags & ITEM_LEFT)
+		tl.x = br.x - size.x;
+	else if (stretchFlags & ITEM_RIGHT)
+		br.x = tl.x + size.x;
+
+	if (stretchFlags & ITEM_TOP)
+		tl.y = br.y - size.y;
+	else if (stretchFlags & ITEM_BOTTOM)
+		br.y = tl.y + size.y;
+}
+
+vec3 CanvasDock::CalculateStretchPos(const vec3 &tl, const vec3 &br)
+{
+	uint32_t alignment = obs_sceneitem_get_alignment(stretchItem);
+	vec3 pos;
+
+	vec3_zero(&pos);
+
+	if (alignment & OBS_ALIGN_LEFT)
+		pos.x = tl.x;
+	else if (alignment & OBS_ALIGN_RIGHT)
+		pos.x = br.x;
+	else
+		pos.x = (br.x - tl.x) * 0.5f + tl.x;
+
+	if (alignment & OBS_ALIGN_TOP)
+		pos.y = tl.y;
+	else if (alignment & OBS_ALIGN_BOTTOM)
+		pos.y = br.y;
+	else
+		pos.y = (br.y - tl.y) * 0.5f + tl.y;
+
+	return pos;
+}
+
+bool CanvasDock::AddItemBounds(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	SelectedItemBounds *data = reinterpret_cast<SelectedItemBounds *>(param);
+	vec3 t[4];
+
+	auto add_bounds = [data, &t]() {
+		for (const vec3 &v : t) {
+			if (data->first) {
+				vec3_copy(&data->tl, &v);
+				vec3_copy(&data->br, &v);
+				data->first = false;
+			} else {
+				vec3_min(&data->tl, &data->tl, &v);
+				vec3_max(&data->br, &data->br, &v);
+			}
+		}
+	};
+
+	if (obs_sceneitem_is_group(item)) {
+		SelectedItemBounds sib;
+		obs_sceneitem_group_enum_items(item, AddItemBounds, &sib);
+
+		if (!sib.first) {
+			matrix4 xform;
+			obs_sceneitem_get_draw_transform(item, &xform);
+
+			vec3_set(&t[0], sib.tl.x, sib.tl.y, 0.0f);
+			vec3_set(&t[1], sib.tl.x, sib.br.y, 0.0f);
+			vec3_set(&t[2], sib.br.x, sib.tl.y, 0.0f);
+			vec3_set(&t[3], sib.br.x, sib.br.y, 0.0f);
+			vec3_transform(&t[0], &t[0], &xform);
+			vec3_transform(&t[1], &t[1], &xform);
+			vec3_transform(&t[2], &t[2], &xform);
+			vec3_transform(&t[3], &t[3], &xform);
+			add_bounds();
+		}
+	}
+	if (!obs_sceneitem_selected(item))
+		return true;
+
+	matrix4 boxTransform;
+	obs_sceneitem_get_box_transform(item, &boxTransform);
+
+	t[0] = GetTransformedPos(0.0f, 0.0f, boxTransform);
+	t[1] = GetTransformedPos(1.0f, 0.0f, boxTransform);
+	t[2] = GetTransformedPos(0.0f, 1.0f, boxTransform);
+	t[3] = GetTransformedPos(1.0f, 1.0f, boxTransform);
+	add_bounds();
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+vec3 CanvasDock::GetSnapOffset(const vec3 &tl, const vec3 &br)
+{
+	auto s = obs_weak_source_get_source(source);
+	vec2 screenSize;
+	screenSize.x = (float)obs_source_get_base_width(s);
+	screenSize.y = (float)obs_source_get_base_height(s);
+	obs_source_release(s);
+	vec3 clampOffset;
+
+	vec3_zero(&clampOffset);
+
+	auto config = obs_frontend_get_user_config();
+	if (!config)
+		return clampOffset;
+
+	const bool snap = config_get_bool(config, "BasicWindow", "SnappingEnabled");
+	if (snap == false)
+		return clampOffset;
+
+	const bool screenSnap = config_get_bool(config, "BasicWindow", "ScreenSnapping");
+	const bool centerSnap = config_get_bool(config, "BasicWindow", "CenterSnapping");
+
+	const float clampDist = (float)config_get_double(config, "BasicWindow", "SnapDistance") / previewScale;
+	const float centerX = br.x - (br.x - tl.x) / 2.0f;
+	const float centerY = br.y - (br.y - tl.y) / 2.0f;
+
+	// Left screen edge.
+	if (screenSnap && fabsf(tl.x) < clampDist)
+		clampOffset.x = -tl.x;
+	// Right screen edge.
+	if (screenSnap && fabsf(clampOffset.x) < EPSILON && fabsf(screenSize.x - br.x) < clampDist)
+		clampOffset.x = screenSize.x - br.x;
+	// Horizontal center.
+	if (centerSnap && fabsf(screenSize.x - (br.x - tl.x)) > clampDist && fabsf(screenSize.x / 2.0f - centerX) < clampDist)
+		clampOffset.x = screenSize.x / 2.0f - centerX;
+
+	// Top screen edge.
+	if (screenSnap && fabsf(tl.y) < clampDist)
+		clampOffset.y = -tl.y;
+	// Bottom screen edge.
+	if (screenSnap && fabsf(clampOffset.y) < EPSILON && fabsf(screenSize.y - br.y) < clampDist)
+		clampOffset.y = screenSize.y - br.y;
+	// Vertical center.
+	if (centerSnap && fabsf(screenSize.y - (br.y - tl.y)) > clampDist && fabsf(screenSize.y / 2.0f - centerY) < clampDist)
+		clampOffset.y = screenSize.y / 2.0f - centerY;
+
+	return clampOffset;
+}
+
+bool CanvasDock::GetSourceSnapOffset(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	OffsetData *data = reinterpret_cast<OffsetData *>(param);
+
+	if (obs_sceneitem_selected(item))
+		return true;
+
+	matrix4 boxTransform;
+	obs_sceneitem_get_box_transform(item, &boxTransform);
+
+	vec3 t[4] = {GetTransformedPos(0.0f, 0.0f, boxTransform), GetTransformedPos(1.0f, 0.0f, boxTransform),
+		     GetTransformedPos(0.0f, 1.0f, boxTransform), GetTransformedPos(1.0f, 1.0f, boxTransform)};
+
+	bool first = true;
+	vec3 tl, br;
+	vec3_zero(&tl);
+	vec3_zero(&br);
+	for (const vec3 &v : t) {
+		if (first) {
+			vec3_copy(&tl, &v);
+			vec3_copy(&br, &v);
+			first = false;
+		} else {
+			vec3_min(&tl, &tl, &v);
+			vec3_max(&br, &br, &v);
+		}
+	}
+
+	// Snap to other source edges
+#define EDGE_SNAP(l, r, x, y)                                                                                              \
+	do {                                                                                                               \
+		double dist = fabsf(l.x - data->r.x);                                                                      \
+		if (dist < data->clampDist && fabsf(data->offset.x) < EPSILON && data->tl.y < br.y && data->br.y > tl.y && \
+		    (fabsf(data->offset.x) > dist || data->offset.x < EPSILON))                                            \
+			data->offset.x = l.x - data->r.x;                                                                  \
+	} while (false)
+
+	EDGE_SNAP(tl, br, x, y);
+	EDGE_SNAP(tl, br, y, x);
+	EDGE_SNAP(br, tl, x, y);
+	EDGE_SNAP(br, tl, y, x);
+#undef EDGE_SNAP
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+bool CanvasDock::FindHandleAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	HandleFindData &data = *reinterpret_cast<HandleFindData *>(param);
+
+	if (!obs_sceneitem_selected(item)) {
+		if (obs_sceneitem_is_group(item)) {
+			HandleFindData newData(data, item);
+			newData.angleOffset = obs_sceneitem_get_rot(item);
+
+			obs_sceneitem_group_enum_items(item, FindHandleAtPos, &newData);
+
+			data.item = newData.item;
+			data.handle = newData.handle;
+			data.angle = newData.angle;
+			data.rotatePoint = newData.rotatePoint;
+			data.offsetPoint = newData.offsetPoint;
+		}
+
+		return true;
+	}
+
+	matrix4 transform;
+	vec3 pos3;
+	float closestHandle = data.radius;
+
+	vec3_set(&pos3, data.pos.x, data.pos.y, 0.0f);
+
+	obs_sceneitem_get_box_transform(item, &transform);
+
+	auto TestHandle = [&](float x, float y, ItemHandle handle) {
+		vec3 handlePos = GetTransformedPos(x, y, transform);
+		vec3_transform(&handlePos, &handlePos, &data.parent_xform);
+
+		float dist = vec3_dist(&handlePos, &pos3);
+		if (dist < data.radius) {
+			if (dist < closestHandle) {
+				closestHandle = dist;
+				data.handle = handle;
+				data.item = item;
+			}
+		}
+	};
+
+	TestHandle(0.0f, 0.0f, ItemHandle::TopLeft);
+	TestHandle(0.5f, 0.0f, ItemHandle::TopCenter);
+	TestHandle(1.0f, 0.0f, ItemHandle::TopRight);
+	TestHandle(0.0f, 0.5f, ItemHandle::CenterLeft);
+	TestHandle(1.0f, 0.5f, ItemHandle::CenterRight);
+	TestHandle(0.0f, 1.0f, ItemHandle::BottomLeft);
+	TestHandle(0.5f, 1.0f, ItemHandle::BottomCenter);
+	TestHandle(1.0f, 1.0f, ItemHandle::BottomRight);
+
+	vec2 rotHandleOffset;
+	vec2_set(&rotHandleOffset, 0.0f, HANDLE_RADIUS * data.radius * 1.5f - data.radius);
+	RotatePos(&rotHandleOffset, atan2(transform.x.y, transform.x.x));
+	RotatePos(&rotHandleOffset, RAD(data.angleOffset));
+
+	vec3 handlePos = GetTransformedPos(0.5f, 0.0f, transform);
+	vec3_transform(&handlePos, &handlePos, &data.parent_xform);
+	handlePos.x -= rotHandleOffset.x;
+	handlePos.y -= rotHandleOffset.y;
+
+	float dist = vec3_dist(&handlePos, &pos3);
+	if (dist < data.radius) {
+		if (dist < closestHandle) {
+			closestHandle = dist;
+			data.item = item;
+			data.angle = obs_sceneitem_get_rot(item);
+			data.handle = ItemHandle::Rot;
+
+			vec2_set(&data.rotatePoint, transform.t.x + transform.x.x / 2 + transform.y.x / 2,
+				 transform.t.y + transform.x.y / 2 + transform.y.y / 2);
+
+			obs_sceneitem_get_pos(item, &data.offsetPoint);
+			data.offsetPoint.x -= data.rotatePoint.x;
+			data.offsetPoint.y -= data.rotatePoint.y;
+
+			RotatePos(&data.offsetPoint, -RAD(obs_sceneitem_get_rot(item)));
+		}
+	}
+
+	UNUSED_PARAMETER(scene);
+	return true;
+}
+
+bool CanvasDock::HandleMouseLeaveEvent(QMouseEvent *event)
+{
+	UNUSED_PARAMETER(event);
+	std::lock_guard<std::mutex> lock(selectMutex);
+	if (!selectionBox)
+		hoveredPreviewItems.clear();
+	return true;
+}
+
+bool CanvasDock::HandleMouseWheelEvent(QWheelEvent *event)
+{
+	UNUSED_PARAMETER(event);
+	return true;
+}
+
+bool CanvasDock::HandleKeyPressEvent(QKeyEvent *event)
+{
+	UNUSED_PARAMETER(event);
+	return true;
+}
+
+bool CanvasDock::HandleKeyReleaseEvent(QKeyEvent *event)
+{
+	UNUSED_PARAMETER(event);
+	return true;
 }

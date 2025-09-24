@@ -102,6 +102,9 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 
 PropertiesDock::~PropertiesDock()
 {
+	auto sh = obs_get_signal_handler();
+	signal_handler_disconnect(sh, "canvas_create", canvas_create, this);
+	signal_handler_disconnect(sh, "canvas_destroy", canvas_destroy, this);
 	obs_frontend_remove_event_callback(frontend_event, this);
 }
 
@@ -109,19 +112,22 @@ void PropertiesDock::canvas_create(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
-	this_->canvasCombo->addItem(QString::fromUtf8(obs_canvas_get_name(canvas)));
-
-	//auto sh = obs_canvas_get_signal_handler(canvas);
-	//signal_handler_connect(sh, "channel_change", canvas_channel_change, this_);
+	auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
+	QMetaObject::invokeMethod(this_, [canvas_name, this_] { this_->canvasCombo->addItem(canvas_name); });
 }
 
 void PropertiesDock::canvas_destroy(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
-	auto idx = this_->canvasCombo->findText(QString::fromUtf8(obs_canvas_get_name(canvas)));
-	if (idx >= 0)
-		this_->canvasCombo->removeItem(idx);
+	auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
+	QMetaObject::invokeMethod(
+		this_,
+		[canvas_name, this_] {
+			auto idx = this_->canvasCombo->findText(canvas_name);
+			if (idx >= 0)
+				this_->canvasCombo->removeItem(idx);
+		});
 }
 
 void PropertiesDock::canvas_channel_change(void *param, calldata_t *cd)

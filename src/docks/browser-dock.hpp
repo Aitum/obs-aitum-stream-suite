@@ -3,20 +3,8 @@
 #include <QWidget>
 #include <obs-frontend-api.h>
 #include <obs.hpp>
+#include "../utils/event-filter.hpp"
 
-typedef std::function<bool(QObject *, QEvent *)> EventFilterFunc;
-
-class OBSEventFilter : public QObject {
-	Q_OBJECT
-public:
-	OBSEventFilter(EventFilterFunc filter_) : filter(filter_) {}
-
-protected:
-	bool eventFilter(QObject *obj, QEvent *event) { return filter(obj, event); }
-
-public:
-	EventFilterFunc filter;
-};
 
 class BrowserDock : public QWidget {
 	Q_OBJECT

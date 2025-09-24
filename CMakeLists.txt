@@ -84,6 +84,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/output-dialog.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
+  src/utils/event-filter.cpp
   src/utils/file-download.c
   src/utils/widgets/hotkey-edit.cpp
   src/utils/widgets/locked-checkbox.cpp
@@ -92,6 +93,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/switching-splitter.cpp
   src/utils/widgets/qt-display.cpp
   src/utils/widgets/visibility-checkbox.cpp
+  src/utils/event-filter.hpp
   src/utils/file-download.h
   src/utils/widgets/hotkey-edit.hpp
   src/utils/widgets/locked-checkbox.hpp

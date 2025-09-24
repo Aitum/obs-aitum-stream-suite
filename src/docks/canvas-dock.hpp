@@ -1,15 +1,44 @@
 
 #pragma once
+#include "../utils/event-filter.hpp"
 #include "../utils/widgets/qt-display.hpp"
 #include "../utils/widgets/source-tree.hpp"
 #include <mutex>
 #include <obs.h>
-#include <QFrame>
-#include <QLayout>
-#include <QSplitter>
-#include <QListWidget>
 #include <QComboBox>
+#include <QFrame>
+#include <QKeyEvent>
+#include <QLayout>
+#include <QListWidget>
+#include <QMouseEvent>
+#include <QSplitter>
+#include <QWheelEvent>
 #include <util/config-file.h>
+#include <graphics/matrix4.h>
+#include <graphics/vec2.h>
+
+#define ITEM_LEFT (1 << 0)
+#define ITEM_RIGHT (1 << 1)
+#define ITEM_TOP (1 << 2)
+#define ITEM_BOTTOM (1 << 3)
+#define ITEM_ROT (1 << 4)
+
+enum class ItemHandle : uint32_t {
+	None = 0,
+	TopLeft = ITEM_TOP | ITEM_LEFT,
+	TopCenter = ITEM_TOP,
+	TopRight = ITEM_TOP | ITEM_RIGHT,
+	CenterLeft = ITEM_LEFT,
+	CenterRight = ITEM_RIGHT,
+	BottomLeft = ITEM_BOTTOM | ITEM_LEFT,
+	BottomCenter = ITEM_BOTTOM,
+	BottomRight = ITEM_BOTTOM | ITEM_RIGHT,
+	Rot = ITEM_ROT
+};
+
+#define HANDLE_RADIUS 4.0f
+#define HANDLE_SEL_RADIUS (HANDLE_RADIUS * 1.5f)
+
 
 class CanvasDock : public QFrame {
 	Q_OBJECT
@@ -49,6 +78,7 @@ private:
 	float scrollX = 0.5f;
 	float scrollY = 0.5f;
 	float groupRot = 0.0f;
+	float previewScale = 1.0f;
 
 	SourceTree *sourceList = nullptr;
 	QListWidget *sceneList = nullptr;
@@ -57,6 +87,60 @@ private:
 	OBSWeakSource source;
 	std::vector<OBSSource> transitions;
 	QComboBox *transition;
+
+	bool mouseDown = false;
+	bool mouseMoved = false;
+	bool scrollMode = false;
+	bool fixedScaling = false;
+	bool cropping = false;
+	bool mouseOverItems = false;
+	bool preview_disabled = false;
+	QFrame *previewDisabledWidget;
+	vec2 scrollingFrom{};
+	vec2 scrollingOffset{};
+	vec2 lastMoveOffset{};
+	float rotateAngle{};
+	vec2 rotatePoint{};
+	vec2 offsetPoint{};
+	vec2 stretchItemSize{};
+	matrix4 screenToItem{};
+	matrix4 itemToScreen{};
+	obs_sceneitem_crop startCrop{};
+	vec2 startItemPos{};
+	vec2 cropSize{};
+	OBSSceneItem stretchGroup;
+	OBSSceneItem stretchItem;
+	ItemHandle stretchHandle = ItemHandle::None;
+	matrix4 invGroupTransform{};
+	inline bool IsFixedScaling() const { return fixedScaling; }
+	vec2 GetMouseEventPos(QMouseEvent *event);
+	bool SelectedAtPos(obs_scene_t *scene, const vec2 &pos);
+
+	std::unique_ptr<OBSEventFilter> eventFilter;
+	OBSEventFilter *BuildEventFilter();
+	bool HandleMousePressEvent(QMouseEvent *event);
+	bool HandleMouseReleaseEvent(QMouseEvent *event);
+	bool HandleMouseMoveEvent(QMouseEvent *event);
+	bool HandleMouseLeaveEvent(QMouseEvent *event);
+	bool HandleMouseWheelEvent(QWheelEvent *event);
+	bool HandleKeyPressEvent(QKeyEvent *event);
+	bool HandleKeyReleaseEvent(QKeyEvent *event);
+	void UpdateCursor(uint32_t &flags);
+	void ProcessClick(const vec2 &pos);
+	void DoCtrlSelect(const vec2 &pos);
+	void DoSelect(const vec2 &pos);
+	OBSSceneItem GetItemAtPos(const vec2 &pos, bool selectBelow);
+	void RotateItem(const vec2 &pos);
+	void CropItem(const vec2 &pos);
+	void StretchItem(const vec2 &pos);
+	void SnapStretchingToScreen(vec3 &tl, vec3 &br);
+	vec3 GetSnapOffset(const vec3 &tl, const vec3 &br);
+	void MoveItems(const vec2 &pos);
+	void SnapItemMovement(vec2 &offset);
+	void BoxItems(const vec2 &startPos, const vec2 &pos);
+	void GetStretchHandleData(const vec2 &pos, bool ignoreGroup);
+	void ClampAspect(vec3 &tl, vec3 &br, vec2 &size, const vec2 &baseSize);
+	vec3 CalculateStretchPos(const vec3 &tl, const vec3 &br);
 
 	obs_scene_item *GetSelectedItem(obs_scene_t *scene = nullptr);
 	QColor GetSelectionColor() const;
@@ -77,10 +161,10 @@ private:
 	int GetTopSelectedSourceItem();
 	void ChangeSceneIndex(bool relative, int offset, int invalidIdx);
 	QListWidget *GetGlobalScenesList();
+	void LoadScenes();
 	void AddScene(QString duplicate = "", bool ask_name = true);
 	void RemoveScene(const QString &sceneName);
 	void SetLinkedScene(obs_source_t *scene, const QString &linkedScene);
-	void SwitchScene(const QString &scene_name, bool transition = true);
 	obs_source_t *GetTransition(const char *transition_name);
 	bool SwapTransition(obs_source_t *transition);
 	void ShowSourcesContextMenu(obs_sceneitem_t *item);
@@ -138,8 +222,76 @@ private:
 	static bool MultiplySelectedItemScale(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool CenterAlignSelectedItems(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool GetSelectedItemsWithSize(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static void source_rename(void *p, calldata_t *calldata);
+	static void source_remove(void *p, calldata_t *calldata);
+	static bool select_one(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool CheckItemSelected(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool FindItemAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static void RotatePos(vec2 *pos, float rot);
+	static bool move_items(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool FindItemsInBox(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool IntersectBox(matrix4 transform, float x1, float x2, float y1, float y2);
+	static bool IntersectLine(float x1, float x2, float x3, float x4, float y1, float y2, float y3, float y4);
+	static bool CounterClockwise(float x1, float x2, float x3, float y1, float y2, float y3);
+	static bool AddItemBounds(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool GetSourceSnapOffset(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static bool FindHandleAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+
+private slots:
+	void SceneRemoved(const QString name);
+	void AddSceneItem(OBSSceneItem item);
+	void RefreshSources(OBSScene scene);
+	void ReorderSources(OBSScene scene);
+	void SwitchBackToSelectedTransition();
+	void SwitchScene(const QString &scene_name, bool transition = true);
 
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasDock();
+};
+
+struct SelectedItemBounds {
+	bool first = true;
+	vec3 tl, br;
+};
+
+struct OffsetData {
+	float clampDist;
+	vec3 tl, br, offset;
+};
+
+struct HandleFindData {
+	const vec2 &pos;
+	const float radius;
+	matrix4 parent_xform;
+
+	OBSSceneItem item;
+	ItemHandle handle = ItemHandle::None;
+	float angle = 0.0f;
+	vec2 rotatePoint;
+	vec2 offsetPoint;
+
+	float angleOffset = 0.0f;
+
+	HandleFindData(const HandleFindData &) = delete;
+	HandleFindData(HandleFindData &&) = delete;
+	HandleFindData &operator=(const HandleFindData &) = delete;
+	HandleFindData &operator=(HandleFindData &&) = delete;
+
+	inline HandleFindData(const vec2 &pos_, float scale) : pos(pos_), radius(HANDLE_SEL_RADIUS / scale)
+	{
+		matrix4_identity(&parent_xform);
+	}
+
+	inline HandleFindData(const HandleFindData &hfd, obs_sceneitem_t *parent)
+		: pos(hfd.pos),
+		  radius(hfd.radius),
+		  item(hfd.item),
+		  handle(hfd.handle),
+		  angle(hfd.angle),
+		  rotatePoint(hfd.rotatePoint),
+		  offsetPoint(hfd.offsetPoint)
+	{
+		obs_sceneitem_get_draw_transform(parent, &parent_xform);
+	}
 };

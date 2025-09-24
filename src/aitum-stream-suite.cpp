@@ -239,6 +239,7 @@ void load_current_profile_config()
 			if (!c)
 				c = obs_get_canvas_by_name(canvas_name);
 			if (c) {
+				obs_frontend_remove_canvas(c);
 				obs_canvas_remove(c);
 				obs_canvas_release(c);
 			}
