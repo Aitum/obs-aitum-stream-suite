@@ -219,7 +219,7 @@ void load_current_profile_config()
 	if (!canvas) {
 		canvas = obs_data_array_create();
 		auto new_canvas = obs_data_create();
-		obs_data_set_string(new_canvas, "name", "Aitum Stream Suite Canvas");
+		obs_data_set_string(new_canvas, "name", "Vertical");
 		obs_data_array_push_back(canvas, new_canvas);
 		obs_data_release(new_canvas);
 		obs_data_set_array(current_profile_config, "canvas", canvas);
