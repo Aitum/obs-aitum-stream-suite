@@ -402,6 +402,10 @@ bool obs_module_load(void)
 
 	auto user_config = obs_frontend_get_user_config();
 	if (user_config) {
+		if (!config_get_bool(user_config, "Aitum", "ThemeSet")) {
+			config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
+			config_set_bool(user_config, "Aitum", "ThemeSet", true);
+		}
 		const char *theme = config_get_string(user_config, "Appearance", "Theme");
 		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
 			main_window->setContentsMargins(10, 10, 10, 10);
