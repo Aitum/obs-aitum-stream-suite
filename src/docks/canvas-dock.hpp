@@ -238,6 +238,7 @@ private:
 	static bool FindHandleAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 
 private slots:
+	void AddSourceFromAction();
 	void SceneRemoved(const QString name);
 	void AddSceneItem(OBSSceneItem item);
 	void RefreshSources(OBSScene scene);

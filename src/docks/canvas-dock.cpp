@@ -1945,7 +1945,7 @@ void CanvasDock::SceneItemAdded(void *data, calldata_t *params)
 
 	obs_sceneitem_t *item = (obs_sceneitem_t *)calldata_ptr(params, "item");
 
-	QMetaObject::invokeMethod(window, "AddSceneItem", Q_ARG(OBSSceneItem, OBSSceneItem(item)));
+	QMetaObject::invokeMethod(window, "AddSceneItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, OBSSceneItem(item)));
 }
 
 void CanvasDock::SceneReordered(void *data, calldata_t *params)
@@ -1954,7 +1954,7 @@ void CanvasDock::SceneReordered(void *data, calldata_t *params)
 
 	obs_scene_t *scene = (obs_scene_t *)calldata_ptr(params, "scene");
 
-	QMetaObject::invokeMethod(window, "ReorderSources", Q_ARG(OBSScene, OBSScene(scene)));
+	QMetaObject::invokeMethod(window, "ReorderSources", Qt::QueuedConnection, Q_ARG(OBSScene, OBSScene(scene)));
 }
 
 void CanvasDock::SceneRefreshed(void *data, calldata_t *params)
@@ -1963,7 +1963,7 @@ void CanvasDock::SceneRefreshed(void *data, calldata_t *params)
 
 	obs_scene_t *scene = (obs_scene_t *)calldata_ptr(params, "scene");
 
-	QMetaObject::invokeMethod(window, "RefreshSources", Q_ARG(OBSScene, OBSScene(scene)));
+	QMetaObject::invokeMethod(window, "RefreshSources", Qt::QueuedConnection, Q_ARG(OBSScene, OBSScene(scene)));
 }
 
 obs_source_t *CanvasDock::GetTransition(const char *transition_name)
@@ -2190,7 +2190,17 @@ bool CanvasDock::add_sources_of_type_to_menu(void *param, obs_source_t *source)
 void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 {
 	menu->clear();
-	if (strcmp(type, "scene") == 0) {
+	if (obs_get_source_output_flags(type) & OBS_SOURCE_REQUIRES_CANVAS) {
+		obs_enum_canvases(
+			[](void *param, obs_canvas_t *canvas) {
+				QMenu *m = (QMenu *)param;
+				auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
+				auto cm = m->addMenu(canvas_name);
+				obs_canvas_enum_scenes(canvas, add_sources_of_type_to_menu, cm);
+				return true;
+			},
+			menu);
+	} else if (strcmp(type, "scene") == 0) {
 		obs_enum_scenes(add_sources_of_type_to_menu, menu);
 	} else {
 		obs_enum_sources(add_sources_of_type_to_menu, menu);
@@ -3275,7 +3285,6 @@ OBSEventFilter *CanvasDock::BuildEventFilter()
 		}
 	});
 }
-
 
 bool CanvasDock::HandleMousePressEvent(QMouseEvent *event)
 {
@@ -4650,4 +4659,39 @@ bool CanvasDock::HandleKeyReleaseEvent(QKeyEvent *event)
 {
 	UNUSED_PARAMETER(event);
 	return true;
+}
+
+void CanvasDock::AddSourceFromAction()
+{
+	QAction *a = qobject_cast<QAction *>(sender());
+	if (!a)
+		return;
+
+	auto t = a->data().toString();
+	auto idUtf8 = t.toUtf8();
+	const char *id = idUtf8.constData();
+	if (id && *id && strlen(id)) {
+		const char *v_id = obs_get_latest_input_type_id(id);
+		QString placeHolderText = QString::fromUtf8(obs_source_get_display_name(v_id));
+		QString text = placeHolderText;
+		int i = 2;
+		OBSSourceAutoRelease s = nullptr;
+		obs_source_t *created_source = nullptr;
+		if (obs_get_source_output_flags(id) & OBS_SOURCE_REQUIRES_CANVAS) {
+			while ((s = obs_canvas_get_source_by_name(canvas, text.toUtf8().constData()))) {
+				text = QString("%1 %2").arg(placeHolderText).arg(i++);
+			}
+			created_source = obs_scene_get_source(obs_canvas_scene_create(canvas, text.toUtf8().constData()));
+		} else {
+			while ((s = obs_get_source_by_name(text.toUtf8().constData()))) {
+				text = QString("%1 %2").arg(placeHolderText).arg(i++);
+			}
+			created_source = obs_source_create(id, text.toUtf8().constData(), nullptr, nullptr);
+		}
+		obs_scene_add(scene, created_source);
+		if (obs_source_configurable(created_source)) {
+			obs_frontend_open_source_properties(created_source);
+		}
+		obs_source_release(created_source);
+	}
 }
