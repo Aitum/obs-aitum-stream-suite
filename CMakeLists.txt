@@ -81,7 +81,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/name-dialog.cpp
   src/dialogs/name-dialog.hpp
   src/dialogs/output-dialog.cpp
-  src/dialogs/output-dialog.hpp)
+  src/dialogs/output-dialog.hpp
+  src/dialogs/scene-collection-wizard.cpp
+  src/dialogs/scene-collection-wizard.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/utils/event-filter.cpp

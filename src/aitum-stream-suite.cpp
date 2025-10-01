@@ -17,6 +17,7 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
+#include "dialogs/scene-collection-wizard.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -307,7 +308,36 @@ void save_current_profile_config()
 static void frontend_event(enum obs_frontend_event event, void *private_data)
 {
 	UNUSED_PARAMETER(private_data);
-	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED || event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+		size_t scene_count = 0;
+		obs_enum_scenes(
+			[](void *param, obs_source_t *) {
+				size_t *scene_count = (size_t *)param;
+				(*scene_count)++;
+				return true;
+			},
+			&scene_count);
+		if (scene_count <= 1) {
+			obs_source_t * ss = obs_frontend_get_current_scene();
+			obs_scene_t *scene = obs_scene_from_source(ss);
+			bool has_items = false;
+			obs_scene_enum_items(
+				scene,
+				[](obs_scene_t *, obs_sceneitem_t *, void *param) {
+					bool *has_items = (bool *)param;
+					*has_items = true;
+					return false;
+				},
+				&has_items);
+			if (!has_items) {
+				SceneCollectionWizard wizard;
+				wizard.exec();
+			}
+			obs_source_release(ss);
+		}
+		load_current_profile_config();
+	}
+	else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGING) {
 		save_current_profile_config();
@@ -395,6 +425,14 @@ bool obs_module_load(void)
 	QFontDatabase::addApplicationFont(":/aitum/media/Roboto-Italic.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed-Italic.ttf");
+
+	obs_frontend_add_tools_menu_item(
+		obs_module_text("SceneCollectionWizard"),
+		[](void *) {
+			SceneCollectionWizard wizard;
+			wizard.exec();
+		},
+		nullptr);
 
 	obs_frontend_add_event_callback(frontend_event, nullptr);
 
