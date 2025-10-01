@@ -66,7 +66,7 @@ BrowserDock::BrowserDock(const char *name, const char *url, QWidget *parent, Qt:
 	obs_frontend_add_event_callback(frontend_event, this);
 
 	setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(this, &QWidget::customContextMenuRequested, [this](const QPoint &pos) {
+	connect(this, &QWidget::customContextMenuRequested, [this]() {
 		QMenu menu;
 		menu.addAction(QString::fromUtf8("Refresh"), [this] {
 			auto props = obs_source_properties(browser_source);
