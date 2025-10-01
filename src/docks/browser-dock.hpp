@@ -1,10 +1,21 @@
 #pragma once
 
 #include <QWidget>
+#include <QGuiApplication>
+#include <QPlatformSurfaceEvent>
+#include <QWindow>
 #include <obs-frontend-api.h>
 #include <obs.hpp>
 #include "../utils/event-filter.hpp"
 
+#if !defined(_WIN32) && !defined(__APPLE__)
+#include <obs-nix-platform.h>
+#endif
+
+#ifdef ENABLE_WAYLAND
+#include <QGuiApplication>
+#include <qpa/qplatformnativeinterface.h>
+#endif
 
 class BrowserDock : public QWidget {
 	Q_OBJECT
@@ -41,26 +52,15 @@ public:
 	~BrowserDock() { display = nullptr; }
 
 	void CreateDisplay(bool force = false);
-	void DestroyDisplay()
-	{
-		display = nullptr;
-	};
+	void DestroyDisplay() { display = nullptr; };
 };
 
-
-#ifdef ENABLE_WAYLAND
-#include <obs-nix-platform.h>
-#include <qpa/qplatformnativeinterface.h>
-#include <QGuiApplication>
-#include <QPlatformSurfaceEvent>
-#include <QWindow>
-
-class SurfaceEventFilter : public QObject {
+class BrowserSurfaceEventFilter : public QObject {
 	BrowserDock *display;
 	int mTimerId;
 
 public:
-	SurfaceEventFilter(BrowserDock *src) : display(src), mTimerId(0) {}
+	BrowserSurfaceEventFilter(BrowserDock *src) : display(src), mTimerId(0) {}
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *event) override
@@ -109,5 +109,3 @@ private:
 		}
 	}
 };
-
-#endif

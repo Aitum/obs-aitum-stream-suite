@@ -12,11 +12,11 @@
 #endif
 #include <util/platform.h>
 
- BrowserDock::BrowserDock(const char *name, const char *url, QWidget *parent, Qt::WindowFlags flags)
+BrowserDock::BrowserDock(const char *name, const char *url, QWidget *parent, Qt::WindowFlags flags)
 	: QWidget(parent, flags),
 	  eventFilter(BuildEventFilter())
 {
-	 setAttribute(Qt::WA_PaintOnScreen);
+	setAttribute(Qt::WA_PaintOnScreen);
 	setAttribute(Qt::WA_StaticContents);
 	setAttribute(Qt::WA_NoSystemBackground);
 	setAttribute(Qt::WA_OpaquePaintEvent);
@@ -33,7 +33,7 @@
 	obs_data_set_string(settings, "css", "");
 	browser_source = obs_source_create_private("browser_source", name, settings);
 	obs_source_inc_showing(browser_source);
-	
+
 	auto windowVisible = [this](bool visible) {
 		if (!visible) {
 #if !defined(_WIN32) && !defined(__APPLE__)
@@ -60,13 +60,9 @@
 	connect(windowHandle(), &QWindow::visibleChanged, windowVisible);
 	connect(windowHandle(), &QWindow::screenChanged, screenChanged);
 
-#ifdef ENABLE_WAYLAND
-	if (obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND)
-		windowHandle()->installEventFilter(new SurfaceEventFilter(this));
-#endif
+	windowHandle()->installEventFilter(new BrowserSurfaceEventFilter(this));
 	obs_frontend_add_event_callback(frontend_event, this);
 }
-
 
 void BrowserDock::paintEvent(QPaintEvent *event)
 {
@@ -159,6 +155,9 @@ void BrowserDock::CreateDisplay(bool force)
 	if (!windowHandle()->isExposed() && !force)
 		return;
 
+	if (!isVisible() && !force)
+		return;
+
 	QSize s = size() * devicePixelRatioF();
 
 	gs_init_data info = {};
@@ -237,7 +236,8 @@ void BrowserDock::Draw(void *data, uint32_t cx, uint32_t cy)
 	gs_viewport_pop();
 }
 
-void BrowserDock::frontend_event(enum obs_frontend_event event, void *data) {
+void BrowserDock::frontend_event(enum obs_frontend_event event, void *data)
+{
 	BrowserDock *window = static_cast<BrowserDock *>(data);
 	if (event == OBS_FRONTEND_EVENT_EXIT || event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
 		obs_frontend_remove_event_callback(frontend_event, data);
@@ -382,7 +382,7 @@ bool BrowserDock::GetSourceRelativeXY(int mouseX, int mouseY, int &relX, int &re
 		relX = int(float(mouseXscaled - x) / scale);
 		relY = int(float(mouseYscaled) / scale);
 	} else {
-		relX = int(float(mouseXscaled ) / scale);
+		relX = int(float(mouseXscaled) / scale);
 		relY = int(float(mouseYscaled - y) / scale);
 	}
 
@@ -483,4 +483,3 @@ bool BrowserDock::HandleKeyEvent(QKeyEvent *event)
 
 	return true;
 }
-
