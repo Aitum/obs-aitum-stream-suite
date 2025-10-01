@@ -23,6 +23,7 @@ BrowserDock::BrowserDock(const char *name, const char *url, QWidget *parent, Qt:
 	setAttribute(Qt::WA_DontCreateNativeAncestors);
 	setAttribute(Qt::WA_NativeWindow);
 
+	setMinimumSize(200, 100);
 	setMouseTracking(true);
 	setFocusPolicy(Qt::StrongFocus);
 	installEventFilter(eventFilter.get());
