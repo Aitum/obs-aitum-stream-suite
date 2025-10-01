@@ -3,6 +3,7 @@
 #include <QWindow>
 #include <QMouseEvent>
 #include <QDockWidget>
+#include <QMenu>
 
 #include "browser-dock.hpp"
 
@@ -63,6 +64,24 @@ BrowserDock::BrowserDock(const char *name, const char *url, QWidget *parent, Qt:
 
 	windowHandle()->installEventFilter(new BrowserSurfaceEventFilter(this));
 	obs_frontend_add_event_callback(frontend_event, this);
+
+	setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(this, &QWidget::customContextMenuRequested, [this](const QPoint &pos) {
+		QMenu menu;
+		menu.addAction(QString::fromUtf8("Refresh"), [this] {
+			auto props = obs_source_properties(browser_source);
+			auto prop = obs_properties_get(props, "refreshnocache");
+			obs_property_button_clicked(prop, browser_source);
+			obs_properties_destroy(props);
+		});
+		menu.addAction(QString::fromUtf8("Reset"), [this] {
+			auto settings = obs_source_get_settings(browser_source);
+			obs_data_set_string(settings, "css", strcmp(obs_data_get_string(settings, "css"), "") == 0 ? " " : "");
+			obs_source_update(browser_source, settings);
+			obs_data_release(settings);
+		});
+		menu.exec(QCursor::pos());
+	});
 }
 
 void BrowserDock::paintEvent(QPaintEvent *event)
