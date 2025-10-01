@@ -41,12 +41,14 @@ private:
 	static void filter_remove(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void frontend_event(enum obs_frontend_event event, void *param);
+	static bool filter_compatible(uint32_t sourceFlags, uint32_t filterFlags);
 
 private slots:
 	void SceneChanged(OBSSource scene);
 	void TransitionChanged(OBSSource transition);
 	void SourceChanged(OBSSource source);
 	void LoadProperties(OBSSource source);
+	void ShowFiltersContextMenu();
 
 public:
 	PropertiesDock(QWidget *parent = nullptr);

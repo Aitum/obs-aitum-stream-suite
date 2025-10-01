@@ -1,11 +1,13 @@
 #include "properties-dock.hpp"
 #include <obs.h>
+#include <obs-module.h>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QDesktopServices>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -91,6 +93,17 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 		}
 		obs_source_release(source);
 	});
+
+	auto addFilterButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8("AddFilter"));
+	addFilterButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
+	addFilterButton->setProperty("class", "icon-plus");
+	addFilterButton->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
+	addFilterButton->setProperty("toolButton", true);
+	addFilterButton->setFlat(false);
+	hl->addWidget(addFilterButton);
+
+	connect(addFilterButton, &QPushButton::clicked, [this] { ShowFiltersContextMenu(); });
+
 	layout = new QFormLayout;
 	vl->addLayout(layout);
 	//QWidget *spacer = new QWidget();
@@ -121,13 +134,11 @@ void PropertiesDock::canvas_destroy(void *param, calldata_t *cd)
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
 	auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
-	QMetaObject::invokeMethod(
-		this_,
-		[canvas_name, this_] {
-			auto idx = this_->canvasCombo->findText(canvas_name);
-			if (idx >= 0)
-				this_->canvasCombo->removeItem(idx);
-		});
+	QMetaObject::invokeMethod(this_, [canvas_name, this_] {
+		auto idx = this_->canvasCombo->findText(canvas_name);
+		if (idx >= 0)
+			this_->canvasCombo->removeItem(idx);
+	});
 }
 
 void PropertiesDock::canvas_channel_change(void *param, calldata_t *cd)
@@ -910,4 +921,78 @@ void PropertiesDock::frontend_event(enum obs_frontend_event event, void *param)
 			}
 		}
 	}
+}
+
+void PropertiesDock::ShowFiltersContextMenu()
+{
+	if (!current_source)
+		return;
+	auto s = obs_weak_source_get_source(current_source);
+	if (!s)
+		return;
+	auto sf = obs_source_get_output_flags(s);
+	obs_source_release(s);
+	QMenu menu;
+	size_t idx = 0;
+	const char *type_str;
+	while (obs_enum_filter_types(idx++, &type_str)) {
+		uint32_t caps = obs_get_source_output_flags(type_str);
+		if ((caps & OBS_SOURCE_DEPRECATED) != 0)
+			continue;
+		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0)
+			continue;
+		if ((caps & OBS_SOURCE_CAP_OBSOLETE) != 0)
+			continue;
+
+		if (!filter_compatible(sf, caps))
+			continue;
+
+		auto name = QString::fromUtf8(obs_source_get_display_name(type_str));
+
+		QList<QAction *> actions = menu.actions();
+		QAction *before = nullptr;
+		for (QAction *menuAction : actions) {
+			if (menuAction->text().compare(name) >= 0)
+				before = menuAction;
+		}
+		auto na = new QAction(name, &menu);
+		connect(na, &QAction::triggered, [this, name, type_str] {
+			if (!current_source)
+				return;
+			auto s = obs_weak_source_get_source(current_source);
+			if (!s)
+				return;
+			QString filter_name = name;
+			int i = 2;
+			OBSSourceAutoRelease f = nullptr;
+			while ((f = obs_source_get_filter_by_name(s, filter_name.toUtf8().constData()))) {
+				filter_name = QString("%1 %2").arg(name).arg(i++);
+			}
+			auto filter = obs_source_create(type_str, filter_name.toUtf8().constData(), nullptr, nullptr);
+			obs_source_filter_add(s, filter);
+			obs_source_release(s);
+			filterCombo->setCurrentText(filter_name);
+		});
+		menu.insertAction(before, na);
+	}
+
+	menu.exec(QCursor::pos());
+}
+
+bool PropertiesDock::filter_compatible(uint32_t sourceFlags, uint32_t filterFlags)
+{
+	bool filterVideo = (filterFlags & OBS_SOURCE_VIDEO) != 0;
+	bool filterAsync = (filterFlags & OBS_SOURCE_ASYNC) != 0;
+	bool filterAudio = (filterFlags & OBS_SOURCE_AUDIO) != 0;
+	bool audio = (sourceFlags & OBS_SOURCE_AUDIO) != 0;
+	bool audioOnly = (sourceFlags & OBS_SOURCE_VIDEO) == 0;
+	bool asyncSource = (sourceFlags & OBS_SOURCE_ASYNC) != 0;
+
+	if (!audio && filterAudio)
+		return false;
+	if (!asyncSource && filterAsync)
+		return false;
+	if (audioOnly && filterVideo)
+		return false;
+	return true;
 }
