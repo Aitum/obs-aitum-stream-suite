@@ -15,7 +15,7 @@ SceneCollectionWizard::SceneCollectionWizard(QWidget *parent) : QWizard(parent)
 
 	setStartId(Page_SceneCollection);
 
-	setWindowTitle(QString::fromUtf8("SceneCollectionWizard"));
+	setWindowTitle(QString::fromUtf8(obs_module_text("SceneCollectionWizard")));
 
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
@@ -26,8 +26,8 @@ SceneCollectionWizard::SceneCollectionWizard(QWidget *parent) : QWizard(parent)
 
 int SceneCollectionWizard::nextId() const
 {
-	return QWizard::nextId();
-	//return SceneCollectionWizard::Page_Cam;
+	//return QWizard::nextId();
+	return SceneCollectionWizard::Page_Cam;
 }
 
 SceneCollectionPage::SceneCollectionPage(QWidget *parent) : QWizardPage(parent)

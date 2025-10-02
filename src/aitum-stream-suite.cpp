@@ -8,6 +8,7 @@
 #include "version.h"
 #include <obs-frontend-api.h>
 #include <obs-module.h>
+#include <QApplication>
 #include <QDesktopServices>
 #include <QDockWidget>
 #include <QMainWindow>
@@ -305,10 +306,17 @@ void save_current_profile_config()
 	dstr_free(&path);
 }
 
+static bool restart = false;
+
 static void frontend_event(enum obs_frontend_event event, void *private_data)
 {
 	UNUSED_PARAMETER(private_data);
 	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+		if (restart) {
+			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			QMetaObject::invokeMethod(main_window, [main_window] { main_window->close(); }, Qt::QueuedConnection);
+			return;
+		}
 		size_t scene_count = 0;
 		obs_enum_scenes(
 			[](void *param, obs_source_t *) {
@@ -318,7 +326,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			},
 			&scene_count);
 		if (scene_count <= 1) {
-			obs_source_t * ss = obs_frontend_get_current_scene();
+			obs_source_t *ss = obs_frontend_get_current_scene();
 			obs_scene_t *scene = obs_scene_from_source(ss);
 			bool has_items = false;
 			obs_scene_enum_items(
@@ -336,8 +344,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_source_release(ss);
 		}
 		load_current_profile_config();
-	}
-	else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
+	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGING) {
 		save_current_profile_config();
@@ -347,7 +354,8 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_data_release(current_profile_config);
 			current_profile_config = nullptr;
 		}
-		output_dock->Exiting();
+		if (output_dock)
+			output_dock->Exiting();
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
@@ -437,12 +445,13 @@ bool obs_module_load(void)
 	obs_frontend_add_event_callback(frontend_event, nullptr);
 
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-
 	auto user_config = obs_frontend_get_user_config();
 	if (user_config) {
 		if (!config_get_bool(user_config, "Aitum", "ThemeSet")) {
 			config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
 			config_set_bool(user_config, "Aitum", "ThemeSet", true);
+			config_save_safe(user_config, "tmp", "bak");
+			restart = true;
 		}
 		const char *theme = config_get_string(user_config, "Appearance", "Theme");
 		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
