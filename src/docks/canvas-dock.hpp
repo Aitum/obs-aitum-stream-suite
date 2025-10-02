@@ -162,6 +162,7 @@ private:
 	void ChangeSceneIndex(bool relative, int offset, int invalidIdx);
 	QListWidget *GetGlobalScenesList();
 	void LoadScenes();
+	void UpdateLinkedScenes();
 	void AddScene(QString duplicate = "", bool ask_name = true);
 	void RemoveScene(const QString &sceneName);
 	void SetLinkedScene(obs_source_t *scene, const QString &linkedScene);

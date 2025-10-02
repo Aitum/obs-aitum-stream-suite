@@ -1798,7 +1798,7 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 		//if (scenesCombo)
 		//	scenesCombo->addItem(sn);
 		auto sli = new QListWidgetItem(sn, sceneList);
-		sli->setIcon(create2StateIcon(":/aitum/media/linked.svg", ":/aitum/media/unlinked.svg"));
+		sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 		sceneList->addItem(sli);
 
 		SwitchScene(sn);
@@ -2513,6 +2513,12 @@ void CanvasDock::SetLinkedScene(obs_source_t *scene_, const QString &linkedScene
 	obs_data_release(ss);
 	obs_data_release(found);
 	obs_data_array_release(c);
+
+	for (int row = 0; row < sceneList->count(); row++) {
+		auto item = sceneList->item(row);
+		item->setIcon(QIcon(":/aitum/media/unlinked.svg"));
+	}
+	UpdateLinkedScenes();
 }
 
 void CanvasDock::ShowSourcesContextMenu(obs_sceneitem_t *item)
@@ -3111,7 +3117,7 @@ void CanvasDock::LoadScenes()
 			signal_handler_connect(sh, "remove", source_remove, t);
 			QString name = QString::fromUtf8(obs_source_get_name(src));
 			auto sli = new QListWidgetItem(name, t->sceneList);
-			sli->setIcon(create2StateIcon(":/aitum/media/linked.svg", ":/aitum/media/unlinked.svg"));
+			sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 			t->sceneList->addItem(sli);
 			obs_data_t *settings = obs_source_get_settings(src);
 			if ((t->currentSceneName.isEmpty() && obs_data_get_bool(settings, "canvas_active")) ||
@@ -3128,12 +3134,56 @@ void CanvasDock::LoadScenes()
 		},
 		this);
 
+	UpdateLinkedScenes();
+
 	if (sceneList->count() == 0) {
 		AddScene("", false);
 	}
 
 	if (sceneList->currentRow() < 0)
 		sceneList->setCurrentRow(0);
+}
+
+void CanvasDock::UpdateLinkedScenes() {
+	struct obs_frontend_source_list scenes = {};
+	obs_frontend_get_scenes(&scenes);
+	for (size_t i = 0; i < scenes.sources.num; i++) {
+		obs_source_t *src = scenes.sources.array[i];
+		obs_data_t *settings = obs_source_get_settings(src);
+		auto c = obs_data_get_array(settings, "canvas");
+		if (c) {
+			const auto count = obs_data_array_count(c);
+			for (size_t j = 0; j < count; j++) {
+				auto item = obs_data_array_item(c, j);
+				if (!item)
+					continue;
+				if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(canvas)) == 0) {
+					auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+					auto sil = sceneList->findItems(sn, Qt::MatchExactly);
+					foreach(auto si, sil)
+					{
+						si->setIcon(QIcon(":/aitum/media/linked.svg"));
+					}
+				} else if (strcmp(obs_data_get_string(item, "name"), "") == 0 &&
+					   obs_data_get_int(item, "width") == canvas_width &&
+					   obs_data_get_int(item, "height") == canvas_height) {
+					obs_data_set_string(item, "name", obs_canvas_get_name(canvas));
+					auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+					auto sil = sceneList->findItems(sn, Qt::MatchExactly);
+					foreach(auto si, sil)
+					{
+						si->setIcon(QIcon(":/aitum/media/linked.svg"));
+					}
+				}
+				obs_data_release(item);
+			}
+
+			obs_data_array_release(c);
+		}
+
+		obs_data_release(settings);
+	}
+	obs_frontend_source_list_free(&scenes);
 }
 
 void CanvasDock::source_rename(void *data, calldata_t *calldata)
