@@ -5,6 +5,8 @@
 #include <QListWidget>
 #include <QFormLayout>
 #include <QComboBox>
+#include <obs-frontend-api.h>
+#include <util/config-file.h>
 
 SceneCollectionWizard::SceneCollectionWizard(QWidget *parent) : QWizard(parent)
 {
@@ -24,10 +26,158 @@ SceneCollectionWizard::SceneCollectionWizard(QWidget *parent) : QWizard(parent)
 #endif
 }
 
+SceneCollectionWizard::~SceneCollectionWizard()
+{
+	if (scene_collection_data)
+		obs_data_release(scene_collection_data);
+}
+
+void SceneCollectionWizard::LoadSceneCollectionFile(QString path)
+{
+	if (scene_collection_data)
+		obs_data_release(scene_collection_data);
+
+	cams.clear();
+	mics.clear();
+
+	scene_collection_data = obs_data_create_from_json_file(path.toUtf8().constData());
+	if (!scene_collection_data)
+		return;
+
+	auto sources = obs_data_get_array(scene_collection_data, "sources");
+	size_t c = obs_data_array_count(sources);
+	for (size_t i = 0; i < c; i++) {
+		auto item = obs_data_array_item(sources, i);
+		if (!item)
+			continue;
+		CheckSource(item);
+		obs_data_release(item);
+	}
+	obs_data_array_release(sources);
+	auto globalAudio = {"DesktopAudioDevice1", "DesktopAudioDevice2", "AuxAudioDevice1",
+			    "AuxAudioDevice2",     "AuxAudioDevice3",     "AuxAudioDevice4"};
+	for (auto ga : globalAudio) {
+		auto item = obs_data_get_obj(scene_collection_data, ga);
+		if (!item)
+			continue;
+		CheckSource(item);
+		obs_data_release(item);
+	}
+}
+
+void SceneCollectionWizard::CheckSource(obs_data_t *item)
+{
+	auto source_type = obs_data_get_string(item, "id");
+	if (strcmp(source_type, "dshow_input") == 0 || strcmp(source_type, "av_capture_input") == 0 ||
+	    strcmp(source_type, "v4l2_input") == 0) {
+		cams.push_back(item);
+	} else if (strcmp(source_type, "wasapi_input_capture") == 0 || strcmp(source_type, "coreaudio_input_capture") == 0 ||
+		   strcmp(source_type, "pulse_input_capture") == 0) {
+		mics.push_back(item);
+	}
+}
+
 int SceneCollectionWizard::nextId() const
 {
-	//return QWizard::nextId();
-	return SceneCollectionWizard::Page_Cam;
+	if (!cams.empty())
+		return SceneCollectionWizard::Page_Cam;
+	if (!mics.empty())
+		return SceneCollectionWizard::Page_Mic;
+	if (currentId() == SceneCollectionWizard::Page_Conclusion)
+		return -1;
+	return SceneCollectionWizard::Page_Conclusion;
+}
+
+obs_data_t *SceneCollectionWizard::GetCam()
+{
+	auto cam = cams.front();
+	cams.pop_front();
+	return cam;
+}
+
+obs_data_t *SceneCollectionWizard::GetMic()
+{
+	auto mic = mics.front();
+	mics.pop_front();
+	return mic;
+}
+
+static std::string _scene_collections_path;
+
+static std::string SceneCollectionsPath()
+{
+	if (!_scene_collections_path.empty())
+		return _scene_collections_path;
+	char *path = obs_module_config_path("");
+	size_t l = strlen(path);
+	if (l == 0) {
+		bfree(path);
+		return _scene_collections_path;
+	}
+	//remove double slashes
+	char c = path[l - 1];
+	while (l > 0 && (c == '\\' || c == '/')) {
+		l--;
+		path[l] = '\0';
+		c = path[l - 1];
+	}
+	//remove module name from path
+	char *slash = strrchr(path, '/');
+	char *backslash = strrchr(path, '\\');
+	if (slash && (!backslash || slash > backslash)) {
+		*slash = '\0';
+	} else if (backslash && (!slash || backslash > slash)) {
+		*backslash = '\0';
+	}
+	//remove double slashes
+	l = strlen(path);
+	if (l > 0) {
+		c = path[l - 1];
+		while (l > 0 && (c == '\\' || c == '/')) {
+			l--;
+			path[l] = '\0';
+			c = path[l - 1];
+		}
+	}
+	//remove plugin_config from path
+	slash = strrchr(path, '/');
+	backslash = strrchr(path, '\\');
+	if (slash && (!backslash || slash > backslash)) {
+		*slash = '\0';
+	} else if (backslash && (!slash || backslash > slash)) {
+		*backslash = '\0';
+	}
+	//remove double slashes
+	l = strlen(path);
+	if (l > 0) {
+		c = path[l - 1];
+		while (l > 0 && (c == '\\' || c == '/')) {
+			l--;
+			path[l] = '\0';
+			c = path[l - 1];
+		}
+	}
+
+	_scene_collections_path = path;
+	_scene_collections_path += "/basic/scenes/";
+	bfree(path);
+	return _scene_collections_path;
+}
+
+bool SceneCollectionWizard::SaveSceneCollection()
+{
+	const auto config = obs_frontend_get_user_config();
+	std::string old_name = config_get_string(config, "Basic", "SceneCollection");
+
+	auto name = obs_data_get_string(scene_collection_data, "name");
+	if(!obs_frontend_add_scene_collection(name))
+		return false;
+
+	std::string path = SceneCollectionsPath() + config_get_string(config, "Basic", "SceneCollectionFile");
+	obs_frontend_set_current_scene_collection(old_name.c_str());
+	obs_data_save_json_safe(scene_collection_data, path.c_str(), "tmp", "bak");
+	obs_frontend_set_current_scene_collection(name);
+	return true;
 }
 
 SceneCollectionPage::SceneCollectionPage(QWidget *parent) : QWizardPage(parent)
@@ -79,6 +229,8 @@ bool SceneCollectionPage::validatePage()
 	if (!item)
 		return false;
 
+	static_cast<SceneCollectionWizard *>(wizard())->LoadSceneCollectionFile(item->data(Qt::UserRole).toString());
+
 	return true;
 }
 
@@ -103,7 +255,6 @@ CamPage::CamPage(QWidget *parent) : QWizardPage(parent), preview(new OBSQTDispla
 	cc = new QComboBox;
 	fl->addRow(QString::fromUtf8(obs_module_text("Cam")), cc);
 
-
 	fl->addRow(preview);
 
 	preview->setObjectName(QStringLiteral("preview"));
@@ -111,17 +262,7 @@ CamPage::CamPage(QWidget *parent) : QWizardPage(parent), preview(new OBSQTDispla
 	connect(preview, &OBSQTDisplay::DisplayCreated,
 		[this]() { obs_display_add_draw_callback(preview->GetDisplay(), DrawPreview, this); });
 
-#ifdef WIN32
-	const char *id = "dshow_input";
-	const char *setting_name = "video_device_id";
-#elif __APPLE__
-	const char *id = "av_capture_input";
-	const char *setting_name = "device";
-#else
-	const char *id = "v4l2_input";
-	const char *setting_name = "input";
-#endif
-	connect(cc, &QComboBox::currentIndexChanged, [this, setting_name] {
+	connect(cc, &QComboBox::currentIndexChanged, [this] {
 		auto data = cc->currentData();
 		auto settings = obs_source_get_settings(cam);
 		if (data.isNull()) {
@@ -154,8 +295,7 @@ CamPage::CamPage(QWidget *parent) : QWizardPage(parent), preview(new OBSQTDispla
 	} else if (list_format == OBS_COMBO_FORMAT_STRING) {
 		for (size_t i = 0; i < c; i++) {
 			auto val = obs_property_list_item_string(prop, i);
-			cc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)),
-				    QVariant(QString::fromUtf8(val)));
+			cc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)), QVariant(QString::fromUtf8(val)));
 		}
 	} else if (list_format == OBS_COMBO_FORMAT_BOOL) {
 		for (size_t i = 0; i < c; i++) {
@@ -164,7 +304,6 @@ CamPage::CamPage(QWidget *parent) : QWizardPage(parent), preview(new OBSQTDispla
 		}
 	}
 	obs_properties_destroy(props);
-
 }
 
 CamPage::~CamPage()
@@ -278,14 +417,116 @@ void CamPage::DrawBackdrop(float cx, float cy)
 	GS_DEBUG_MARKER_END();
 }
 
+bool CamPage::validatePage()
+{
+	auto data = cc->currentData();
+	if (data.isNull())
+		return false;
+
+	auto cam_data = static_cast<SceneCollectionWizard *>(wizard())->GetCam();
+	obs_data_set_string(cam_data, "id", id);
+	auto cam_settings = obs_data_get_obj(cam_data, "settings");
+	if (!cam_settings) {
+		cam_settings = obs_data_create();
+		obs_data_set_obj(cam_data, "settings", cam_settings);
+	}
+	auto val = data.toString();
+	obs_data_set_string(cam_settings, setting_name, val.toUtf8().constData());
+	obs_data_release(cam_settings);
+
+	auto settings = obs_source_get_settings(cam);
+	obs_data_set_string(settings, setting_name, "");
+	obs_source_update(cam, settings);
+	obs_data_release(settings);
+	return true;
+}
+
 MicPage::MicPage(QWidget *parent) : QWizardPage(parent)
 {
 	setTitle(QString::fromUtf8(obs_module_text("Mic")));
 	setSubTitle(QString::fromUtf8(obs_module_text("MicDescription")));
+
+	auto fl = new QFormLayout;
+	setLayout(fl);
+	mc = new QComboBox;
+	fl->addRow(QString::fromUtf8(obs_module_text("Mic")), mc);
+
+	connect(mc, &QComboBox::currentIndexChanged, [this] {
+		auto data = mc->currentData();
+		auto settings = obs_source_get_settings(mic);
+		if (data.isNull()) {
+			obs_data_set_string(settings, setting_name, "");
+		} else {
+			auto val = data.toString();
+			obs_data_set_string(settings, setting_name, val.toUtf8().constData());
+		}
+		obs_source_update(mic, settings);
+		obs_data_release(settings);
+	});
+
+	mic = obs_source_create_private(id, "mic", nullptr);
+
+	auto props = obs_source_properties(mic);
+	auto prop = obs_properties_get(props, setting_name);
+	size_t c = obs_property_list_item_count(prop);
+	int list_format = obs_property_list_format(prop);
+	if (list_format == OBS_COMBO_FORMAT_INT) {
+		for (size_t i = 0; i < c; i++) {
+			mc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)),
+				    QVariant(obs_property_list_item_int(prop, i)));
+		}
+	} else if (list_format == OBS_COMBO_FORMAT_FLOAT) {
+		for (size_t i = 0; i < c; i++) {
+			mc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)),
+				    QVariant(obs_property_list_item_float(prop, i)));
+		}
+	} else if (list_format == OBS_COMBO_FORMAT_STRING) {
+		for (size_t i = 0; i < c; i++) {
+			auto val = obs_property_list_item_string(prop, i);
+			mc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)), QVariant(QString::fromUtf8(val)));
+		}
+	} else if (list_format == OBS_COMBO_FORMAT_BOOL) {
+		for (size_t i = 0; i < c; i++) {
+			mc->addItem(QString::fromUtf8(obs_property_list_item_name(prop, i)),
+				    QVariant(obs_property_list_item_bool(prop, i)));
+		}
+	}
+	obs_properties_destroy(props);
+}
+
+bool MicPage::validatePage()
+{
+	auto data = mc->currentData();
+	if (data.isNull())
+		return false;
+
+	auto mic_data = static_cast<SceneCollectionWizard *>(wizard())->GetMic();
+	obs_data_set_string(mic_data, "id", id);
+	auto mic_settings = obs_data_get_obj(mic_data, "settings");
+	if (!mic_settings) {
+		mic_settings = obs_data_create();
+		obs_data_set_obj(mic_data, "settings", mic_settings);
+	}
+	auto val = data.toString();
+	obs_data_set_string(mic_settings, setting_name, val.toUtf8().constData());
+	obs_data_release(mic_settings);
+
+	auto settings = obs_source_get_settings(mic);
+	obs_data_set_string(settings, setting_name, "");
+	obs_source_update(mic, settings);
+	obs_data_release(settings);
+	return true;
 }
 
 ConclusionPage::ConclusionPage(QWidget *parent) : QWizardPage(parent)
 {
 	setTitle(QString::fromUtf8(obs_module_text("Conclusion")));
 	setSubTitle(QString::fromUtf8(obs_module_text("ConclusionDescription")));
+	setFinalPage(true);
+}
+
+bool ConclusionPage::validatePage() {
+	if (!QWizardPage::validatePage())
+		return false;
+	return static_cast<SceneCollectionWizard *>(wizard())->SaveSceneCollection();
 }
