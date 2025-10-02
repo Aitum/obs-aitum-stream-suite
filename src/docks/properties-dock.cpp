@@ -74,10 +74,11 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 		obs_canvas_release(canvas);
 	});
 
-	sourceLabel = new QLabel;
+	sourceLabel = new QLabel(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 	hl->addWidget(sourceLabel);
 
 	filterCombo = new QComboBox;
+	filterCombo->setPlaceholderText(QString::fromUtf8(obs_module_text("SelectFilter")));
 	hl->addWidget(filterCombo);
 
 	connect(filterCombo, &QComboBox::currentTextChanged, [this] {
@@ -290,7 +291,7 @@ void PropertiesDock::SourceChanged(OBSSource source)
 	filterCombo->clear();
 	filterCombo->addItem(QStringLiteral(""));
 	if (!source) {
-		sourceLabel->setText("");
+		sourceLabel->setText(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 		current_source = nullptr;
 		LoadProperties(nullptr);
 		return;
