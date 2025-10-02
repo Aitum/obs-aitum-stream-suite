@@ -3,6 +3,7 @@
 #include <QListWidget>
 #include <QComboBox>
 #include <obs.hpp>
+#include <src/utils/widgets/qt-display.hpp>
 
 class SceneCollectionWizard : public QWizard {
 	Q_OBJECT
@@ -34,9 +35,17 @@ class CamPage : public QWizardPage {
 private:
 	QComboBox *cc;
 	OBSSourceAutoRelease cam;
-	OBSDisplay display;
+	OBSQTDisplay *preview;
+	gs_vertbuffer_t *box = nullptr;
+
+	void DrawBackdrop(float cx, float cy);
+
+	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
+	static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale);
+
 public:
 	CamPage(QWidget *parent = nullptr);
+	~CamPage();
 
 	void initializePage() override;
 };
