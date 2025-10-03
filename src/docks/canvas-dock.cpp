@@ -28,6 +28,8 @@
 #define HELPER_ROT_BREAKPONT 45.0f
 #define SPACER_LABEL_MARGIN 6.0f
 
+std::list<CanvasDock *> canvas_docks;
+
 CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
 	  preview(new OBSQTDisplay(this)),
@@ -800,6 +802,7 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 
 CanvasDock::~CanvasDock()
 {
+	canvas_docks.remove(this);
 	obs_display_remove_draw_callback(preview->GetDisplay(), DrawPreview, this);
 	SaveSettings();
 	obs_data_release(settings);
@@ -1686,40 +1689,12 @@ void CanvasDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	auto canvasItem = sceneList->item(idx);
 	if (!canvasItem)
 		return;
-	auto sl = GetGlobalScenesList();
-	int row = -1;
-	bool hidden = false;
-	bool selected = false;
-	for (int i = 0; i < sl->count(); i++) {
-		auto item = sl->item(i);
-		if (item->text() == canvasItem->text()) {
-			row = i;
-			hidden = item->isHidden();
-			selected = item->isSelected();
-			break;
-		}
-	}
-	if (row < 0 || row >= sl->count())
-		return;
-
-	sl->blockSignals(true);
-	QListWidgetItem *item = sl->takeItem(row);
-	if (relative) {
-		sl->insertItem(row + offset, item);
-	} else if (offset == 0) {
-		sl->insertItem(offset, item);
-	} else {
-		sl->insertItem(sl->count(), item);
-	}
-	item->setHidden(hidden);
-	item->setSelected(selected);
-	sl->blockSignals(false);
 
 	if (idx == invalidIdx)
 		return;
 
 	sceneList->blockSignals(true);
-	item = sceneList->takeItem(idx);
+	auto item = sceneList->takeItem(idx);
 	if (relative) {
 		sceneList->insertItem(idx + offset, item);
 		sceneList->setCurrentRow(idx + offset);
@@ -3144,7 +3119,8 @@ void CanvasDock::LoadScenes()
 		sceneList->setCurrentRow(0);
 }
 
-void CanvasDock::UpdateLinkedScenes() {
+void CanvasDock::UpdateLinkedScenes()
+{
 	struct obs_frontend_source_list scenes = {};
 	obs_frontend_get_scenes(&scenes);
 	for (size_t i = 0; i < scenes.sources.num; i++) {
@@ -4744,4 +4720,51 @@ void CanvasDock::AddSourceFromAction()
 		}
 		obs_source_release(created_source);
 	}
+}
+
+void CanvasDock::MainSceneChanged()
+{
+	auto current_scene = obs_frontend_get_current_scene();
+	if (!current_scene) {
+		//if (linkedButton)
+		//	linkedButton->setChecked(false);
+		return;
+	}
+
+	auto ss = obs_source_get_settings(current_scene);
+	obs_source_release(current_scene);
+	auto c = obs_data_get_array(ss, "canvas");
+	obs_data_release(ss);
+	if (!c) {
+		//if (linkedButton)
+		//	linkedButton->setChecked(false);
+		return;
+	}
+	const auto count = obs_data_array_count(c);
+	obs_data_t *found = nullptr;
+	for (size_t i = 0; i < count; i++) {
+		auto item = obs_data_array_item(c, i);
+		if (!item)
+			continue;
+		if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(canvas)) == 0) {
+			found = item;
+			break;
+		} else if (strcmp(obs_data_get_string(item, "name"), "") == 0 && obs_data_get_int(item, "width") == canvas_width &&
+			   obs_data_get_int(item, "height") == canvas_height) {
+			obs_data_set_string(item, "name", obs_canvas_get_name(canvas));
+			found = item;
+			break;
+		}
+		obs_data_release(item);
+	}
+	if (found) {
+		auto sn = QString::fromUtf8(obs_data_get_string(found, "scene"));
+		SwitchScene(sn);
+		//if (linkedButton)
+		//	linkedButton->setChecked(true);
+	} // else if (linkedButton) {
+	//	linkedButton->setChecked(false);
+	//}
+	obs_data_release(found);
+	obs_data_array_release(c);
 }

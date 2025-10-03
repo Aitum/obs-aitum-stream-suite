@@ -37,6 +37,8 @@ QAction *virtualCameraAction = nullptr;
 OBSBasicSettings *configDialog = nullptr;
 OutputDock *output_dock = nullptr;
 
+extern std::list<CanvasDock *> canvas_docks;
+
 QIcon create2StateIcon(QString fileOn, QString fileOff)
 {
 	QIcon icon = QIcon(fileOff);
@@ -74,18 +76,22 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 			}
 			obs_data_release(data_obj);
 		}
-
 	}
 
-
 	QMetaObject::invokeMethod(output_dock, "ApiInfo", Q_ARG(QString, QString::fromUtf8((const char *)file->buffer.array)));
-	
 
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
 		version_download_info = nullptr;
 	}
 	return true;
+}
+
+void transition_start(void *, calldata_t *)
+{
+	for (const auto &it : canvas_docks) {
+		QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
+	}
 }
 
 void save_dock_state(int index)
@@ -296,8 +302,9 @@ void load_current_profile_config()
 						    new CanvasCloneDock(t, main_window));
 			i++;
 		} else {
-			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
-						    new CanvasDock(t, main_window));
+			auto cd = new CanvasDock(t, main_window);
+			canvas_docks.push_back(cd);
+			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"), cd);
 			i++;
 		}
 	}
@@ -386,6 +393,14 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			}
 			obs_source_release(ss);
 		}
+		struct obs_frontend_source_list transitions = {};
+		obs_frontend_get_transitions(&transitions);
+		for (size_t i = 0; i < transitions.sources.num; i++) {
+			auto sh = obs_source_get_signal_handler(transitions.sources.array[i]);
+			signal_handler_connect(sh, "transition_start", transition_start, nullptr);
+		}
+		obs_frontend_source_list_free(&transitions);
+
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		load_current_profile_config();
@@ -433,6 +448,18 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		if (recordAction->isChecked()) {
 			recordAction->setChecked(false);
 		}
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
+		for (const auto &it : canvas_docks) {
+			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
+		}
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED){
+		struct obs_frontend_source_list transitions = {};
+		obs_frontend_get_transitions(&transitions);
+		for (size_t i = 0; i < transitions.sources.num; i++) {
+			auto sh = obs_source_get_signal_handler(transitions.sources.array[i]);
+			signal_handler_connect(sh, "transition_start", transition_start, nullptr);
+		}
+		obs_frontend_source_list_free(&transitions);
 	}
 
 	//OBS_FRONTEND_EVENT_PROFILE_RENAMED

@@ -246,6 +246,7 @@ private slots:
 	void ReorderSources(OBSScene scene);
 	void SwitchBackToSelectedTransition();
 	void SwitchScene(const QString &scene_name, bool transition = true);
+	void MainSceneChanged();
 
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
