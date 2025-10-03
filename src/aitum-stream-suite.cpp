@@ -44,7 +44,7 @@ QIcon create2StateIcon(QString fileOn, QString fileOff)
 	return icon;
 }
 
-extern QAction *aitumSettingsAction;
+extern QWidget *aitumSettingsWidget;
 
 bool version_info_downloaded(void *param, struct file_download_data *file)
 {
@@ -52,7 +52,34 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 	if (!file || !file->buffer.num)
 		return true;
 
+	auto d = obs_data_create_from_json((const char *)file->buffer.array);
+	if (d) {
+		auto data_obj = obs_data_get_obj(d, "data");
+		obs_data_release(d);
+		if (data_obj) {
+
+			auto version = obs_data_get_string(data_obj, "version");
+			int major;
+			int minor;
+			int patch;
+			if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
+				auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
+				if (sv >
+				    MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
+					QMetaObject::invokeMethod(aitumSettingsWidget, [] {
+						aitumSettingsWidget->setStyleSheet(
+							QString::fromUtf8("background: rgb(192,128,0);"));
+					});
+				}
+			}
+			obs_data_release(data_obj);
+		}
+
+	}
+
+
 	QMetaObject::invokeMethod(output_dock, "ApiInfo", Q_ARG(QString, QString::fromUtf8((const char *)file->buffer.array)));
+	
 
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
@@ -84,7 +111,7 @@ void reset_live_dock_state()
 {
 	//Shows activity feeds, chat (multi-chat), Game capture change dock, main scenes quick switch dock, canvas previews, multi-stream dock. Hides scene list or sources or anything related to actually making a stream setup and not actually being live
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
@@ -121,10 +148,14 @@ void reset_live_dock_state()
 void reset_build_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+	if (d)
+		d->setVisible(true);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
 	if (d)
@@ -135,6 +166,10 @@ void reset_build_dock_state()
 		d->setVisible(false);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d)
 		d->setVisible(false);
 }
@@ -142,10 +177,14 @@ void reset_build_dock_state()
 void reset_design_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+	if (d)
+		d->setVisible(true);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
 	if (d)
@@ -156,6 +195,10 @@ void reset_design_dock_state()
 		d->setVisible(false);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d)
 		d->setVisible(false);
 }
@@ -423,7 +466,7 @@ QIcon generateEmojiQIcon(QString emoji)
 	return QIcon(pixmap);
 }
 
-QAction *aitumSettingsAction = nullptr;
+QWidget *aitumSettingsWidget = nullptr;
 
 bool obs_module_load(void)
 {
@@ -479,12 +522,13 @@ bool obs_module_load(void)
 		load_dock_state(index);
 	});
 
-	aitumSettingsAction = tb->addAction(QString::fromUtf8(obs_module_text("Settings")));
+	auto aitumSettingsAction = tb->addAction(QString::fromUtf8(obs_module_text("Settings")));
 	aitumSettingsAction->setProperty("themeID", "configIconSmall");
 	aitumSettingsAction->setProperty("class", "icon-gear");
-	tb->widgetForAction(aitumSettingsAction)->setProperty("themeID", "configIconSmall");
-	tb->widgetForAction(aitumSettingsAction)->setProperty("class", "icon-gear");
-	tb->widgetForAction(aitumSettingsAction)->setObjectName("AitumStreamSuiteSettingsButton");
+	aitumSettingsWidget = tb->widgetForAction(aitumSettingsAction);
+	aitumSettingsWidget->setProperty("themeID", "configIconSmall");
+	aitumSettingsWidget->setProperty("class", "icon-gear");
+	aitumSettingsWidget->setObjectName("AitumStreamSuiteSettingsButton");
 	QObject::connect(aitumSettingsAction, &QAction::triggered, [] {
 		if (!configDialog)
 			configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
