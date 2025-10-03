@@ -149,6 +149,10 @@ void reset_live_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d)
+		d->setVisible(false);
 }
 
 void reset_build_dock_state()
@@ -178,6 +182,12 @@ void reset_build_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
 }
 
 void reset_design_dock_state()
@@ -207,6 +217,12 @@ void reset_design_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
 }
 
 void load_dock_state(int index)
