@@ -237,6 +237,7 @@ private:
 	static bool AddItemBounds(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool GetSourceSnapOffset(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool FindHandleAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static void save_load(obs_data_t *save_data, bool saving, void *private_data);
 
 private slots:
 	void AddSourceFromAction();

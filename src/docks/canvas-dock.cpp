@@ -687,6 +687,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	connect(panel_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
 
 	LoadScenes();
+
+	obs_frontend_add_save_callback(save_load, this);
 }
 
 void CanvasDock::GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale)
@@ -802,6 +804,7 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 
 CanvasDock::~CanvasDock()
 {
+	obs_frontend_remove_save_callback(save_load, this);
 	canvas_docks.remove(this);
 	obs_display_remove_draw_callback(preview->GetDisplay(), DrawPreview, this);
 	SaveSettings();
@@ -3093,8 +3096,9 @@ void CanvasDock::LoadScenes()
 			QString name = QString::fromUtf8(obs_source_get_name(src));
 			auto sli = new QListWidgetItem(name, t->sceneList);
 			sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
-			t->sceneList->addItem(sli);
 			obs_data_t *settings = obs_source_get_settings(src);
+			const int order = (int)obs_data_get_int(settings, "order");
+			t->sceneList->insertItem(order, sli);
 			if ((t->currentSceneName.isEmpty() && obs_data_get_bool(settings, "canvas_active")) ||
 			    name == t->currentSceneName) {
 				for (int j = 0; j < t->sceneList->count(); j++) {
@@ -3108,6 +3112,18 @@ void CanvasDock::LoadScenes()
 			return true;
 		},
 		this);
+
+	sceneList->blockSignals(true);
+	for (int idx = 0; idx < sceneList->count(); idx++) {
+		auto item = sceneList->takeItem(idx);
+		auto scene = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
+		auto settings = obs_source_get_settings(scene);
+		const int order = (int)obs_data_get_int(settings, "order");
+		sceneList->insertItem(order, item);
+		obs_data_release(settings);
+		obs_source_release(scene);
+	}
+	sceneList->blockSignals(false);
 
 	UpdateLinkedScenes();
 
@@ -4767,4 +4783,22 @@ void CanvasDock::MainSceneChanged()
 	//}
 	obs_data_release(found);
 	obs_data_array_release(c);
+}
+
+void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
+{
+	if (!saving)
+		return;
+	CanvasDock *window = static_cast<CanvasDock *>(param);
+	auto c = window->sceneList->count();
+	for (int row = 0; row < c; row++) {
+		auto scene_name = window->sceneList->item(row)->text();
+		auto scene = obs_canvas_get_source_by_name(window->canvas, scene_name.toUtf8().constData());
+		if (scene) {
+			auto settings = obs_source_get_settings(scene);
+			obs_data_set_int(settings, "order", row);
+			obs_data_release(settings);
+			obs_source_release(scene);
+		}
+	}
 }
