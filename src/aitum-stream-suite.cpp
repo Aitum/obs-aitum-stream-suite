@@ -314,13 +314,21 @@ void load_current_profile_config()
 			obs_data_release(t);
 			canvas_count--;
 		} else if (strcmp(obs_data_get_string(t, "type"), "clone") == 0) {
-			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
-						    new CanvasCloneDock(t, main_window));
+			auto ccd = new CanvasCloneDock(t, main_window);
+			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"), ccd);
+			if (!obs_data_get_bool(t, "has_loaded")) {
+				ccd->parentWidget()->show();
+				obs_data_set_bool(t, "has_loaded", true);
+			}
 			i++;
 		} else {
 			auto cd = new CanvasDock(t, main_window);
 			canvas_docks.push_back(cd);
 			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"), cd);
+			if (!obs_data_get_bool(t, "has_loaded")) {
+				cd->parentWidget()->show();
+				obs_data_set_bool(t, "has_loaded", true);
+			}
 			i++;
 		}
 	}

@@ -4786,6 +4786,7 @@ void CanvasDock::MainSceneChanged()
 
 void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 {
+	UNUSED_PARAMETER(save_data);
 	if (!saving)
 		return;
 	CanvasDock *window = static_cast<CanvasDock *>(param);
