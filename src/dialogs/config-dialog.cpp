@@ -35,6 +35,9 @@
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include <src/docks/canvas-dock.hpp>
+#include <src/utils/color.hpp>
+#include <QColorDialog>
 
 template<typename T> std::string to_string_with_precision(const T a_value, const int n = 6)
 {
@@ -602,6 +605,20 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	canvas_title->setStyleSheet(QString("QToolButton{background-color: %1;font-weight: bold;border: none;}")
 					    .arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb)));
 	canvas_title_layout->addWidget(canvas_title, 1, Qt::AlignLeft);
+
+	auto canvas_color = new QPushButton(QString::fromUtf8("Color"));
+	auto c = color_from_int(obs_data_get_int(settings, "color"));
+	canvas_color->setStyleSheet(QString("border: 2px solid %1;").arg(c.name(QColor::HexRgb)));
+	canvas_title_layout->addWidget(canvas_color, 0, Qt::AlignCenter);
+	connect(canvas_color, &QPushButton::clicked, [this, canvas_color, settings] {
+		auto currentColor = color_from_int(obs_data_get_int(settings, "color"));
+		QColor newColor = QColorDialog::getColor(currentColor, this, QString::fromUtf8(obs_module_text("SelectColor")));
+		if (newColor.isValid()) {
+			obs_data_set_int(settings, "color", color_to_int(newColor));
+			canvas_color->setStyleSheet(QString("border: 2px solid %1;").arg(newColor.name(QColor::HexRgb)));
+		}
+	});
+
 
 	const bool expanded = obs_data_get_bool(settings, "expanded");
 	auto advancedGroup = new QFrame;

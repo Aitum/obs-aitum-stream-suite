@@ -23,6 +23,7 @@
 #include <obs-module.h>
 #include <util/dstr.h>
 #include <util/platform.h>
+#include <src/utils/color.hpp>
 
 #define HANDLE_RADIUS 4.0f
 #define HELPER_ROT_BREAKPONT 45.0f
@@ -46,6 +47,9 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	box = gs_render_save();
 
 	obs_leave_graphics();
+
+	auto c = color_from_int(obs_data_get_int(settings, "color"));
+	setStyleSheet(QString::fromUtf8("#contextContainer { border: 2px solid %1}").arg(c.name(QColor::HexRgb)));
 
 	setObjectName(QStringLiteral("contextContainer"));
 	setContentsMargins(0, 0, 0, 0);
@@ -1253,11 +1257,6 @@ QColor CanvasDock::GetHoverColor() const
 		return color_from_int(config_get_int(config, "Accessibility", "SelectBlue"));
 	}
 	return QColor::fromRgb(0, 127, 255);
-}
-
-inline QColor CanvasDock::color_from_int(long long val)
-{
-	return QColor(val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff);
 }
 
 void CanvasDock::SetLabelText(int sourceIndex, int px)

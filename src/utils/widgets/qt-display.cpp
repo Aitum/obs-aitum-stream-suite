@@ -20,6 +20,7 @@
 #include <QGuiApplication>
 #include <qpa/qplatformnativeinterface.h>
 #endif
+#include <src/utils/color.hpp>
 
 class SurfaceEventFilter : public QObject {
 	OBSQTDisplay *display;
@@ -59,20 +60,6 @@ protected:
 		return result;
 	}
 };
-
-static inline long long color_to_int(const QColor &color)
-{
-	auto shift = [&](unsigned val, int shift_left) {
-		return ((val & 0xff) << shift_left);
-	};
-
-	return shift(color.red(), 0) | shift(color.green(), 8) | shift(color.blue(), 16) | shift(color.alpha(), 24);
-}
-
-static inline QColor rgba_to_color(uint32_t rgba)
-{
-	return QColor::fromRgb(rgba & 0xFF, (rgba >> 8) & 0xFF, (rgba >> 16) & 0xFF, (rgba >> 24) & 0xFF);
-}
 
 OBSQTDisplay::OBSQTDisplay(QWidget *parent, Qt::WindowFlags flags) : QWidget(parent, flags)
 {
@@ -114,7 +101,7 @@ OBSQTDisplay::OBSQTDisplay(QWidget *parent, Qt::WindowFlags flags) : QWidget(par
 
 QColor OBSQTDisplay::GetDisplayBackgroundColor() const
 {
-	return rgba_to_color(backgroundColor);
+	return color_from_int(backgroundColor);
 }
 
 void OBSQTDisplay::SetDisplayBackgroundColor(const QColor &color)

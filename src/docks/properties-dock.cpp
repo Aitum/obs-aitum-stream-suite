@@ -14,6 +14,7 @@
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <src/utils/color.hpp>
 
 PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 {
@@ -375,20 +376,6 @@ void PropertiesDock::source_remove(void *param, calldata_t *cd)
 	if (obs_weak_source_references_source(this_->current_source, source)) {
 		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
-}
-
-static inline QColor color_from_int(long long val)
-{
-	return QColor(val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff);
-}
-
-static inline long long color_to_int(QColor color)
-{
-	auto shift = [&](unsigned val, int shift) {
-		return ((val & 0xff) << shift);
-	};
-
-	return shift(color.red(), 0) | shift(color.green(), 8) | shift(color.blue(), 16) | shift(color.alpha(), 24);
 }
 
 void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout)

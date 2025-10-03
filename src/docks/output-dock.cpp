@@ -10,6 +10,7 @@
 #include <QScrollArea>
 #include <util/config-file.h>
 #include <obs-frontend-api.h>
+#include <src/utils/color.hpp>
 
 QIcon create2StateIcon(QString fileOn, QString fileOff);
 
@@ -273,7 +274,26 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		std::get<QPushButton *>(*it) = streamButton;
 	}
 	auto streamGroup = new QFrame;
-	//streamGroup->setStyleSheet(outputGroupStyle);
+	streamGroup->setProperty("class", "stream-group");
+
+	auto canvas = obs_data_get_array(current_profile_config, "canvas");
+	auto count = obs_data_array_count(canvas);
+	auto fcn = obs_data_get_string(output_data, "canvas");
+	for (size_t i = 0; i < count; i++) {
+		auto item = obs_data_array_item(canvas,i);
+		if (!item)
+			continue;
+		auto cn = obs_data_get_string(item, "name");
+		if (cn[0] != '\0' && strcmp(cn, fcn) == 0) {
+			auto c = color_from_int(obs_data_get_int(item, "color"));
+			streamGroup->setStyleSheet(QString(".stream-group { border: 2px solid %1;}").arg(c.name(QColor::HexRgb)));
+			obs_data_release(item);
+			break;
+		}
+		obs_data_release(item);
+	}
+	obs_data_array_release(canvas);
+	
 	streamGroup->setObjectName(name);
 	auto streamLayout = new QVBoxLayout;
 

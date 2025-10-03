@@ -205,7 +205,6 @@ private:
 	static vec3 GetTransformedPos(float x, float y, const matrix4 &mat);
 	static obs_source_t *CreateLabel(float pixelRatio, int i);
 	static config_t *GetUserConfig(void);
-	static inline QColor color_from_int(long long val);
 	static bool SceneItemHasVideo(obs_sceneitem_t *item);
 	static bool CloseFloat(float a, float b, float epsilon = 0.01f);
 	static inline bool crop_enabled(const obs_sceneitem_crop *crop);

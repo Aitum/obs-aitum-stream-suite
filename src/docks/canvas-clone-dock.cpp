@@ -1,6 +1,7 @@
 #include "canvas-clone-dock.hpp"
 #include <QLayout>
 #include "canvas-dock.hpp"
+#include <src/utils/color.hpp>
 
 CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
@@ -17,6 +18,9 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	box = gs_render_save();
 
 	obs_leave_graphics();
+
+	auto c = color_from_int(obs_data_get_int(settings, "color"));
+	setStyleSheet(QString("QFrame{border: 2px solid %1;}").arg(c.name(QColor::HexRgb)));
 
 	auto l = new QBoxLayout(QBoxLayout::TopToBottom, this);
 	l->setContentsMargins(0, 0, 0, 0);
