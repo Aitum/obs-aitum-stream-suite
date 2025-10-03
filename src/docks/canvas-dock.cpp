@@ -31,6 +31,8 @@
 
 std::list<CanvasDock *> canvas_docks;
 
+extern QTabBar *modesTabBar;
+
 CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
 	  preview(new OBSQTDisplay(this)),
@@ -644,13 +646,10 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	canvas_split->addWidget(panel_split);
 
-	auto state = obs_data_get_string(settings, "panel_split");
-	if (state and strlen(state) > 0)
-		panel_split->restoreState(QByteArray::fromBase64(state));
-
-	state = obs_data_get_string(settings, "canvas_split");
-	if (state and strlen(state) > 0)
-		canvas_split->restoreState(QByteArray::fromBase64(state));
+	auto index = -1;
+	if (modesTabBar)
+		index = modesTabBar->currentIndex();
+	LoadMode(index);
 
 	size_t idx = 0;
 	const char *id;
@@ -824,10 +823,26 @@ void CanvasDock::SaveSettings()
 	auto state = canvas_split->saveState();
 	auto b64 = state.toBase64();
 	auto state_chars = b64.constData();
+	auto index = modesTabBar->currentIndex();
+	if (index == 0) {
+		obs_data_set_string(settings, "canvas_split_live", state_chars);
+	} else if (index == 1) {
+		obs_data_set_string(settings, "canvas_split_build", state_chars);
+	} else if (index == 2) {
+		obs_data_set_string(settings, "canvas_split_design", state_chars);
+	}
 	obs_data_set_string(settings, "canvas_split", state_chars);
 	state = panel_split->saveState();
 	b64 = state.toBase64();
 	state_chars = b64.constData();
+	if (index == 0) {
+		obs_data_set_string(settings, "panel_split_live", state_chars);
+	} else if (index == 1) {
+		obs_data_set_string(settings, "panel_split_build", state_chars);
+	} else if (index == 2) {
+		obs_data_set_string(settings, "panel_split_design", state_chars);
+	}
+
 	obs_data_set_string(settings, "panel_split", state_chars);
 }
 
@@ -4801,4 +4816,33 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 			obs_source_release(scene);
 		}
 	}
+}
+
+void CanvasDock::LoadMode(int index) {
+	auto state = "";
+	if (index == 0) {
+		state = obs_data_get_string(settings, "panel_split_live");
+	} else if (index == 1) {
+		state = obs_data_get_string(settings, "panel_split_build");
+	} else if (index == 2) {
+		state = obs_data_get_string(settings, "panel_split_design");
+	}
+	if (state[0] == '\0')
+		state = obs_data_get_string(settings, "panel_split");
+
+	if (state[0] != '\0')
+		panel_split->restoreState(QByteArray::fromBase64(state));
+
+	state = "";
+	if (index == 0) {
+		state = obs_data_get_string(settings, "canvas_split_live");
+	} else if (index == 1) {
+		state = obs_data_get_string(settings, "canvas_split_build");
+	} else if (index == 2) {
+		state = obs_data_get_string(settings, "canvas_split_design");
+	}
+	if (state[0] == '\0')
+		state = obs_data_get_string(settings, "canvas_split");
+	if (state[0] != '\0')
+		canvas_split->restoreState(QByteArray::fromBase64(state));
 }

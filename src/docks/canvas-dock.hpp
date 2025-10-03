@@ -247,7 +247,7 @@ private slots:
 	void SwitchBackToSelectedTransition();
 	void SwitchScene(const QString &scene_name, bool transition = true);
 	void MainSceneChanged();
-
+	void LoadMode(int index);
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasDock();

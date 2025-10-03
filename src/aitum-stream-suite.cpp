@@ -253,6 +253,9 @@ void load_dock_state(int index)
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		main_window->restoreState(QByteArray::fromBase64(state));
 	}
+	for (const auto &it : canvas_docks) {
+		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
+	}
 }
 
 void load_current_profile_config()
