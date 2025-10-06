@@ -70,6 +70,8 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/docks/canvas-dock.hpp
   src/docks/canvas-clone-dock.cpp
   src/docks/canvas-clone-dock.hpp
+  src/docks/filters-dock.cpp
+  src/docks/filters-dock.hpp
   src/docks/output-dock.cpp
   src/docks/output-dock.hpp
   src/docks/properties-dock.cpp

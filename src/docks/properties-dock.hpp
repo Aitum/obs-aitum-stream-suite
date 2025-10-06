@@ -13,7 +13,6 @@ class PropertiesDock : public QFrame {
 private:
 	QComboBox *canvasCombo = nullptr;
 	QLabel *sourceLabel = nullptr;
-	QComboBox *filterCombo = nullptr;
 
 	obs_weak_canvas_t *current_canvas = nullptr;
 	obs_weak_source_t *current_transition = nullptr;
@@ -37,19 +36,15 @@ private:
 	static void transition_stop(void *param, calldata_t *cd);
 	static void scene_item_select(void *param, calldata_t *cd);
 	static void scene_item_deselect(void *param, calldata_t *cd);
-	static void filter_add(void *param, calldata_t *cd);
-	static void filter_remove(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
+	static void properties_remove(void *param, calldata_t *cd);
 	static void frontend_event(enum obs_frontend_event event, void *param);
-	static bool filter_compatible(uint32_t sourceFlags, uint32_t filterFlags);
 
 private slots:
 	void SceneChanged(OBSSource scene);
 	void TransitionChanged(OBSSource transition);
 	void SourceChanged(OBSSource source);
 	void LoadProperties(OBSSource source);
-	void ShowFiltersContextMenu();
-
 public:
 	PropertiesDock(QWidget *parent = nullptr);
 	~PropertiesDock();

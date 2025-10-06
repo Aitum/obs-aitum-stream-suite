@@ -1,7 +1,9 @@
 #include "dialogs/config-dialog.hpp"
+#include "dialogs/scene-collection-wizard.hpp"
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
+#include "docks/filters-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
 #include "utils/file-download.h"
@@ -18,7 +20,6 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
-#include "dialogs/scene-collection-wizard.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -36,6 +37,8 @@ QAction *virtualCameraAction = nullptr;
 
 OBSBasicSettings *configDialog = nullptr;
 OutputDock *output_dock = nullptr;
+PropertiesDock *properties_dock = nullptr;
+FiltersDock *filters_dock = nullptr;
 
 extern std::list<CanvasDock *> canvas_docks;
 
@@ -153,6 +156,10 @@ void reset_live_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
+	if (d)
+		d->setVisible(false);
 }
 
 void reset_build_dock_state()
@@ -188,6 +195,12 @@ void reset_build_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
 }
 
 void reset_design_dock_state()
@@ -219,6 +232,12 @@ void reset_design_dock_state()
 		d->setVisible(false);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -479,7 +498,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 		}
-	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED){
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED) {
 		struct obs_frontend_source_list transitions = {};
 		obs_frontend_get_transitions(&transitions);
 		for (size_t i = 0; i < transitions.sources.num; i++) {
@@ -545,10 +564,13 @@ bool obs_module_load(void)
 	auto user_config = obs_frontend_get_user_config();
 	if (user_config) {
 		if (!config_get_bool(user_config, "Aitum", "ThemeSet")) {
-			config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
+			auto theme = config_get_string(user_config, "Appearance", "Theme");
+			if (!theme || strcmp(theme, "com.obsproject.Aitum.Original") != 0) {
+				config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
+				restart = true;
+			}
 			config_set_bool(user_config, "Aitum", "ThemeSet", true);
 			config_save_safe(user_config, "tmp", "bak");
-			restart = true;
 		}
 		const char *theme = config_get_string(user_config, "Appearance", "Theme");
 		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
@@ -685,8 +707,10 @@ bool obs_module_load(void)
 
 	output_dock = new OutputDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
-	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"),
-				    new PropertiesDock(main_window));
+	properties_dock = new PropertiesDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"), properties_dock);
+	filters_dock = new FiltersDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteFilters", obs_module_text("AitumStreamSuiteFilters"), filters_dock);
 
 	version_download_info = download_info_create_single(
 		"[Aitum Stream Suite]", "OBS", "https://api.aitum.tv/plugin/streamsuite", version_info_downloaded, nullptr);

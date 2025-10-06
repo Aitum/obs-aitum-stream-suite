@@ -1,3 +1,4 @@
+#include "filters-dock.hpp"
 #include "properties-dock.hpp"
 #include <obs.h>
 #include <obs-module.h>
@@ -15,6 +16,8 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include <src/utils/color.hpp>
+
+extern FiltersDock *filters_dock;
 
 PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 {
@@ -78,34 +81,6 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 	sourceLabel = new QLabel(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 	hl->addWidget(sourceLabel);
 
-	filterCombo = new QComboBox;
-	filterCombo->setPlaceholderText(QString::fromUtf8(obs_module_text("SelectFilter")));
-	hl->addWidget(filterCombo);
-
-	connect(filterCombo, &QComboBox::currentTextChanged, [this] {
-		auto source = obs_weak_source_get_source(this->current_source);
-		if (!source)
-			return;
-		auto filter = obs_source_get_filter_by_name(source, filterCombo->currentText().toUtf8().constData());
-		if (filter) {
-			QMetaObject::invokeMethod(this, "LoadProperties", Q_ARG(OBSSource, OBSSource(filter)));
-			obs_source_release(filter);
-		} else {
-			QMetaObject::invokeMethod(this, "LoadProperties", Q_ARG(OBSSource, OBSSource(source)));
-		}
-		obs_source_release(source);
-	});
-
-	auto addFilterButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8("AddFilter"));
-	addFilterButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
-	addFilterButton->setProperty("class", "icon-plus");
-	addFilterButton->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
-	addFilterButton->setProperty("toolButton", true);
-	addFilterButton->setFlat(false);
-	hl->addWidget(addFilterButton);
-
-	connect(addFilterButton, &QPushButton::clicked, [this] { ShowFiltersContextMenu(); });
-
 	layout = new QFormLayout;
 	vl->addLayout(layout);
 	//QWidget *spacer = new QWidget();
@@ -166,6 +141,7 @@ void PropertiesDock::scene_item_select(void *param, calldata_t *cd)
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
+	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
 }
 
 void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
@@ -174,6 +150,7 @@ void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	if (obs_weak_source_references_source(this_->current_source, obs_sceneitem_get_source(item))) {
 		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, nullptr));
 	}
 }
 
@@ -197,6 +174,7 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_select", scene_item_select, this);
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_deselect", scene_item_deselect, this);
 	QMetaObject::invokeMethod(this, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
+	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, OBSSource(scene)));
 	obs_scene_enum_items(
 		obs_scene_from_source(scene),
 		[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
@@ -281,16 +259,12 @@ void PropertiesDock::SourceChanged(OBSSource source)
 		if (obs_weak_source_references_source(current_source, source))
 			return;
 		auto prev_source = obs_weak_source_get_source(current_source);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "filter_add", filter_add, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "filter_remove", filter_remove, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", source_remove, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", source_remove, this);
 		obs_source_release(prev_source);
 
 		obs_weak_source_release(current_source);
 	}
-	filterCombo->clear();
-	filterCombo->addItem(QStringLiteral(""));
 	if (!source) {
 		sourceLabel->setText(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 		current_source = nullptr;
@@ -299,39 +273,11 @@ void PropertiesDock::SourceChanged(OBSSource source)
 	}
 	current_source = obs_source_get_weak_source(source);
 	sourceLabel->setText(QString::fromUtf8(obs_source_get_name(source)));
-	signal_handler_connect(obs_source_get_signal_handler(source), "filter_add", filter_add, this);
-	signal_handler_connect(obs_source_get_signal_handler(source), "filter_remove", filter_remove, this);
+
 	signal_handler_connect(obs_source_get_signal_handler(source), "remove", source_remove, this);
 	signal_handler_connect(obs_source_get_signal_handler(source), "destroy", source_remove, this);
-	obs_source_enum_filters(
-		source,
-		[](obs_source_t *parent, obs_source_t *filter, void *param) {
-			UNUSED_PARAMETER(parent);
-			auto this_ = static_cast<PropertiesDock *>(param);
-			this_->filterCombo->addItem(QString::fromUtf8(obs_source_get_name(filter)));
-		},
-		this);
+
 	LoadProperties(source);
-}
-
-void PropertiesDock::filter_add(void *param, calldata_t *cd)
-{
-	auto this_ = static_cast<PropertiesDock *>(param);
-	//auto source = (obs_source_t *)calldata_ptr(cd, "source");
-	auto filter = (obs_source_t *)calldata_ptr(cd, "filter");
-
-	this_->filterCombo->addItem(QString::fromUtf8(obs_source_get_name(filter)));
-}
-
-void PropertiesDock::filter_remove(void *param, calldata_t *cd)
-{
-	auto this_ = static_cast<PropertiesDock *>(param);
-	//auto source = (obs_source_t *)calldata_ptr(cd, "source");
-	auto filter = (obs_source_t *)calldata_ptr(cd, "filter");
-
-	auto idx = this_->filterCombo->findText(QString::fromUtf8(obs_source_get_name(filter)));
-	if (idx >= 0)
-		this_->filterCombo->removeItem(idx);
 }
 
 void PropertiesDock::LoadProperties(OBSSource source)
@@ -339,6 +285,10 @@ void PropertiesDock::LoadProperties(OBSSource source)
 	if (current_properties) {
 		if (obs_weak_source_references_source(current_properties, source))
 			return;
+		auto prev_source = obs_weak_source_get_source(current_properties);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", properties_remove, this);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", properties_remove, this);
+		obs_source_release(prev_source);
 
 		obs_weak_source_release(current_properties);
 	}
@@ -360,6 +310,9 @@ void PropertiesDock::LoadProperties(OBSSource source)
 	if (!properties)
 		return;
 
+	signal_handler_connect(obs_source_get_signal_handler(source), "remove", properties_remove, this);
+	signal_handler_connect(obs_source_get_signal_handler(source), "destroy", properties_remove, this);
+
 	obs_data_t *settings = obs_source_get_settings(source);
 	obs_property_t *property = obs_properties_first(properties);
 	while (property) {
@@ -375,6 +328,23 @@ void PropertiesDock::source_remove(void *param, calldata_t *cd)
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	if (obs_weak_source_references_source(this_->current_source, source)) {
 		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
+	}
+}
+
+void PropertiesDock::properties_remove(void *param, calldata_t *cd)
+{
+	auto this_ = static_cast<PropertiesDock *>(param);
+	auto source = (obs_source_t *)calldata_ptr(cd, "source");
+	if (obs_weak_source_references_source(this_->current_properties, source)) {
+		if (this_->current_properties != this_->current_source) {
+			auto s = obs_weak_source_get_source(this_->current_source);
+			if (s) {
+				QMetaObject::invokeMethod(this_, "LoadProperties", Q_ARG(OBSSource, OBSSource(s)));
+				obs_source_release(s);
+				return;
+			}
+		}
+		QMetaObject::invokeMethod(this_, "LoadProperties", Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
 }
 
@@ -909,78 +879,4 @@ void PropertiesDock::frontend_event(enum obs_frontend_event event, void *param)
 			}
 		}
 	}
-}
-
-void PropertiesDock::ShowFiltersContextMenu()
-{
-	if (!current_source)
-		return;
-	auto s = obs_weak_source_get_source(current_source);
-	if (!s)
-		return;
-	auto sf = obs_source_get_output_flags(s);
-	obs_source_release(s);
-	QMenu menu;
-	size_t idx = 0;
-	const char *type_str;
-	while (obs_enum_filter_types(idx++, &type_str)) {
-		uint32_t caps = obs_get_source_output_flags(type_str);
-		if ((caps & OBS_SOURCE_DEPRECATED) != 0)
-			continue;
-		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0)
-			continue;
-		if ((caps & OBS_SOURCE_CAP_OBSOLETE) != 0)
-			continue;
-
-		if (!filter_compatible(sf, caps))
-			continue;
-
-		auto name = QString::fromUtf8(obs_source_get_display_name(type_str));
-
-		QList<QAction *> actions = menu.actions();
-		QAction *before = nullptr;
-		for (QAction *menuAction : actions) {
-			if (menuAction->text().compare(name) >= 0)
-				before = menuAction;
-		}
-		auto na = new QAction(name, &menu);
-		connect(na, &QAction::triggered, [this, name, type_str] {
-			if (!current_source)
-				return;
-			auto s = obs_weak_source_get_source(current_source);
-			if (!s)
-				return;
-			QString filter_name = name;
-			int i = 2;
-			OBSSourceAutoRelease f = nullptr;
-			while ((f = obs_source_get_filter_by_name(s, filter_name.toUtf8().constData()))) {
-				filter_name = QString("%1 %2").arg(name).arg(i++);
-			}
-			auto filter = obs_source_create(type_str, filter_name.toUtf8().constData(), nullptr, nullptr);
-			obs_source_filter_add(s, filter);
-			obs_source_release(s);
-			filterCombo->setCurrentText(filter_name);
-		});
-		menu.insertAction(before, na);
-	}
-
-	menu.exec(QCursor::pos());
-}
-
-bool PropertiesDock::filter_compatible(uint32_t sourceFlags, uint32_t filterFlags)
-{
-	bool filterVideo = (filterFlags & OBS_SOURCE_VIDEO) != 0;
-	bool filterAsync = (filterFlags & OBS_SOURCE_ASYNC) != 0;
-	bool filterAudio = (filterFlags & OBS_SOURCE_AUDIO) != 0;
-	bool audio = (sourceFlags & OBS_SOURCE_AUDIO) != 0;
-	bool audioOnly = (sourceFlags & OBS_SOURCE_VIDEO) == 0;
-	bool asyncSource = (sourceFlags & OBS_SOURCE_ASYNC) != 0;
-
-	if (!audio && filterAudio)
-		return false;
-	if (!asyncSource && filterAsync)
-		return false;
-	if (audioOnly && filterVideo)
-		return false;
-	return true;
 }
