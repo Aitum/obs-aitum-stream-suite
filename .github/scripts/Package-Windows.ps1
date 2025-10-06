@@ -75,6 +75,15 @@ function Package {
 
     Copy-Item -Path "${ProjectRoot}/release/${Configuration}/${ProductName}/bin" -Destination "${ProjectRoot}/release/Package/obs-plugins" -Recurse
     Copy-Item -Path "${ProjectRoot}/release/${Configuration}/${ProductName}/data" -Destination "${ProjectRoot}/release/Package/data/obs-plugins/${ProductName}" -Recurse
+
+    $plugins = @('advanced-masks.1856','move.913','retro-effects.1972','composite-blur.1780','svg-source.2174','noise.1916','stroke-glow-shadow.1800','freeze-filter.950','3d-effect.1692')
+    foreach ($plugin in $plugins) {
+        $relPath = [regex]::Matches(((Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""), '<ahref="(/forum/resources/[^"]+)"((?!forum).)*windows(-x64)?.zip').Groups[1].Value
+        Invoke-WebRequest -OutFile "temp.zip" "https://obsproject.com${relPath}"
+        Expand-Archive -Path "temp.zip" -DestinationPath "${ProjectRoot}/release/Package/" -Force
+        Remove-Item -Path "temp.zip"
+    }
+
     Copy-Item -Path "${ProjectRoot}/theme" -Destination "${ProjectRoot}/release/Package/data/obs-studio/themes" -Recurse
     Copy-Item "${IsccFile}" -Destination "${ProjectRoot}/release"
     Copy-Item "${ProjectRoot}/media/icon.ico" -Destination "${ProjectRoot}/release"
