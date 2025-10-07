@@ -254,6 +254,9 @@ public:
 
 	obs_canvas_t *GetCanvas() const { return canvas; }
 	void UpdateSettings(obs_data_t *settings);
+
+	uint32_t GetCanvasWidth() { return canvas_width; };
+	uint32_t GetCanvasHeight() { return canvas_height; };
 };
 
 struct SelectedItemBounds {

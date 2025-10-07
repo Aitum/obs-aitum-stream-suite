@@ -4,6 +4,7 @@
 #include <src/utils/color.hpp>
 
 std::list<CanvasCloneDock *> canvas_clone_docks;
+extern std::list<CanvasDock *> canvas_docks;
 
 CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
@@ -53,6 +54,19 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 				canvas_width = ovi.base_width;
 			if (ovi.base_height > 0)
 				canvas_height = ovi.base_height;
+		} else {
+			for (const auto &it : canvas_docks) {
+				if (it->GetCanvas() == clone_canvas) {
+					canvas_width = it->GetCanvasWidth();
+					canvas_height = it->GetCanvasHeight();
+				}
+			}
+			for (const auto &it : canvas_clone_docks) {
+				if (it->GetCanvas() == clone_canvas) {
+					canvas_width = it->GetCanvasWidth();
+					canvas_height = it->GetCanvasHeight();
+				}
+			}
 		}
 		obs_canvas_release(clone_canvas);
 	}
@@ -209,6 +223,20 @@ void CanvasCloneDock::Tick(void *data, float seconds)
 {
 	UNUSED_PARAMETER(seconds);
 	CanvasCloneDock *ccd = static_cast<CanvasCloneDock *>(data);
+	if (!ccd->clone) {
+		auto clone_canvas = obs_get_canvas_by_name(obs_data_get_string(ccd->settings, "clone"));
+		if (clone_canvas) {
+			ccd->clone = obs_canvas_get_weak_canvas(clone_canvas);
+			obs_video_info ovi;
+			if (obs_canvas_get_video_info(clone_canvas, &ovi)) {
+				if (ovi.base_width > 0)
+					ccd->canvas_width = ovi.base_width;
+				if (ovi.base_height > 0)
+					ccd->canvas_height = ovi.base_height;
+			}
+			obs_canvas_release(clone_canvas);
+		}
+	}
 	if (!ccd->clone)
 		return;
 	obs_canvas_t *c = obs_weak_canvas_get_canvas(ccd->clone);
@@ -217,6 +245,37 @@ void CanvasCloneDock::Tick(void *data, float seconds)
 	if (c == ccd->canvas) {
 		obs_canvas_release(c);
 		return;
+	}
+	obs_video_info ovi;
+	if (obs_canvas_get_video_info(c, &ovi)) {
+		if (ovi.base_width > 0 && ccd->canvas_width != ovi.base_width)
+			ccd->canvas_width = ovi.base_width;
+		if (ovi.base_height > 0 && ccd->canvas_height != ovi.base_height)
+			ccd->canvas_height = ovi.base_height;
+	} else {
+		for (const auto &it : canvas_docks) {
+			if (it->GetCanvas() == c) {
+				ccd->canvas_width = it->GetCanvasWidth();
+				ccd->canvas_height = it->GetCanvasHeight();
+			}
+		}
+		for (const auto &it : canvas_clone_docks) {
+			if (it->GetCanvas() == c) {
+				ccd->canvas_width = it->GetCanvasWidth();
+				ccd->canvas_height = it->GetCanvasHeight();
+			}
+		}
+	}
+	if (obs_canvas_get_video_info(ccd->canvas, &ovi)) {
+		if (ovi.base_width != ccd->canvas_width || ovi.base_height != ccd->canvas_height ||
+		    ovi.output_width != ccd->canvas_width || ovi.output_height != ccd->canvas_height) {
+			obs_get_video_info(&ovi);
+			ovi.base_height = ccd->canvas_height;
+			ovi.base_width = ccd->canvas_width;
+			ovi.output_height = ccd->canvas_height;
+			ovi.output_width = ccd->canvas_width;
+			obs_canvas_reset_video(ccd->canvas, &ovi);
+		}
 	}
 	for (int i = 0; i < MAX_CHANNELS; i++) {
 		obs_source_t *s = obs_canvas_get_channel(c, i);
@@ -476,10 +535,13 @@ void CanvasCloneDock::DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t 
 		obs_sceneitem_set_order_position(item2, order_position);
 }
 
-void CanvasCloneDock::UpdateSettings(obs_data_t *s) {
-	obs_data_release(settings);
-	settings = s;
-	obs_data_addref(s);
+void CanvasCloneDock::UpdateSettings(obs_data_t *s)
+{
+	if (s) {
+		obs_data_release(settings);
+		settings = s;
+		obs_data_addref(s);
+	}
 
 	auto c = color_from_int(obs_data_get_int(settings, "color"));
 	setStyleSheet(QString("QFrame{border: 2px solid %1;}").arg(c.name(QColor::HexRgb)));
@@ -495,6 +557,19 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s) {
 				canvas_width = ovi.base_width;
 			if (ovi.base_height > 0)
 				canvas_height = ovi.base_height;
+		} else {
+			for (const auto &it : canvas_docks) {
+				if (it->GetCanvas() == clone_canvas) {
+					canvas_width = it->GetCanvasWidth();
+					canvas_height = it->GetCanvasHeight();
+				}
+			}
+			for (const auto &it : canvas_clone_docks) {
+				if (it->GetCanvas() == clone_canvas) {
+					canvas_width = it->GetCanvasWidth();
+					canvas_height = it->GetCanvasHeight();
+				}
+			}
 		}
 		obs_canvas_release(clone_canvas);
 	} else {
@@ -505,17 +580,4 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s) {
 		canvas_width = 1080;
 	if (canvas_height < 1)
 		canvas_height = 1920;
-
-	obs_video_info ovi;
-	if (obs_canvas_get_video_info(canvas, &ovi)) {
-		if (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
-		    ovi.output_height != canvas_height) {
-			obs_get_video_info(&ovi);
-			ovi.base_height = canvas_height;
-			ovi.base_width = canvas_width;
-			ovi.output_height = canvas_height;
-			ovi.output_width = canvas_width;
-			obs_canvas_reset_video(canvas, &ovi);
-		}
-	}
 }

@@ -4854,9 +4854,11 @@ void CanvasDock::LoadMode(int index)
 }
 
 void CanvasDock::UpdateSettings(obs_data_t* s) {
-	obs_data_release(settings);
-	settings = s;
-	obs_data_addref(s);
+	if (s) {
+		obs_data_release(settings);
+		settings = s;
+		obs_data_addref(s);
+	}
 
 	auto c = color_from_int(obs_data_get_int(settings, "color"));
 	setStyleSheet(QString::fromUtf8("#contextContainer { border: 2px solid %1}").arg(c.name(QColor::HexRgb)));
