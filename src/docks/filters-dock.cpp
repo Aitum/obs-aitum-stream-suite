@@ -42,7 +42,7 @@ FiltersDock::FiltersDock(QWidget *parent) : QFrame(parent)
 		if (!f)
 			return;
 
-		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Q_ARG(OBSSource, OBSSource(f)));
+		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(f)));
 		obs_source_release(f);
 		if (!item->isSelected())
 			item->setSelected(true);
@@ -97,7 +97,7 @@ FiltersDock::FiltersDock(QWidget *parent) : QFrame(parent)
 
 	a = toolbar->addAction(QIcon(":/settings/images/settings/general.svg"),
 			       QString::fromUtf8(obs_frontend_get_locale_string("SourceProperties")), [this] {
-				       
+
 			       });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("propertiesIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-gear");
@@ -176,7 +176,7 @@ void FiltersDock::ShowFiltersContextMenu(QListWidgetItem *widget_item)
 		if (!f)
 			return;
 
-		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Q_ARG(OBSSource, OBSSource(f)));
+		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(f)));
 		properties_dock->parentWidget()->show();
 	});
 	menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Remove")),
@@ -320,7 +320,8 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 			obs_source_filter_add(s, filter);
 			obs_source_release(s);
 
-			QMetaObject::invokeMethod(properties_dock, "LoadProperties", Q_ARG(OBSSource, OBSSource(filter)));
+			QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection,
+						  Q_ARG(OBSSource, OBSSource(filter)));
 			obs_source_release(filter);
 			//todo make sure the new item is selected
 		});
@@ -392,6 +393,6 @@ void FiltersDock::source_remove(void *param, calldata_t *cd)
 	auto this_ = static_cast<FiltersDock *>(param);
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	if (obs_weak_source_references_source(this_->source, source)) {
-		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
 }

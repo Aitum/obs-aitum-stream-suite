@@ -140,8 +140,10 @@ void PropertiesDock::scene_item_select(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
-	QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
-	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
+	QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection,
+				  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
+	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection,
+				  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
 }
 
 void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
@@ -149,8 +151,8 @@ void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	if (obs_weak_source_references_source(this_->current_source, obs_sceneitem_get_source(item))) {
-		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
-		QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, nullptr));
+		QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, nullptr));
 	}
 }
 
@@ -173,8 +175,8 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 	current_scene = obs_source_get_weak_source(scene);
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_select", scene_item_select, this);
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_deselect", scene_item_deselect, this);
-	QMetaObject::invokeMethod(this, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
-	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Q_ARG(OBSSource, OBSSource(scene)));
+	QMetaObject::invokeMethod(this, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(scene)));
 	obs_scene_enum_items(
 		obs_scene_from_source(scene),
 		[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
@@ -182,7 +184,7 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 			auto this_ = static_cast<PropertiesDock *>(param);
 			if (!obs_sceneitem_selected(item))
 				return true;
-			QMetaObject::invokeMethod(this_, "SourceChanged",
+			QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection,
 						  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
 			return false;
 		},
@@ -327,7 +329,7 @@ void PropertiesDock::source_remove(void *param, calldata_t *cd)
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	if (obs_weak_source_references_source(this_->current_source, source)) {
-		QMetaObject::invokeMethod(this_, "SourceChanged", Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
 }
 
@@ -339,12 +341,13 @@ void PropertiesDock::properties_remove(void *param, calldata_t *cd)
 		if (this_->current_properties != this_->current_source) {
 			auto s = obs_weak_source_get_source(this_->current_source);
 			if (s) {
-				QMetaObject::invokeMethod(this_, "LoadProperties", Q_ARG(OBSSource, OBSSource(s)));
+				QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection,
+							  Q_ARG(OBSSource, OBSSource(s)));
 				obs_source_release(s);
 				return;
 			}
 		}
-		QMetaObject::invokeMethod(this_, "LoadProperties", Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
 }
 
