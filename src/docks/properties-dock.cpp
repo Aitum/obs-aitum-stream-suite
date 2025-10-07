@@ -294,14 +294,14 @@ void PropertiesDock::LoadProperties(OBSSource source)
 
 		obs_weak_source_release(current_properties);
 	}
-	if (properties) {
-		obs_properties_destroy(properties);
-		properties = nullptr;
-	}
 	for (int i = layout->rowCount() - 1; i >= 0; i--) {
 		layout->removeRow(i);
 	}
 	property_widgets.clear();
+	if (properties) {
+		obs_properties_destroy(properties);
+		properties = nullptr;
+	}
 	if (!source) {
 		current_properties = nullptr;
 		return;
@@ -842,7 +842,12 @@ void PropertiesDock::RefreshProperties(obs_properties_t *properties, QFormLayout
 {
 	obs_property_t *property = obs_properties_first(properties);
 	while (property) {
-		auto widget = property_widgets.at(property);
+		auto it = property_widgets.find(property);
+		if (it == property_widgets.end()) {
+			obs_property_next(&property);
+			continue;
+		}
+		auto widget = it->second;
 		auto visible = obs_property_visible(property);
 		if (widget->isVisible() != visible) {
 			widget->setVisible(visible);
