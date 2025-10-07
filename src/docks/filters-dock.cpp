@@ -298,10 +298,12 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 		auto name = QString::fromUtf8(obs_source_get_display_name(type_str));
 
 		QList<QAction *> actions = addFilterMenu->actions();
-		QAction *before = nullptr;
+		QAction *after = nullptr;
 		for (QAction *menuAction : actions) {
-			if (menuAction->text().compare(name) >= 0)
-				before = menuAction;
+			if (menuAction->text().compare(name, Qt::CaseInsensitive) >= 0) {
+				after = menuAction;
+				break;
+			}
 		}
 		auto na = new QAction(name, addFilterMenu);
 		connect(na, &QAction::triggered, [this, name, type_str] {
@@ -323,9 +325,8 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 			QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection,
 						  Q_ARG(OBSSource, OBSSource(filter)));
 			obs_source_release(filter);
-			//todo make sure the new item is selected
 		});
-		addFilterMenu->insertAction(before, na);
+		addFilterMenu->insertAction(after, na);
 	}
 }
 
