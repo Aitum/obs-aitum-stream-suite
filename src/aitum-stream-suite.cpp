@@ -41,6 +41,7 @@ PropertiesDock *properties_dock = nullptr;
 FiltersDock *filters_dock = nullptr;
 
 extern std::list<CanvasDock *> canvas_docks;
+extern std::list<CanvasCloneDock *> canvas_clone_docks;
 
 QIcon create2StateIcon(QString fileOn, QString fileOff)
 {
@@ -323,8 +324,18 @@ void load_current_profile_config()
 		if (obs_data_get_bool(t, "delete")) {
 			const char *canvas_name = obs_data_get_string(t, "name");
 			obs_frontend_remove_dock(canvas_name);
-
-			obs_canvas_t *c = obs_get_canvas_by_uuid(obs_data_get_string(t, "uuid"));
+			auto uuid = obs_data_get_string(t, "uuid");
+			for (const auto &it : canvas_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				}
+			}
+			for (const auto &it : canvas_clone_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				}
+			}
+			obs_canvas_t *c = obs_get_canvas_by_uuid(uuid);
 			if (!c)
 				c = obs_get_canvas_by_name(canvas_name);
 			if (c) {
@@ -336,20 +347,73 @@ void load_current_profile_config()
 			obs_data_release(t);
 			canvas_count--;
 		} else if (strcmp(obs_data_get_string(t, "type"), "clone") == 0) {
-			auto ccd = new CanvasCloneDock(t, main_window);
-			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"), ccd);
-			if (!obs_data_get_bool(t, "has_loaded")) {
-				ccd->parentWidget()->show();
-				obs_data_set_bool(t, "has_loaded", true);
+			auto uuid = obs_data_get_string(t, "uuid");
+			for (const auto &it : canvas_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				}
+			}
+			CanvasCloneDock *ccd = nullptr;
+			for (const auto &it : canvas_clone_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
+						   obs_data_get_string(t, "name")) != 0) {
+						// canvas name changed, remove old dock and create a new one
+						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					} else {
+						ccd = it;
+					}
+				}
+			}
+			if (ccd) {
+				ccd->UpdateSettings(t);
+			} else {
+				ccd = new CanvasCloneDock(t, main_window);
+				if (obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
+								ccd)) {
+					canvas_clone_docks.push_back(ccd);
+					if (!obs_data_get_bool(t, "has_loaded")) {
+						ccd->parentWidget()->show();
+						obs_data_set_bool(t, "has_loaded", true);
+					}
+				} else {
+					delete ccd;
+				}
 			}
 			i++;
 		} else {
-			auto cd = new CanvasDock(t, main_window);
-			canvas_docks.push_back(cd);
-			obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"), cd);
-			if (!obs_data_get_bool(t, "has_loaded")) {
-				cd->parentWidget()->show();
-				obs_data_set_bool(t, "has_loaded", true);
+			auto uuid = obs_data_get_string(t, "uuid");
+			for (const auto &it : canvas_clone_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				}
+			}
+			CanvasDock *cd = nullptr;
+			for (const auto &it : canvas_docks) {
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
+					if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
+						   obs_data_get_string(t, "name")) != 0) {
+						// canvas name changed, remove old dock and create a new one
+						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					} else {
+						cd = it;
+					}
+				}
+			}
+			if (cd) {
+				cd->UpdateSettings(t);
+			} else {
+				cd = new CanvasDock(t, main_window);
+				if (obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
+								cd)) {
+					canvas_docks.push_back(cd);
+					if (!obs_data_get_bool(t, "has_loaded")) {
+						cd->parentWidget()->show();
+						obs_data_set_bool(t, "has_loaded", true);
+					}
+				} else {
+					delete cd;
+				}
 			}
 			i++;
 		}

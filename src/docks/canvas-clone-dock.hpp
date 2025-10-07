@@ -27,4 +27,7 @@ private:
 public:
 	CanvasCloneDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasCloneDock();
+
+	obs_canvas_t *GetCanvas() const { return canvas; }
+	void UpdateSettings(obs_data_t *settings);
 };

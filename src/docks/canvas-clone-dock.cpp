@@ -3,6 +3,8 @@
 #include "canvas-dock.hpp"
 #include <src/utils/color.hpp>
 
+std::list<CanvasCloneDock *> canvas_clone_docks;
+
 CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
 	  preview(new OBSQTDisplay(this)),
@@ -77,13 +79,18 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		if (obs_canvas_get_video_info(canvas, &ovi)) {
 			if (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
 			    ovi.output_width != canvas_width || ovi.output_height != canvas_height) {
-				obs_canvas_remove(canvas);
-				obs_canvas_release(canvas);
-				canvas = nullptr;
+				obs_get_video_info(&ovi);
+				ovi.base_height = canvas_height;
+				ovi.base_width = canvas_width;
+				ovi.output_height = canvas_height;
+				ovi.output_width = canvas_width;
+				obs_canvas_reset_video(canvas, &ovi);
 			}
 		}
-	}
-	if (!canvas) {
+		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
+			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
+		}
+	} else {
 		obs_video_info ovi;
 		obs_get_video_info(&ovi);
 		ovi.base_height = canvas_height;
@@ -133,6 +140,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 
 CanvasCloneDock::~CanvasCloneDock()
 {
+	canvas_clone_docks.remove(this);
 	obs_remove_tick_callback(Tick, this);
 	obs_data_release(settings);
 	obs_weak_canvas_release(clone);
@@ -466,4 +474,48 @@ void CanvasCloneDock::DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t 
 	int order_position2 = obs_sceneitem_get_order_position(item2);
 	if (order_position != order_position2)
 		obs_sceneitem_set_order_position(item2, order_position);
+}
+
+void CanvasCloneDock::UpdateSettings(obs_data_t *s) {
+	obs_data_release(settings);
+	settings = s;
+	obs_data_addref(s);
+
+	auto c = color_from_int(obs_data_get_int(settings, "color"));
+	setStyleSheet(QString("QFrame{border: 2px solid %1;}").arg(c.name(QColor::HexRgb)));
+
+	obs_weak_canvas_release(clone);
+	clone = nullptr;
+	auto clone_canvas = obs_get_canvas_by_name(obs_data_get_string(settings, "clone"));
+	if (clone_canvas) {
+		clone = obs_canvas_get_weak_canvas(clone_canvas);
+		obs_video_info ovi;
+		if (obs_canvas_get_video_info(clone_canvas, &ovi)) {
+			if (ovi.base_width > 0)
+				canvas_width = ovi.base_width;
+			if (ovi.base_height > 0)
+				canvas_height = ovi.base_height;
+		}
+		obs_canvas_release(clone_canvas);
+	} else {
+		canvas_width = (uint32_t)obs_data_get_int(settings, "width");
+		canvas_height = (uint32_t)obs_data_get_int(settings, "height");
+	}
+	if (canvas_width < 1)
+		canvas_width = 1080;
+	if (canvas_height < 1)
+		canvas_height = 1920;
+
+	obs_video_info ovi;
+	if (obs_canvas_get_video_info(canvas, &ovi)) {
+		if (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+		    ovi.output_height != canvas_height) {
+			obs_get_video_info(&ovi);
+			ovi.base_height = canvas_height;
+			ovi.base_width = canvas_width;
+			ovi.output_height = canvas_height;
+			ovi.output_width = canvas_width;
+			obs_canvas_reset_video(canvas, &ovi);
+		}
+	}
 }

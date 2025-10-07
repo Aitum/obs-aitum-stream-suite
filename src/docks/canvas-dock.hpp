@@ -251,6 +251,9 @@ private slots:
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasDock();
+
+	obs_canvas_t *GetCanvas() const { return canvas; }
+	void UpdateSettings(obs_data_t *settings);
 };
 
 struct SelectedItemBounds {

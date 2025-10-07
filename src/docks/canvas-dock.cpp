@@ -65,10 +65,10 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	canvas_split->setOrientation(Qt::Vertical);
 
 	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
-	if (!canvas_width)
+	if (canvas_width < 1)
 		canvas_width = 1080;
 	canvas_height = (uint32_t)obs_data_get_int(settings, "height");
-	if (!canvas_height)
+	if (canvas_height < 1)
 		canvas_height = 1920;
 
 	canvas_name = obs_data_get_string(settings, "name");
@@ -89,13 +89,18 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		if (obs_canvas_get_video_info(canvas, &ovi)) {
 			if (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
 			    ovi.output_width != canvas_width || ovi.output_height != canvas_height) {
-				obs_canvas_remove(canvas);
-				obs_canvas_release(canvas);
-				canvas = nullptr;
+				obs_get_video_info(&ovi);
+				ovi.base_height = canvas_height;
+				ovi.base_width = canvas_width;
+				ovi.output_height = canvas_height;
+				ovi.output_width = canvas_width;
+				obs_canvas_reset_video(canvas, &ovi);
 			}
 		}
-	}
-	if (!canvas) {
+		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
+			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
+		}
+	} else {
 		obs_video_info ovi;
 		obs_get_video_info(&ovi);
 		ovi.base_height = canvas_height;
@@ -4818,7 +4823,8 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 	}
 }
 
-void CanvasDock::LoadMode(int index) {
+void CanvasDock::LoadMode(int index)
+{
 	auto state = "";
 	if (index == 0) {
 		state = obs_data_get_string(settings, "panel_split_live");
@@ -4845,4 +4851,33 @@ void CanvasDock::LoadMode(int index) {
 		state = obs_data_get_string(settings, "canvas_split");
 	if (state[0] != '\0')
 		canvas_split->restoreState(QByteArray::fromBase64(state));
+}
+
+void CanvasDock::UpdateSettings(obs_data_t* s) {
+	obs_data_release(settings);
+	settings = s;
+	obs_data_addref(s);
+
+	auto c = color_from_int(obs_data_get_int(settings, "color"));
+	setStyleSheet(QString::fromUtf8("#contextContainer { border: 2px solid %1}").arg(c.name(QColor::HexRgb)));
+
+	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
+	if (canvas_width < 1)
+		canvas_width = 1080;
+	canvas_height = (uint32_t)obs_data_get_int(settings, "height");
+	if (canvas_height < 1)
+		canvas_height = 1920;
+
+	obs_video_info ovi;
+	if (obs_canvas_get_video_info(canvas, &ovi)) {
+		if (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+		    ovi.output_height != canvas_height) {
+			obs_get_video_info(&ovi);
+			ovi.base_height = canvas_height;
+			ovi.base_width = canvas_width;
+			ovi.output_height = canvas_height;
+			ovi.output_width = canvas_width;
+			obs_canvas_reset_video(canvas, &ovi);
+		}
+	}
 }
