@@ -131,10 +131,10 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 			obs_data_release(t);
 			continue;
 		}
-		obs_source_t *src = obs_canvas_get_source_by_name(clone_canvas, src_name);
+		obs_source_t *src = clone_canvas ? obs_canvas_get_source_by_name(clone_canvas, src_name) : nullptr;
 		if (!src)
 			src = obs_get_source_by_name(src_name);
-		obs_source_t *dst = obs_canvas_get_source_by_name(clone_canvas, dst_name);
+		obs_source_t *dst = clone_canvas ? obs_canvas_get_source_by_name(clone_canvas, dst_name) : nullptr;
 		if (!dst)
 			dst = obs_get_source_by_name(dst_name);
 		if (!src || !dst) {
