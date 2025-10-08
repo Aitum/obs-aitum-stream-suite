@@ -520,8 +520,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 				},
 				&has_items);
 			if (!has_items) {
-				SceneCollectionWizard wizard;
+				const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+				SceneCollectionWizard wizard(main_window);
 				wizard.exec();
+				QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
 			}
 			obs_source_release(ss);
 		}
@@ -801,8 +803,14 @@ bool obs_module_load(void)
 	live_scenes_dock = new LiveScenesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteLiveScenes", obs_module_text("AitumStreamSuiteLiveScenes"), live_scenes_dock);
 
-	version_download_info = download_info_create_single(
-		"[Aitum Stream Suite]", "OBS", "https://api.aitum.tv/plugin/streamsuite", version_info_downloaded, nullptr);
+	std::string url = "https://api.aitum.tv/plugin/streamsuite";
+	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
+
+	version_download_info = download_info_create_single("[Aitum Stream Suite]", "OBS", url.c_str(), version_info_downloaded, nullptr);
 	return true;
 }
 

@@ -5,6 +5,7 @@
 #include <QListWidget>
 #include <QFormLayout>
 #include <QComboBox>
+#include <QPushButton>
 #include <obs-frontend-api.h>
 #include <util/config-file.h>
 
@@ -24,6 +25,7 @@ SceneCollectionWizard::SceneCollectionWizard(QWidget *parent) : QWizard(parent)
 #if defined(_WIN32) || defined(__APPLE__)
 	setWizardStyle(QWizard::ModernStyle);
 #endif
+	setMinimumSize(800, 600);
 }
 
 SceneCollectionWizard::~SceneCollectionWizard()
@@ -90,16 +92,28 @@ int SceneCollectionWizard::nextId() const
 
 obs_data_t *SceneCollectionWizard::GetCam()
 {
-	auto cam = cams.front();
-	cams.pop_front();
-	return cam;
+	if (!cams.empty())
+		return cams.front();
+	return nullptr;
+}
+
+void SceneCollectionWizard::NextCam()
+{
+	if (!cams.empty())
+		cams.pop_front();
 }
 
 obs_data_t *SceneCollectionWizard::GetMic()
 {
-	auto mic = mics.front();
-	mics.pop_front();
-	return mic;
+	if (!mics.empty())
+		return mics.front();
+	return nullptr;
+}
+
+void SceneCollectionWizard::NextMic()
+{
+	if (!mics.empty())
+		mics.pop_front();
 }
 
 static std::string _scene_collections_path;
@@ -170,7 +184,7 @@ bool SceneCollectionWizard::SaveSceneCollection()
 	std::string old_name = config_get_string(config, "Basic", "SceneCollection");
 
 	auto name = obs_data_get_string(scene_collection_data, "name");
-	if(!obs_frontend_add_scene_collection(name))
+	if (!obs_frontend_add_scene_collection(name))
 		return false;
 
 	std::string path = SceneCollectionsPath() + config_get_string(config, "Basic", "SceneCollectionFile");
@@ -187,10 +201,19 @@ SceneCollectionPage::SceneCollectionPage(QWidget *parent) : QWizardPage(parent)
 
 	scl = new QListWidget;
 
+	scl->setResizeMode(QListView::Adjust);
+	scl->setViewMode(QListView::IconMode);
+	scl->setUniformItemSizes(true);
+	scl->setIconSize(QSize(160, 160));
+
 	auto fl = new QFormLayout;
 	setLayout(fl);
 
-	fl->addRow(QString::fromUtf8(obs_module_text("SceneCollection")), scl);
+	fl->addRow(QString::fromUtf8(obs_module_text("SceneCollectionPreset")), scl);
+
+	auto ownSceneCollection = new QPushButton(QString::fromUtf8(obs_module_text("UseOtherSceneCollection")));
+	connect(ownSceneCollection, &QPushButton::clicked, [this] { wizard()->close(); });
+	fl->addRow(ownSceneCollection);
 
 	std::string path = obs_get_module_data_path(obs_current_module());
 	if (path.back() != '/')
@@ -214,6 +237,13 @@ SceneCollectionPage::SceneCollectionPage(QWidget *parent) : QWizardPage(parent)
 			fn = backslash + 1;
 		}
 		auto item = new QListWidgetItem(QString::fromUtf8(fn, strlen(fn) - 5), scl);
+
+		std::string thumbPath = std::string(filePath, strlen(filePath) - 5);
+		thumbPath += "/thumbnail.png";
+		if (os_file_exists(thumbPath.c_str()))
+			item->setIcon(QIcon(QString::fromUtf8(thumbPath.c_str())));
+		else
+			item->setIcon(QIcon(":settings/images/settings/general.svg"));
 		item->setData(Qt::UserRole, QString::fromUtf8(filePath));
 		scl->addItem(item);
 	}
@@ -253,7 +283,8 @@ CamPage::CamPage(QWidget *parent) : QWizardPage(parent), preview(new OBSQTDispla
 	auto fl = new QFormLayout;
 	setLayout(fl);
 	cc = new QComboBox;
-	fl->addRow(QString::fromUtf8(obs_module_text("Cam")), cc);
+	camLabel = new QLabel(QString::fromUtf8(obs_module_text("Cam")));
+	fl->addRow(camLabel, cc);
 
 	fl->addRow(preview);
 
@@ -316,6 +347,11 @@ CamPage::~CamPage()
 void CamPage::initializePage()
 {
 	QWizardPage::initializePage();
+	cam_data = static_cast<SceneCollectionWizard *>(wizard())->GetCam();
+	if (cam_data) {
+		auto name = QString::fromUtf8(obs_data_get_string(cam_data, "name"));
+		camLabel->setText(name);
+	}
 }
 
 void CamPage::DrawPreview(void *data, uint32_t cx, uint32_t cy)
@@ -423,7 +459,6 @@ bool CamPage::validatePage()
 	if (data.isNull())
 		return false;
 
-	auto cam_data = static_cast<SceneCollectionWizard *>(wizard())->GetCam();
 	obs_data_set_string(cam_data, "id", id);
 	auto cam_settings = obs_data_get_obj(cam_data, "settings");
 	if (!cam_settings) {
@@ -438,6 +473,9 @@ bool CamPage::validatePage()
 	obs_data_set_string(settings, setting_name, "");
 	obs_source_update(cam, settings);
 	obs_data_release(settings);
+
+	static_cast<SceneCollectionWizard *>(wizard())->NextCam();
+	initializePage();
 	return true;
 }
 
@@ -449,7 +487,8 @@ MicPage::MicPage(QWidget *parent) : QWizardPage(parent)
 	auto fl = new QFormLayout;
 	setLayout(fl);
 	mc = new QComboBox;
-	fl->addRow(QString::fromUtf8(obs_module_text("Mic")), mc);
+	micLabel = new QLabel(QString::fromUtf8(obs_module_text("Mic")));
+	fl->addRow(micLabel, mc);
 
 	connect(mc, &QComboBox::currentIndexChanged, [this] {
 		auto data = mc->currentData();
@@ -494,13 +533,21 @@ MicPage::MicPage(QWidget *parent) : QWizardPage(parent)
 	obs_properties_destroy(props);
 }
 
+void MicPage::initializePage() {
+	QWizardPage::initializePage();
+	mic_data = static_cast<SceneCollectionWizard *>(wizard())->GetMic();
+	if (mic_data) {
+		auto name = QString::fromUtf8(obs_data_get_string(mic_data, "name"));
+		micLabel->setText(name);
+	}
+}
+
 bool MicPage::validatePage()
 {
 	auto data = mc->currentData();
 	if (data.isNull())
 		return false;
 
-	auto mic_data = static_cast<SceneCollectionWizard *>(wizard())->GetMic();
 	obs_data_set_string(mic_data, "id", id);
 	auto mic_settings = obs_data_get_obj(mic_data, "settings");
 	if (!mic_settings) {
@@ -515,17 +562,21 @@ bool MicPage::validatePage()
 	obs_data_set_string(settings, setting_name, "");
 	obs_source_update(mic, settings);
 	obs_data_release(settings);
+
+	static_cast<SceneCollectionWizard *>(wizard())->NextMic();
+	initializePage();
 	return true;
 }
 
 ConclusionPage::ConclusionPage(QWidget *parent) : QWizardPage(parent)
 {
-	setTitle(QString::fromUtf8(obs_module_text("Conclusion")));
-	setSubTitle(QString::fromUtf8(obs_module_text("ConclusionDescription")));
+	setTitle(QString::fromUtf8(obs_module_text("WizardConclusion")));
+	setSubTitle(QString::fromUtf8(obs_module_text("WizardConclusionDescription")));
 	setFinalPage(true);
 }
 
-bool ConclusionPage::validatePage() {
+bool ConclusionPage::validatePage()
+{
 	if (!QWizardPage::validatePage())
 		return false;
 	return static_cast<SceneCollectionWizard *>(wizard())->SaveSceneCollection();

@@ -2,6 +2,7 @@
 #include <QWizard>
 #include <QListWidget>
 #include <QComboBox>
+#include <QLabel>
 #include <obs.hpp>
 #include <src/utils/widgets/qt-display.hpp>
 
@@ -26,7 +27,9 @@ public:
 	void LoadSceneCollectionFile(QString path);
 
 	obs_data_t *GetCam();
+	void NextCam();
 	obs_data_t *GetMic();
+	void NextMic();
 	bool SaveSceneCollection();
 };
 
@@ -46,9 +49,11 @@ class CamPage : public QWizardPage {
 	Q_OBJECT
 private:
 	QComboBox *cc;
+	QLabel *camLabel = nullptr;
 	OBSSourceAutoRelease cam;
 	OBSQTDisplay *preview;
 	gs_vertbuffer_t *box = nullptr;
+	obs_data_t *cam_data = nullptr;
 
 #ifdef WIN32
 	const char *id = "dshow_input";
@@ -78,7 +83,9 @@ class MicPage : public QWizardPage {
 	Q_OBJECT
 private:
 	QComboBox *mc;
+	QLabel *micLabel = nullptr;
 	OBSSourceAutoRelease mic;
+	obs_data_t *mic_data = nullptr;
 
 #ifdef WIN32
 	const char *id = "wasapi_input_capture";
@@ -94,6 +101,7 @@ private:
 public:
 	MicPage(QWidget *parent = nullptr);
 
+	void initializePage() override;
 	bool validatePage() override;
 };
 
