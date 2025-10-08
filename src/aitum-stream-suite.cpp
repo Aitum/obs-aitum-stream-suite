@@ -20,6 +20,7 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
+#include "docks/live-scenes-dock.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -39,6 +40,7 @@ OBSBasicSettings *configDialog = nullptr;
 OutputDock *output_dock = nullptr;
 PropertiesDock *properties_dock = nullptr;
 FiltersDock *filters_dock = nullptr;
+LiveScenesDock *live_scenes_dock = nullptr;
 
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
@@ -93,6 +95,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 
 void transition_start(void *, calldata_t *)
 {
+	QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 	}
@@ -161,6 +164,12 @@ void reset_live_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
 }
 
 void reset_build_dock_state()
@@ -198,6 +207,12 @@ void reset_build_dock_state()
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -243,6 +258,10 @@ void reset_design_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	if (d)
+		d->setVisible(false);
 }
 
 void load_dock_state(int index)
@@ -419,6 +438,9 @@ void load_current_profile_config()
 		}
 	}
 	obs_data_array_release(canvas);
+	for (const auto &it : canvas_clone_docks) {
+		it->UpdateSettings(nullptr);
+	}
 
 	auto index = obs_data_get_int(current_profile_config, "dock_state_mode");
 	if (modesTabBar->currentIndex() == index) {
@@ -559,6 +581,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			recordAction->setChecked(false);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
+		QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 		}
@@ -775,6 +798,8 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"), properties_dock);
 	filters_dock = new FiltersDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteFilters", obs_module_text("AitumStreamSuiteFilters"), filters_dock);
+	live_scenes_dock = new LiveScenesDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteLiveScenes", obs_module_text("AitumStreamSuiteLiveScenes"), live_scenes_dock);
 
 	version_download_info = download_info_create_single(
 		"[Aitum Stream Suite]", "OBS", "https://api.aitum.tv/plugin/streamsuite", version_info_downloaded, nullptr);

@@ -179,10 +179,6 @@ private:
 	void SetGridMode(bool checked);
 	bool IsGridMode();
 
-	QIcon GetIconFromType(enum obs_icon_type icon_type) const;
-	QIcon GetGroupIcon() const;
-	QIcon GetSceneIcon() const;
-
 	enum class CenterType {
 		Scene,
 		Vertical,
