@@ -340,6 +340,7 @@ void FiltersDock::SourceChanged(OBSSource s)
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", source_remove, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "filter_add", filter_add, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "filter_remove", filter_remove, this);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "reorder_filters", filter_reorder, this);
 		obs_source_release(prev_source);
 
 		obs_weak_source_release(source);
@@ -354,6 +355,7 @@ void FiltersDock::SourceChanged(OBSSource s)
 	signal_handler_connect(obs_source_get_signal_handler(s), "destroy", source_remove, this);
 	signal_handler_connect(obs_source_get_signal_handler(s), "filter_add", filter_add, this);
 	signal_handler_connect(obs_source_get_signal_handler(s), "filter_remove", filter_remove, this);
+	signal_handler_connect(obs_source_get_signal_handler(s), "reorder_filters", filter_reorder, this) ;
 
 	obs_source_enum_filters(
 		s,
@@ -388,6 +390,47 @@ void FiltersDock::filter_remove(void *param, calldata_t *cd)
 		}
 	});
 }
+
+void FiltersDock::filter_reorder(void *param, calldata_t *cd)
+{
+	auto this_ = static_cast<FiltersDock *>(param);
+	auto source = (obs_source_t*)calldata_ptr(cd, "source");
+	if (!obs_weak_source_references_source(this_->source, source))
+		return;
+	QMetaObject::invokeMethod(this_, "Reorder", Qt::QueuedConnection);
+}
+
+void FiltersDock::Reorder() {
+	const auto item = filtersList->currentItem();
+	QString currentItem;
+	if (item)
+		currentItem = item->text();
+	filtersList->clear();
+
+	obs_source_t *s = obs_weak_source_get_source(source);
+	if (!s)
+		return;
+	obs_source_enum_filters(
+		s,
+		[](obs_source_t *parent, obs_source_t *filter, void *param) {
+			UNUSED_PARAMETER(parent);
+			auto this_ = static_cast<FiltersDock *>(param);
+			this_->filtersList->addItem(QString::fromUtf8(obs_source_get_name(filter)));
+		},
+		this);
+	obs_source_release(s);
+
+	if (!currentItem.isEmpty()) {
+		for (int i = 0; i < filtersList->count(); i++) {
+			auto item = filtersList->item(i);
+			if (item && item->text() == currentItem) {
+				filtersList->setCurrentItem(item);
+				item->setSelected(true);
+			}
+		}
+	}
+}
+	
 
 void FiltersDock::source_remove(void *param, calldata_t *cd)
 {

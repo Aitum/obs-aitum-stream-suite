@@ -23,9 +23,11 @@ private:
 	static void filter_add(void *param, calldata_t *cd);
 	static void filter_remove(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
+	static void filter_reorder(void *param, calldata_t *cd);
 
 private slots:
 	void SourceChanged(OBSSource source);
+	void Reorder();
 public:
 	FiltersDock(QWidget *parent = nullptr);
 	~FiltersDock();
