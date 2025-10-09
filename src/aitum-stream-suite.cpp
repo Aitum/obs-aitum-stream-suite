@@ -237,9 +237,19 @@ void reset_build_dock_state()
 	if (d)
 		d->setVisible(false);
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
-	if (d)
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
+	if (d) {
 		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
 	if (d)
@@ -257,26 +267,33 @@ void reset_build_dock_state()
 	if (d)
 		d->setVisible(false);
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-	}
-
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
 	}
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
 	}
 
-	QList<QDockWidget *> left_docks;
-	QList<int> left_dock_sizes;
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("transitionsDock"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+	}
+	
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	if (d)
+		d->setVisible(false);
+
+	QList<QDockWidget *> right_docks;
+	QList<int> right_dock_sizes;
 
 	foreach(auto &canvas_dock, canvas_docks)
 	{
@@ -284,9 +301,9 @@ void reset_build_dock_state()
 		canvas_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
-		left_docks.append(d);
-		left_dock_sizes.append(1);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
 	}
 
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
@@ -294,12 +311,12 @@ void reset_build_dock_state()
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
-		left_docks.append(d);
-		left_dock_sizes.append(1);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
 	}
 
-	main_window->resizeDocks(left_docks, left_dock_sizes, Qt::Vertical);
+	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 }
 
 void reset_design_dock_state()

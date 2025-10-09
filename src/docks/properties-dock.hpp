@@ -44,6 +44,7 @@ private slots:
 	void SceneChanged(OBSSource scene);
 	void TransitionChanged(OBSSource transition);
 	void SourceChanged(OBSSource source);
+	void SourceDeselected(OBSSource source);
 	void LoadProperties(OBSSource source);
 public:
 	PropertiesDock(QWidget *parent = nullptr);
