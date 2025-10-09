@@ -124,7 +124,8 @@ void reset_live_dock_state()
 {
 	//Shows activity feeds, chat (multi-chat), Game capture change dock, main scenes quick switch dock, canvas previews, multi-stream dock. Hides scene list or sources or anything related to actually making a stream setup and not actually being live
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_sideDocks_toggled", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
@@ -133,28 +134,54 @@ void reset_live_dock_state()
 	if (d)
 		d->setVisible(false);
 
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
+	if (d)
+		d->setVisible(false);
+
+	QList<QDockWidget *> right_docks;
+	QList<int> right_dock_sizes;
+
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteActivity"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuitePortal"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+		right_docks.append(d);
+		right_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
@@ -169,13 +196,43 @@ void reset_live_dock_state()
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
 	}
+
+	QList<QDockWidget *> left_docks;
+	QList<int> left_dock_sizes;
+
+	foreach(auto &canvas_dock, canvas_docks)
+	{
+		d = (QDockWidget *)canvas_dock->parentWidget();
+		canvas_dock->reset_live_state();
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+		left_docks.append(d);
+		left_dock_sizes.append(1);
+	}
+
+	foreach(auto &canvas_clone_dock, canvas_clone_docks)
+	{
+		d = (QDockWidget *)canvas_clone_dock->parentWidget();
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+		left_docks.append(d);
+		left_dock_sizes.append(1);
+	}
+	//main_window->tabifyDockWidget()
+	//main_window->splitDockWidget()
+	main_window->resizeDocks(left_docks, left_dock_sizes, Qt::Vertical);
+	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 }
 
 void reset_build_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_sideDocks_toggled", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
@@ -217,12 +274,38 @@ void reset_build_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 	}
+
+	QList<QDockWidget *> left_docks;
+	QList<int> left_dock_sizes;
+
+	foreach(auto &canvas_dock, canvas_docks)
+	{
+		d = (QDockWidget *)canvas_dock->parentWidget();
+		canvas_dock->reset_build_state();
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+		left_docks.append(d);
+		left_dock_sizes.append(1);
+	}
+
+	foreach(auto &canvas_clone_dock, canvas_clone_docks)
+	{
+		d = (QDockWidget *)canvas_clone_dock->parentWidget();
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+		left_docks.append(d);
+		left_dock_sizes.append(1);
+	}
+
+	main_window->resizeDocks(left_docks, left_dock_sizes, Qt::Vertical);
 }
 
 void reset_design_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Qt::BlockingQueuedConnection, Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d)
 		d->setVisible(false);
@@ -329,6 +412,7 @@ void load_current_profile_config()
 		canvas = obs_data_array_create();
 		auto new_canvas = obs_data_create();
 		obs_data_set_string(new_canvas, "name", "Vertical");
+		obs_data_set_int(new_canvas, "color", 0x1F1A17);
 		obs_data_array_push_back(canvas, new_canvas);
 		obs_data_release(new_canvas);
 		obs_data_set_array(current_profile_config, "canvas", canvas);
@@ -444,7 +528,7 @@ void load_current_profile_config()
 
 	auto index = obs_data_get_int(current_profile_config, "dock_state_mode");
 	if (modesTabBar->currentIndex() == index) {
-		load_dock_state(index);
+		QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
 	} else {
 		modesTab = -1;
 		modesTabBar->setCurrentIndex(index);
@@ -669,6 +753,7 @@ bool obs_module_load(void)
 	}
 
 	modesTabBar = new QTabBar();
+	modesTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
 	auto tb = new TabToolBar(modesTabBar);
 	main_window->addToolBar(tb);
 	tb->setFloatable(false);
@@ -677,7 +762,7 @@ bool obs_module_load(void)
 
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
-	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
+	//modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
 	tb->addWidget(modesTabBar);
 	tb->addSeparator();
 
@@ -685,6 +770,22 @@ bool obs_module_load(void)
 		save_dock_state(modesTab);
 		modesTab = index;
 		load_dock_state(index);
+	});
+
+	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
+		QMenu menu;
+		menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [] {
+			auto index = modesTabBar->currentIndex();
+			if (index == 0) {
+				reset_live_dock_state();
+			} else if (index == 1) {
+				reset_build_dock_state();
+			} else if (index == 2) {
+				reset_design_dock_state();
+			}
+		});
+
+		menu.exec(QCursor::pos());
 	});
 
 	auto aitumSettingsAction = tb->addAction(QString::fromUtf8(obs_module_text("Settings")));

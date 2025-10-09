@@ -3,10 +3,8 @@
 
 QCef *cef = nullptr;
 
-BrowserDock::BrowserDock(const char *url, QWidget *parent)
-	: QWidget(parent)
+BrowserDock::BrowserDock(const char *url, QWidget *parent) : QWidget(parent)
 {
-
 	setMinimumSize(200, 100);
 
 	if (!cef) {
@@ -21,8 +19,10 @@ BrowserDock::BrowserDock(const char *url, QWidget *parent)
 	}
 
 	auto l = new QVBoxLayout(this);
+	l->setContentsMargins(0, 0, 0, 0);
 	setLayout(l);
-	if (cef)
+	if (cef) {
 		cefWidget = cef->create_widget(nullptr, url);
-	l->addWidget(cefWidget);
+		l->addWidget(cefWidget);
+	}
 }

@@ -276,6 +276,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		auto s = obs_data_create();
 		// Set the info from the output dialog
 		obs_data_set_string(s, "name", newName.toUtf8().constData());
+		obs_data_set_int(s, "color", 0x1F1A17);
 		obs_data_array_push_back(canvases, s);
 		AddCanvas(canvasLayout, s, canvases);
 		obs_data_release(s);

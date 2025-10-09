@@ -4808,7 +4808,8 @@ void CanvasDock::LoadMode(int index)
 		canvas_split->restoreState(QByteArray::fromBase64(state));
 }
 
-void CanvasDock::UpdateSettings(obs_data_t* s) {
+void CanvasDock::UpdateSettings(obs_data_t *s)
+{
 	if (s) {
 		obs_data_release(settings);
 		settings = s;
@@ -4837,4 +4838,15 @@ void CanvasDock::UpdateSettings(obs_data_t* s) {
 			obs_canvas_reset_video(canvas, &ovi);
 		}
 	}
+}
+
+void CanvasDock::reset_live_state()
+{
+	canvas_split->setSizes({1, 0});
+	panel_split->setSizes({1, 1, 1});
+}
+
+void CanvasDock::reset_build_state() {
+	canvas_split->setSizes({1, 1});
+	panel_split->setSizes({1, 1, 1});
 }
