@@ -138,43 +138,66 @@ void reset_live_dock_state()
 	if (d)
 		d->setVisible(false);
 
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("transitionsDock"));
+	if (d)
+		d->setVisible(false);
+
 	QList<QDockWidget *> right_docks;
 	QList<int> right_dock_sizes;
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
+
+	auto chat = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
+	if (chat) {
+		chat->setVisible(true);
+		chat->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, chat);
+		right_docks.append(chat);
+		right_dock_sizes.append(3);
+	}
+
+
+	auto activity = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteActivity"));
+	if (activity) {
+		activity->setVisible(true);
+		activity->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, activity);
+		right_docks.append(activity);
+		right_dock_sizes.append(3);
+		if (chat)
+			main_window->splitDockWidget(chat, activity, Qt::Horizontal);
+	}
+	
+
+	auto info = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
+	if (info) {
+		info->setVisible(true);
+		info->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, info);
+		right_docks.append(info);
 		right_dock_sizes.append(1);
 	}
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteActivity"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
+	auto portal = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuitePortal"));
+	if (portal) {
+		portal->setVisible(true);
+		portal->setFloating(false);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, portal);
+		right_docks.append(portal);
 		right_dock_sizes.append(1);
+		if (info)
+			main_window->splitDockWidget(portal, info, Qt::Horizontal);
 	}
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
-		right_dock_sizes.append(1);
-	}
+	QList<QDockWidget *> bottom_docks;
+	QList<int> bottom_dock_sizes;
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuitePortal"));
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("mixerDock"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
-		right_dock_sizes.append(1);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
@@ -182,6 +205,8 @@ void reset_live_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
@@ -191,13 +216,6 @@ void reset_live_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
 	if (d)
 		d->setVisible(false);
-
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
-	}
 
 	QList<QDockWidget *> left_docks;
 	QList<int> left_dock_sizes;
@@ -222,10 +240,19 @@ void reset_live_dock_state()
 		left_docks.append(d);
 		left_dock_sizes.append(1);
 	}
-	//main_window->tabifyDockWidget()
-	//main_window->splitDockWidget()
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+		left_docks.append(d);
+		left_dock_sizes.append(1);
+	}
+
 	main_window->resizeDocks(left_docks, left_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
+	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
 }
 
 void reset_build_dock_state()
@@ -274,11 +301,34 @@ void reset_build_dock_state()
 		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
 	}
 
+	QList<QDockWidget *> bottom_docks;
+	QList<int> bottom_dock_sizes;
+
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(2);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("mixerDock"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(1);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("SceneNotesDock"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(1);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("transitionsDock"));
@@ -317,6 +367,8 @@ void reset_build_dock_state()
 	}
 
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
+	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
+
 }
 
 void reset_design_dock_state()
