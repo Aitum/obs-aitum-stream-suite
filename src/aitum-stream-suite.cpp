@@ -810,7 +810,8 @@ bool obs_module_load(void)
 		url += pguid;
 	}
 
-	version_download_info = download_info_create_single("[Aitum Stream Suite]", "OBS", url.c_str(), version_info_downloaded, nullptr);
+	version_download_info =
+		download_info_create_single("[Aitum Stream Suite]", "OBS", url.c_str(), version_info_downloaded, nullptr);
 	return true;
 }
 
@@ -864,14 +865,13 @@ void obs_module_post_load()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
-				    new BrowserDock(obs_module_text("AitumStreamSuiteChat"), "https://chat.aitumsuite.tv/chat",
-						    main_window));
+				    new BrowserDock("https://chat.aitumsuite.tv/chat", main_window));
 	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),
-				    new BrowserDock(obs_module_text("AitumStreamSuiteActivity"),
-						    "https://chat.aitumsuite.tv/activity", main_window));
+				    new BrowserDock("https://chat.aitumsuite.tv/activity", main_window));
 	obs_frontend_add_dock_by_id("AitumStreamSuiteInfo", obs_module_text("AitumStreamSuiteInfo"),
-				    new BrowserDock(obs_module_text("AitumStreamSuiteInfo"), "https://chat.aitumsuite.tv/info",
-						    main_window));
+				    new BrowserDock("https://chat.aitumsuite.tv/info", main_window));
+	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
+				    new BrowserDock("https://chat.aitumsuite.tv/portal", main_window));
 }
 
 void obs_module_unload()
