@@ -1,33 +1,26 @@
+#include "locked-checkbox.hpp"
+#include "obs-module.h"
 #include "source-tree.hpp"
-
-#include <obs-frontend-api.h>
+#include "visibility-checkbox.hpp"
 #include <obs.h>
-
-#include <string>
-
+#include <obs-frontend-api.h>
+#include <QAccessible>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QSpacerItem>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QMouseEvent>
-#include <QAccessible>
-#include <QMessageBox>
-
-#include <QStylePainter>
 #include <QMainWindow>
+#include <QMessageBox>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QSpacerItem>
 #include <QStyleOptionFocusRect>
-
-#include "visibility-checkbox.hpp"
-#include "locked-checkbox.hpp"
-
-#include "obs-module.h"
+#include <QStylePainter>
+#include <QVBoxLayout>
+#include <src/docks/canvas-dock.hpp>
 #include <src/utils/icon.hpp>
+#include <string>
 
 /* ========================================================================= */
-
-
 
 SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tree(tree_), sceneitem(sceneitem_)
 {
@@ -82,7 +75,6 @@ SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tre
 	vis->setAccessibleName(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.Visibility")));
 	vis->setAccessibleDescription(
 		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.VisibilityDescription")).arg(name));
-	
 
 	lock = new LockedCheckBox();
 	lock->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
@@ -183,12 +175,16 @@ void SourceTreeItem::Clear()
 	DisconnectSignals();
 	sceneitem = nullptr;
 }
+extern std::list<CanvasDock *> canvas_docks;
 
 void SourceTreeItem::removeItem(void *data, calldata_t *cd)
 {
 	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
 	obs_sceneitem_t *curItem = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	obs_scene_t *curScene = (obs_scene_t *)calldata_ptr(cd, "scene");
+
+	if (std::find(canvas_docks.begin(), canvas_docks.end(), this_->tree->canvasDock) == canvas_docks.end())
+		return;
 
 	if (curItem == this_->sceneitem) {
 		QMetaObject::invokeMethod(this_->tree, "Remove", Q_ARG(OBSSceneItem, curItem), Q_ARG(OBSScene, curScene));
@@ -473,6 +469,8 @@ void SourceTreeItem::Renamed(const QString &name)
 
 void SourceTreeItem::Update(bool force)
 {
+	if (std::find(canvas_docks.begin(), canvas_docks.end(), tree->canvasDock) == canvas_docks.end())
+		return;
 	obs_scene_t *scene = tree->getScene(tree->getSceneParam);
 	obs_scene_t *itemScene = obs_sceneitem_get_scene(sceneitem);
 
@@ -630,6 +628,8 @@ static bool enumItem(obs_scene_t *, obs_sceneitem_t *item, void *ptr)
 
 void SourceTreeModel::SceneChanged()
 {
+	if (std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
+		return;
 	obs_scene_t *scene = st->getScene(st->getSceneParam);
 
 	beginResetModel();
@@ -748,6 +748,8 @@ void SourceTreeModel::Add(obs_sceneitem_t *item)
 
 void SourceTreeModel::Remove(obs_sceneitem_t *item)
 {
+	if (std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
+		return;
 	int idx = -1;
 	for (int i = 0; i < items.count(); i++) {
 		if (items[i] == item) {
@@ -985,13 +987,14 @@ void SourceTreeModel::UpdateGroupState(bool update)
 
 /* ========================================================================= */
 
-SourceTree::SourceTree(std::mutex *select_mutex, std::vector<obs_sceneitem_t *> *hovered_preview_items, obs_scene_t *(*get_scene)(void*),
-		       void *get_scene_param, QWidget *parent_)
+SourceTree::SourceTree(std::mutex *select_mutex, std::vector<obs_sceneitem_t *> *hovered_preview_items,
+		       obs_scene_t *(*get_scene)(void *), void *get_scene_param, CanvasDock *canvas_dock, QWidget *parent_)
 	: QListView(parent_),
 	  selectMutex(select_mutex),
 	  hoveredPreviewItems(hovered_preview_items),
 	  getScene(get_scene),
-	  getSceneParam(get_scene_param)
+	  getSceneParam(get_scene_param),
+	  canvasDock(canvas_dock)
 {
 	SourceTreeModel *stm_ = new SourceTreeModel(this);
 	setModel(stm_);
@@ -1512,6 +1515,8 @@ bool SourceTree::GroupedItemsSelected() const
 
 void SourceTree::Remove(OBSSceneItem item, OBSScene scene)
 {
+	if (std::find(canvas_docks.begin(), canvas_docks.end(), canvasDock) == canvas_docks.end())
+		return;
 	GetStm()->Remove(item);
 	obs_frontend_save();
 

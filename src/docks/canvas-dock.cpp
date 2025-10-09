@@ -286,7 +286,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	sourcesGroupLayout->setContentsMargins(0, 0, 0, 0);
 	sourcesGroup->setLayout(sourcesGroupLayout);
 	sourceList = new SourceTree(
-		&selectMutex, &hoveredPreviewItems, [](void *param) { return ((CanvasDock *)param)->scene; }, this, this);
+		&selectMutex, &hoveredPreviewItems, [](void *param) { return ((CanvasDock *)param)->scene; }, this, this, this);
 	sourceList->setContentsMargins(0, 0, 0, 0);
 	sourceList->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	sourceList->setFrameShape(QFrame::NoFrame);
