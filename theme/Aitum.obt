@@ -389,6 +389,7 @@ QWidget:disabled {
     color: var(--text_disabled);
 }
 
+
 /* Container windows */
 
 QDialog,
@@ -697,9 +698,11 @@ QScrollArea {
  */
 OBSBasicStatusBar {
     margin:5px 0;
-    padding:0;
+    padding:5px ;
     spacing:10;
     background:var(--blueMed);
+    border-radius:5px;
+    min-height:20px;
 }
 
 StatusBarWidget > QFrame {
@@ -1405,6 +1408,7 @@ QSlider::handle:disabled {
     icon-size: var(--icon_base);
 }
 
+
 /* This is an incredibly cursed but necessary fix */
 #stackedMixerArea QPushButton:!hover {
     background-color: var(--button_bg);
@@ -1419,14 +1423,17 @@ QSlider::handle:disabled {
     background-color: var(--button_bg_down);
 }
 
-#stackedMixerArea {
-    border: none;
+#stackedMixerArea{
+    border: 10px solid transparent;
     padding: 0px;
-    border-bottom: 1px solid #222;
+    /* background:red; */
 }
-
+#stackedMixerArea > * {
+    background:rgba(0,0,0,0.2);
+    border-radius:5px;
+}
 VolControl #volLabel {
-    padding: var(--padding_base) 0px var(--padding_base);
+    padding: var(--padding_base);
     text-align: center;
     font-size: var(--font_base);
     color: var(--text_muted);
@@ -1434,27 +1441,44 @@ VolControl #volLabel {
 
 /* Horizontal Mixer */
 #hMixerScrollArea VolControl {
-    padding: 0px var(--padding_xlarge) var(--padding_base);
-    border-bottom: 1px solid var(--border_color);
+    padding:0px 10px 5px;
+    border-bottom: 0px solid var(--blueDark);
+    border-radius:5px;
+    margin:10px 10px 0 10px;
+}
+
+#hMixerScrollArea>*>* {
+    background: transparent !important
 }
 
 #hMixerScrollArea VolControl QSlider {
     margin: 0px 0px var(--padding_base);
+}
+#hMixerScrollArea VolControl {
+    background: var(--greyMed)
 }
 
 #hMixerScrollArea VolControl QSlider::groove:horizontal {
     background: var(--bg_window);
     height: var(--volume_slider);
 }
+#hMixerScrollArea VolControl #volLabel {
+    margin:10px 0;
+    padding:0;
+}
 
 /* Vertical Mixer */
 #stackedMixerArea QScrollBar:vertical {
     border-left: 1px solid var(--border_color);
 }
-
+#vMixerScrollArea > * > *{
+    background: transparent!important
+}
 #vMixerScrollArea VolControl {
-    padding: var(--padding_large) 0px var(--padding_base);
-    border-right: 1px solid var(--border_color);
+    border:5px solid var(--greyMed);
+    margin:10px 0 10px 10px;
+    border-radius: 5px;
+    background:var(--greyMed)
 }
 
 #vMixerScrollArea VolControl QSlider {
@@ -1479,7 +1503,7 @@ VolControl #volLabel {
 }
 
 #vMixerScrollArea VolControl QLabel {
-    padding: 0px var(--padding_large);
+    padding: 0px;
 }
 
 #vMixerScrollArea VolControl QPushButton {
@@ -1489,7 +1513,6 @@ VolControl #volLabel {
 #vMixerScrollArea VolControl MuteCheckBox {
     margin-left: var(--padding_xlarge);
 }
-
 VolControl {
     background: var(--bg_base);
 }
@@ -1510,8 +1533,8 @@ VolumeMeter {
     qproperty-minorTickColor: var(--grey1);
 }
 
-/* Status Bar */
 
+/* Status Bar */
 QStatusBar::item {
     border: none;
 }
@@ -2332,6 +2355,19 @@ QMainWindow>QToolBar QTabBar::tab::right {
 }
 
 
+#AitumStreamSuiteOutput > QWidget > * > * > *{
+    background:#121519;
+    /* border-radius: 5px; */
+}
+#AitumStreamSuiteOutput>QWidget>*>*> * > * {
+/* background:red; */
+    margin:0px 5px;
+}
+#AitumStreamSuiteOutput>QWidget{
+    padding:10px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
 
 
 
