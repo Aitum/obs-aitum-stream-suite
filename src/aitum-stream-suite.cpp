@@ -580,8 +580,16 @@ void load_current_profile_config()
 				}
 			}
 			obs_canvas_t *c = obs_get_canvas_by_uuid(uuid);
+			if (c && obs_canvas_removed(c)) {
+				obs_canvas_release(c);
+				c = nullptr;
+			}
 			if (!c)
 				c = obs_get_canvas_by_name(canvas_name);
+			if (c && obs_canvas_removed(c)) {
+				obs_canvas_release(c);
+				c = nullptr;
+			}
 			if (c) {
 				obs_frontend_remove_canvas(c);
 				obs_canvas_remove(c);
@@ -599,14 +607,17 @@ void load_current_profile_config()
 			}
 			CanvasCloneDock *ccd = nullptr;
 			for (const auto &it : canvas_clone_docks) {
-				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
-					if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
-						   obs_data_get_string(t, "name")) != 0) {
-						// canvas name changed, remove old dock and create a new one
-						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-					} else {
-						ccd = it;
-					}
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) != 0)
+					continue;
+
+				if (obs_canvas_removed(it->GetCanvas())) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
+						  obs_data_get_string(t, "name")) != 0) {
+					// canvas name changed, remove old dock and create a new one
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				} else {
+					ccd = it;
 				}
 			}
 			if (ccd) {
@@ -634,14 +645,16 @@ void load_current_profile_config()
 			}
 			CanvasDock *cd = nullptr;
 			for (const auto &it : canvas_docks) {
-				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
-					if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
-						   obs_data_get_string(t, "name")) != 0) {
-						// canvas name changed, remove old dock and create a new one
-						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-					} else {
-						cd = it;
-					}
+				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) != 0)
+					continue;
+				if (obs_canvas_removed(it->GetCanvas())) {
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
+						  obs_data_get_string(t, "name")) != 0) {
+					// canvas name changed, remove old dock and create a new one
+					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+				} else {
+					cd = it;
 				}
 			}
 			if (cd) {
@@ -717,8 +730,10 @@ static bool restart = false;
 
 static void frontend_event(enum obs_frontend_event event, void *private_data)
 {
+	static bool finished_loading = false;
 	UNUSED_PARAMETER(private_data);
 	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+		finished_loading = true;
 		if (restart) {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 			QMetaObject::invokeMethod(main_window, [main_window] { main_window->close(); }, Qt::QueuedConnection);
@@ -813,13 +828,32 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED) {
-		struct obs_frontend_source_list transitions = {};
-		obs_frontend_get_transitions(&transitions);
-		for (size_t i = 0; i < transitions.sources.num; i++) {
-			auto sh = obs_source_get_signal_handler(transitions.sources.array[i]);
-			signal_handler_connect(sh, "transition_start", transition_start, nullptr);
+		if (finished_loading) {
+			struct obs_frontend_source_list transitions = {};
+			obs_frontend_get_transitions(&transitions);
+			for (size_t i = 0; i < transitions.sources.num; i++) {
+				auto sh = obs_source_get_signal_handler(transitions.sources.array[i]);
+				signal_handler_connect(sh, "transition_start", transition_start, nullptr);
+			}
+			obs_frontend_source_list_free(&transitions);
+			load_current_profile_config();
 		}
-		obs_frontend_source_list_free(&transitions);
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP) {
+		for (auto i = canvas_clone_docks.size(); i > 0; i--) {
+			auto it = canvas_clone_docks.begin();
+			std::advance(it, i - 1);
+			auto dock = (*it)->parentWidget();
+			if (dock)
+				obs_frontend_remove_dock(dock->objectName().toUtf8().constData());
+		}
+
+		for (auto i = canvas_docks.size(); i > 0; i--) {
+			auto it = canvas_docks.begin();
+			std::advance(it, i - 1);
+			auto dock = (*it)->parentWidget();
+			if (dock)
+				obs_frontend_remove_dock(dock->objectName().toUtf8().constData());
+		}
 	}
 
 	//OBS_FRONTEND_EVENT_PROFILE_RENAMED

@@ -81,12 +81,22 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 
 	canvas = obs_get_canvas_by_uuid(obs_data_get_string(settings, "uuid"));
 	if (canvas) {
-		std::string name = obs_canvas_get_name(canvas);
-		if (name != canvas_name) {
-			obs_canvas_set_name(canvas, canvas_name.c_str());
+		if (obs_canvas_removed(canvas)) {
+			obs_canvas_release(canvas);
+			canvas = nullptr;
+		} else {
+			std::string name = obs_canvas_get_name(canvas);
+			if (name != canvas_name) {
+				obs_canvas_set_name(canvas, canvas_name.c_str());
+			}
 		}
-	} else {
+	}
+	if (!canvas) {
 		canvas = obs_get_canvas_by_name(canvas_name.c_str());
+		if (canvas && obs_canvas_removed(canvas)) {
+			obs_canvas_release(canvas);
+			canvas = nullptr;
+		}
 	}
 	if (canvas) {
 		obs_video_info ovi;
