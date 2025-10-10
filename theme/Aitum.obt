@@ -2284,13 +2284,16 @@ QMainWindow>QToolBar QTabBar::tab:hover{
     qproperty-setCursor: pointing_hand;
 }
 
-QMainWindow > QToolBar > QAbstractButton{
-    width:12px;
+QMainWindow > QToolBar > QToolButton{
+    /* min-width:12px; */
+    /* max-width:none; */
     height:12px;
-    padding:10px 12px;
+    padding:10px 8px;
     margin:0;
     qproperty-sourceSize:10px;
 }
+
+
 
 
 QMainWindow > QToolBar::separator{
@@ -2368,7 +2371,6 @@ QMainWindow>QToolBar QTabBar::tab::right {
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
 }
-
 
 
 /*LAYOUT*/
