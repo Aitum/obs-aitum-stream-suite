@@ -21,6 +21,7 @@ class QHBoxLayout;
 class LockedCheckBox;
 class VisibilityCheckBox;
 class VisibilityItemWidget;
+class CanvasDock;
 
 class SourceTreeSubItemCheckBox : public QCheckBox {
 	Q_OBJECT

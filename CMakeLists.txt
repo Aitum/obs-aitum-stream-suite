@@ -96,6 +96,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/icon.cpp
   src/utils/widgets/hotkey-edit.cpp
   src/utils/widgets/locked-checkbox.cpp
+  src/utils/widgets/pixmap-label.cpp
   src/utils/widgets/source-tree.cpp
   src/utils/widgets/stream-key-input.cpp
   src/utils/widgets/switching-splitter.cpp
@@ -107,6 +108,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/icon.hpp
   src/utils/widgets/hotkey-edit.hpp
   src/utils/widgets/locked-checkbox.hpp
+  src/utils/widgets/pixmap-label.hpp
   src/utils/widgets/source-tree.hpp
   src/utils/widgets/stream-key-input.hpp
   src/utils/widgets/switching-splitter.hpp

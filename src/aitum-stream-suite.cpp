@@ -7,6 +7,7 @@
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
 #include "utils/file-download.h"
+#include "utils/widgets/pixmap-label.hpp"
 #include "version.h"
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -29,8 +30,10 @@ OBS_MODULE_USE_DEFAULT_LOCALE("aitum-stream-suite", "en-US")
 download_info_t *version_download_info = nullptr;
 obs_data_t *current_profile_config = nullptr;
 QTabBar *modesTabBar = nullptr;
+QToolBar *toolbar = nullptr;
 int modesTab = -1;
 
+QList<QAction *> partnerBlockActions;
 QAction *streamAction = nullptr;
 QAction *recordAction = nullptr;
 QAction *studioModeAction = nullptr;
@@ -82,9 +85,73 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 			}
 			obs_data_release(data_obj);
 		}
+		obs_data_array_t *blocks = obs_data_get_array(data_obj, "partnerBlocks");
+		if (obs_data_array_count(blocks) > 0) {
+			time_t current_time = time(nullptr);
+			auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
+			if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
+				QMetaObject::invokeMethod(toolbar, [blocks] {
+					auto before = streamAction;
+					size_t count = obs_data_array_count(blocks);
+					for (size_t i = 0; i < count; i++) {
+						obs_data_t *block = obs_data_array_item(blocks, i);
+						auto block_type = obs_data_get_string(block, "type");
+						if (strcmp(block_type, "LINK") == 0) {
+							auto button = new QPushButton(
+								QString::fromUtf8(obs_data_get_string(block, "label")));
+							button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+							auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
+							button->connect(button, &QPushButton::clicked,
+								[url] { QDesktopServices::openUrl(QUrl(url)); });
+							partnerBlockActions.append(toolbar->insertWidget(before, button));
+						} else if (strcmp(block_type, "IMAGE") == 0) {
+							auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
+							if (image_data.startsWith("data:image/")) {
+								auto pos = image_data.indexOf(";");
+								auto format = image_data.mid(11, pos - 11);
+								QImage image;
+								if (image.loadFromData(
+									    QByteArray::fromBase64(
+										    image_data.mid(pos + 7).toUtf8().constData()),
+									    format.toUtf8().constData())) {
+									auto label = new AspectRatioPixmapLabel;
+									label->setPixmap(QPixmap::fromImage(image));
+									label->setAlignment(Qt::AlignCenter);
+									label->setStyleSheet(QString::fromUtf8(
+										obs_data_get_string(block, "qss")));
+									partnerBlockActions.append(
+										toolbar->insertWidget(before, label));
+								}
+							}
+						} else if (strcmp(block_type, "LABEL") == 0) {
+							auto label = new QLabel(QString::fromUtf8(obs_data_get_string(block, "label")));
+							label->setOpenExternalLinks(true);
+							label->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+							partnerBlockActions.append(toolbar->insertWidget(before, label));
+						}
+						obs_data_release(block);
+					}
+					auto close = new QAction("x");
+					close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
+					close->connect(close, &QAction::triggered, [] {
+						foreach(auto &a, partnerBlockActions)
+						{
+							toolbar->removeAction(a);
+						}
+						partnerBlockActions.clear();
+						config_set_int(obs_frontend_get_user_config(), "Aitum", "partner_block",
+							       (int64_t)time(nullptr));
+					});
+					toolbar->insertAction(before, close);
+					partnerBlockActions.append(close);
+					QWidget *spacer = new QWidget();
+					spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+					partnerBlockActions.append(toolbar->insertWidget(before, spacer));
+				});
+			}
+		}
+		obs_data_array_release(blocks);
 	}
-
-	QMetaObject::invokeMethod(output_dock, "ApiInfo", Q_ARG(QString, QString::fromUtf8((const char *)file->buffer.array)));
 
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
@@ -145,7 +212,6 @@ void reset_live_dock_state()
 	QList<QDockWidget *> right_docks;
 	QList<int> right_dock_sizes;
 
-
 	auto chat = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
 	if (chat) {
 		chat->setVisible(true);
@@ -154,7 +220,6 @@ void reset_live_dock_state()
 		right_docks.append(chat);
 		right_dock_sizes.append(3);
 	}
-
 
 	auto activity = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteActivity"));
 	if (activity) {
@@ -166,7 +231,6 @@ void reset_live_dock_state()
 		if (chat)
 			main_window->splitDockWidget(chat, activity, Qt::Horizontal);
 	}
-	
 
 	auto info = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
 	if (info) {
@@ -337,7 +401,7 @@ void reset_build_dock_state()
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
 	}
-	
+
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
 	if (d)
 		d->setVisible(false);
@@ -368,7 +432,6 @@ void reset_build_dock_state()
 
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
-
 }
 
 void reset_design_dock_state()
@@ -823,17 +886,17 @@ bool obs_module_load(void)
 
 	modesTabBar = new QTabBar();
 	modesTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
-	auto tb = new TabToolBar(modesTabBar);
-	main_window->addToolBar(tb);
-	tb->setFloatable(false);
+	toolbar = new TabToolBar(modesTabBar);
+	main_window->addToolBar(toolbar);
+	toolbar->setFloatable(false);
 	//tb->setMovable(false);
 	//tb->setAllowedAreas(Qt::ToolBarArea::TopToolBarArea);
 
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
 	//modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
-	tb->addWidget(modesTabBar);
-	tb->addSeparator();
+	toolbar->addWidget(modesTabBar);
+	toolbar->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
 		save_dock_state(modesTab);
@@ -857,10 +920,10 @@ bool obs_module_load(void)
 		menu.exec(QCursor::pos());
 	});
 
-	auto aitumSettingsAction = tb->addAction(QString::fromUtf8(obs_module_text("Settings")));
+	auto aitumSettingsAction = toolbar->addAction(QString::fromUtf8(obs_module_text("Settings")));
 	aitumSettingsAction->setProperty("themeID", "configIconSmall");
 	aitumSettingsAction->setProperty("class", "icon-gear");
-	aitumSettingsWidget = tb->widgetForAction(aitumSettingsAction);
+	aitumSettingsWidget = toolbar->widgetForAction(aitumSettingsAction);
 	aitumSettingsWidget->setProperty("themeID", "configIconSmall");
 	aitumSettingsWidget->setProperty("class", "icon-gear");
 	aitumSettingsWidget->setObjectName("AitumStreamSuiteSettingsButton");
@@ -888,21 +951,21 @@ bool obs_module_load(void)
 	});
 
 	// Contribute Button
-	auto contributeButton = tb->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
+	auto contributeButton = toolbar->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
 	contributeButton->setProperty("themeID", "icon-aitum-donate");
 	contributeButton->setProperty("class", "icon-aitum-donate");
-	tb->widgetForAction(contributeButton)->setProperty("themeID", "icon-aitum-donate");
-	tb->widgetForAction(contributeButton)->setProperty("class", "icon-aitum-donate");
+	toolbar->widgetForAction(contributeButton)->setProperty("themeID", "icon-aitum-donate");
+	toolbar->widgetForAction(contributeButton)->setProperty("class", "icon-aitum-donate");
 	contributeButton->setToolTip(QString::fromUtf8(obs_module_text("AitumStreamSuiteDonate")));
 	QAction::connect(contributeButton, &QAction::triggered,
 			 [] { QDesktopServices::openUrl(QUrl("https://aitum.tv/contribute")); });
 
 	// Aitum Button
-	auto aitumButton = tb->addAction(QIcon(":/aitum/media/aitum.png"), QString::fromUtf8(obs_module_text("Aitum")));
+	auto aitumButton = toolbar->addAction(QIcon(":/aitum/media/aitum.png"), QString::fromUtf8(obs_module_text("Aitum")));
 	aitumButton->setProperty("themeID", "icon-aitum");
 	aitumButton->setProperty("class", "icon-aitum");
-	tb->widgetForAction(aitumButton)->setProperty("themeID", "icon-aitum");
-	tb->widgetForAction(aitumButton)->setProperty("class", "icon-aitum");
+	toolbar->widgetForAction(aitumButton)->setProperty("themeID", "icon-aitum");
+	toolbar->widgetForAction(aitumButton)->setProperty("class", "icon-aitum");
 	aitumButton->setToolTip(QString::fromUtf8("https://aitum.tv"));
 	QAction::connect(aitumButton, &QAction::triggered, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
 
@@ -910,10 +973,10 @@ bool obs_module_load(void)
 	//tb->layout()->addItem(new QSpacerItem(0, 0));
 	QWidget *spacer = new QWidget();
 	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-	tb->addWidget(spacer);
+	toolbar->addWidget(spacer);
 
 	//auto controlsToolBar = main_window->addToolBar(QString::fromUtf8(obs_module_text("Controls")));
-	auto controlsToolBar = tb;
+	auto controlsToolBar = toolbar;
 
 	streamAction = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("Stream")));
 	streamAction->setCheckable(true);
