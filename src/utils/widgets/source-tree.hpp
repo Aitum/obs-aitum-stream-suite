@@ -21,6 +21,7 @@ class QHBoxLayout;
 class LockedCheckBox;
 class VisibilityCheckBox;
 class VisibilityItemWidget;
+class CanvasDock;
 
 class SourceTreeSubItemCheckBox : public QCheckBox {
 	Q_OBJECT
@@ -150,7 +151,7 @@ class SourceTree : public QListView {
 	Q_OBJECT
 
 	bool ignoreReorder = false;
-	//CanvasDock *canvasDock;
+	CanvasDock *canvasDock;
 	std::mutex *selectMutex;
 	std::vector<obs_sceneitem_t *> *hoveredPreviewItems;
 	obs_scene_t *(*getScene)(void* param);
@@ -182,7 +183,8 @@ public:
 	}
 
 	explicit SourceTree(std::mutex *select_mutex, std::vector<obs_sceneitem_t *> *hovered_preview_items,
-			    obs_scene_t *(*get_scene)(void*), void *get_scene_param,
+			    obs_scene_t *(*get_scene)(void *), void *get_scene_param,
+			    CanvasDock *canvas_dock,
 			    QWidget *parent = nullptr);
 
 	inline bool IgnoreReorder() const { return ignoreReorder; }

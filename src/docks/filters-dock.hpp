@@ -27,6 +27,7 @@ private:
 
 private slots:
 	void SourceChanged(OBSSource source);
+	void SourceDeselected(OBSSource source);
 	void Reorder();
 public:
 	FiltersDock(QWidget *parent = nullptr);

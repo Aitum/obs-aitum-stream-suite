@@ -286,7 +286,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	sourcesGroupLayout->setContentsMargins(0, 0, 0, 0);
 	sourcesGroup->setLayout(sourcesGroupLayout);
 	sourceList = new SourceTree(
-		&selectMutex, &hoveredPreviewItems, [](void *param) { return ((CanvasDock *)param)->scene; }, this, this);
+		&selectMutex, &hoveredPreviewItems, [](void *param) { return ((CanvasDock *)param)->scene; }, this, this, this);
 	sourceList->setContentsMargins(0, 0, 0, 0);
 	sourceList->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	sourceList->setFrameShape(QFrame::NoFrame);
@@ -4808,7 +4808,8 @@ void CanvasDock::LoadMode(int index)
 		canvas_split->restoreState(QByteArray::fromBase64(state));
 }
 
-void CanvasDock::UpdateSettings(obs_data_t* s) {
+void CanvasDock::UpdateSettings(obs_data_t *s)
+{
 	if (s) {
 		obs_data_release(settings);
 		settings = s;
@@ -4837,4 +4838,15 @@ void CanvasDock::UpdateSettings(obs_data_t* s) {
 			obs_canvas_reset_video(canvas, &ovi);
 		}
 	}
+}
+
+void CanvasDock::reset_live_state()
+{
+	canvas_split->setSizes({3, 1});
+	panel_split->setSizes({1, 0, 0});
+}
+
+void CanvasDock::reset_build_state() {
+	canvas_split->setSizes({1, 1});
+	panel_split->setSizes({1, 1, 1});
 }

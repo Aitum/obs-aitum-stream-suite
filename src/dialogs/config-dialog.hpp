@@ -82,6 +82,7 @@ public:
 	void LoadSettings(obs_data_t *settings);
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
 	void SetNewerVersion(QString newer_version_available);
+	void AddCanvas();
 
 public slots:
 };

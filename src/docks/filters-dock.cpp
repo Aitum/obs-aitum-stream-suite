@@ -367,6 +367,12 @@ void FiltersDock::SourceChanged(OBSSource s)
 		this);
 }
 
+void FiltersDock::SourceDeselected(OBSSource s)
+{
+	if (obs_weak_source_references_source(source, s))
+		SourceChanged(nullptr);
+}
+
 void FiltersDock::filter_add(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<FiltersDock *>(param);
@@ -437,6 +443,6 @@ void FiltersDock::source_remove(void *param, calldata_t *cd)
 	auto this_ = static_cast<FiltersDock *>(param);
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	if (obs_weak_source_references_source(this_->source, source)) {
-		QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(this_, "SourceDeselected", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 	}
 }
