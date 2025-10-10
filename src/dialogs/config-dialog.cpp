@@ -254,34 +254,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	addButton->setProperty("class", "icon-plus");
 
 	connect(addButton, &QPushButton::clicked, [this] {
-		QString newName = QString::fromUtf8(obs_module_text("AitumStreamSuiteCanvas"));
-		QStringList otherNames;
-		auto canvases = obs_data_get_array(main_settings, "canvas");
-		obs_data_array_enum(
-			canvases,
-			[](obs_data_t *data2, void *param) {
-				((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-			},
-			&otherNames);
-		otherNames.removeDuplicates();
-		int i = 2;
-		while (otherNames.contains(newName))
-			newName = QString::fromUtf8(obs_module_text("AitumStreamSuiteCanvas")) + " " + QString::number(i++);
-
-		if (!canvases) {
-			canvases = obs_data_array_create();
-			obs_data_set_array(main_settings, "canvas", canvases);
-		}
-
-		auto s = obs_data_create();
-		// Set the info from the output dialog
-		obs_data_set_string(s, "name", newName.toUtf8().constData());
-		obs_data_set_int(s, "color", 0x1F1A17);
-		obs_data_array_push_back(canvases, s);
-		AddCanvas(canvasLayout, s, canvases);
-		obs_data_release(s);
-
-		obs_data_array_release(canvases);
+		AddCanvas();
 	});
 
 	//streaming_title_layout->addWidget(guide_link, 0, Qt::AlignRight);
@@ -619,7 +592,6 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 			canvas_color->setStyleSheet(QString("border: 2px solid %1;").arg(newColor.name(QColor::HexRgb)));
 		}
 	});
-
 
 	const bool expanded = obs_data_get_bool(settings, "expanded");
 	auto advancedGroup = new QFrame;
@@ -1277,6 +1249,38 @@ void OBSBasicSettings::SetNewerVersion(QString newer_version_available)
 		return;
 	newVersion->setText(QString::fromUtf8(obs_module_text("NewVersion")).arg(newer_version_available));
 	newVersion->setVisible(true);
+}
+
+void OBSBasicSettings::AddCanvas() {
+	QString newName = QString::fromUtf8(obs_module_text("AitumStreamSuiteCanvas"));
+	QStringList otherNames;
+	auto canvases = obs_data_get_array(main_settings, "canvas");
+	obs_data_array_enum(
+		canvases,
+		[](obs_data_t *data2, void *param) {
+			((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+		},
+		&otherNames);
+	otherNames.removeDuplicates();
+	int i = 2;
+	while (otherNames.contains(newName))
+		newName = QString::fromUtf8(obs_module_text("AitumStreamSuiteCanvas")) + " " + QString::number(i++);
+
+	if (!canvases) {
+		canvases = obs_data_array_create();
+		obs_data_set_array(main_settings, "canvas", canvases);
+	}
+
+	auto s = obs_data_create();
+	// Set the info from the output dialog
+	obs_data_set_string(s, "name", newName.toUtf8().constData());
+	obs_data_set_int(s, "color", 0x1F1A17);
+	obs_data_array_push_back(canvases, s);
+	AddCanvas(canvasLayout, s, canvases);
+	obs_data_release(s);
+
+	obs_data_array_release(canvases);
+	listWidget->setCurrentRow(1);
 }
 
 QIcon getPlatformIconFromEndpoint(QString endpoint);

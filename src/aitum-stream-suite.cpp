@@ -45,6 +45,8 @@ PropertiesDock *properties_dock = nullptr;
 FiltersDock *filters_dock = nullptr;
 LiveScenesDock *live_scenes_dock = nullptr;
 
+QString newer_version_available;
+
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
 
@@ -77,6 +79,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 				auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
 				if (sv >
 				    MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
+					newer_version_available = QString::fromUtf8(version);
 					QMetaObject::invokeMethod(aitumSettingsWidget, [] {
 						aitumSettingsWidget->setStyleSheet(
 							QString::fromUtf8("background: rgb(192,128,0);"));
@@ -935,6 +938,7 @@ bool obs_module_load(void)
 			obs_data_apply(settings, current_profile_config);
 
 		configDialog->LoadSettings(settings);
+		configDialog->SetNewerVersion(newer_version_available);
 
 		if (configDialog->exec() == QDialog::Accepted) {
 			if (current_profile_config) {
@@ -968,6 +972,32 @@ bool obs_module_load(void)
 	toolbar->widgetForAction(aitumButton)->setProperty("class", "icon-aitum");
 	aitumButton->setToolTip(QString::fromUtf8("https://aitum.tv"));
 	QAction::connect(aitumButton, &QAction::triggered, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
+
+	auto addCanvas = toolbar->addAction(QString::fromUtf8(obs_module_text("AddCanvas")));
+	QAction::connect(addCanvas, &QAction::triggered, [] {
+		if (!configDialog)
+			configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
+		auto settings = obs_data_create();
+		if (current_profile_config)
+			obs_data_apply(settings, current_profile_config);
+
+		configDialog->LoadSettings(settings);
+		configDialog->SetNewerVersion(newer_version_available);
+		configDialog->AddCanvas();
+
+		if (configDialog->exec() == QDialog::Accepted) {
+			if (current_profile_config) {
+				obs_data_apply(current_profile_config, settings);
+				obs_data_release(settings);
+			} else {
+				current_profile_config = settings;
+			}
+			save_current_profile_config();
+			load_current_profile_config();
+		} else {
+			obs_data_release(settings);
+		}
+	});
 
 	//tb->addAction(QString::fromUtf8(obs_module_text("Reset")));
 	//tb->layout()->addItem(new QSpacerItem(0, 0));
