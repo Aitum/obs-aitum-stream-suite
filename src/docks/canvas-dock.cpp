@@ -87,16 +87,15 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	}
 	if (canvas) {
 		obs_video_info ovi;
-		if (obs_canvas_get_video_info(canvas, &ovi)) {
-			if (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
-			    ovi.output_width != canvas_width || ovi.output_height != canvas_height) {
-				obs_get_video_info(&ovi);
-				ovi.base_height = canvas_height;
-				ovi.base_width = canvas_width;
-				ovi.output_height = canvas_height;
-				ovi.output_width = canvas_width;
-				obs_canvas_reset_video(canvas, &ovi);
-			}
+		if (!obs_canvas_get_video_info(canvas, &ovi) ||
+		    (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+		     ovi.output_height != canvas_height)) {
+			obs_get_video_info(&ovi);
+			ovi.base_height = canvas_height;
+			ovi.base_width = canvas_width;
+			ovi.output_height = canvas_height;
+			ovi.output_width = canvas_width;
+			obs_canvas_reset_video(canvas, &ovi);
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
@@ -2028,31 +2027,6 @@ QMenu *CanvasDock::CreateAddSourcePopupMenu()
 	bool foundDeprecated = false;
 	size_t idx = 0;
 
-	auto addSource = [this](QMenu *popup, const char *source_type, const char *name) {
-		QString qname = QString::fromUtf8(name);
-		QAction *popupItem = new QAction(qname, this);
-		if (strcmp(source_type, "scene") == 0) {
-			popupItem->setIcon(GetSceneIcon());
-		} else if (strcmp(source_type, "group") == 0) {
-			popupItem->setIcon(GetGroupIcon());
-		} else {
-			popupItem->setIcon(GetIconFromType(obs_source_get_icon_type(source_type)));
-		}
-		popupItem->setData(QString::fromUtf8(source_type));
-		QMenu *menu = new QMenu(this);
-		popupItem->setMenu(menu);
-		QObject::connect(menu, &QMenu::aboutToShow, [this, menu, source_type] { LoadSourceTypeMenu(menu, source_type); });
-		QList<QAction *> actions = menu->actions();
-		QAction *after = nullptr;
-		for (QAction *menuAction : actions) {
-			if (menuAction->text().compare(name) >= 0) {
-				after = menuAction;
-				break;
-			}
-		}
-		popup->insertAction(after, popupItem);
-	};
-
 	QMenu *popup = new QMenu(QString::fromUtf8(obs_frontend_get_locale_string("Add")), this);
 	QMenu *deprecated = new QMenu(QString::fromUtf8(obs_frontend_get_locale_string("Deprecated")), popup);
 
@@ -2066,16 +2040,16 @@ QMenu *CanvasDock::CreateAddSourcePopupMenu()
 			continue;
 
 		if ((caps & OBS_SOURCE_DEPRECATED) == 0) {
-			addSource(popup, unversioned_type, name);
+			AddSourceTypeToMenu(popup, unversioned_type, name);
 		} else {
-			addSource(deprecated, unversioned_type, name);
+			AddSourceTypeToMenu(deprecated, unversioned_type, name);
 			foundDeprecated = true;
 		}
 		foundValues = true;
 	}
 
-	addSource(popup, "scene", obs_frontend_get_locale_string("Basic.Scene"));
-	addSource(popup, "group", obs_frontend_get_locale_string("Group"));
+	AddSourceTypeToMenu(popup, "scene", obs_frontend_get_locale_string("Basic.Scene"));
+	AddSourceTypeToMenu(popup, "group", obs_frontend_get_locale_string("Group"));
 
 	if (!foundDeprecated) {
 		delete deprecated;
@@ -2171,6 +2145,32 @@ void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 void CanvasDock::AddSourceToScene(obs_source_t *s)
 {
 	obs_scene_add(scene, s);
+}
+
+void CanvasDock::AddSourceTypeToMenu(QMenu *popup, const char *source_type, const char *name)
+{
+	QString qname = QString::fromUtf8(name);
+	QAction *popupItem = new QAction(qname, popup);
+	if (strcmp(source_type, "scene") == 0) {
+		popupItem->setIcon(GetSceneIcon());
+	} else if (strcmp(source_type, "group") == 0) {
+		popupItem->setIcon(GetGroupIcon());
+	} else {
+		popupItem->setIcon(GetIconFromType(obs_source_get_icon_type(source_type)));
+	}
+	popupItem->setData(QString::fromUtf8(source_type));
+	QMenu *menu = new QMenu(popup);
+	popupItem->setMenu(menu);
+	QObject::connect(menu, &QMenu::aboutToShow, [this, menu, source_type] { LoadSourceTypeMenu(menu, source_type); });
+	QList<QAction *> actions = popup->actions();
+	QAction *after = nullptr;
+	for (QAction *menuAction : actions) {
+		if (menuAction->text().compare(name, Qt::CaseInsensitive) >= 0) {
+			after = menuAction;
+			break;
+		}
+	}
+	popup->insertAction(after, popupItem);
 }
 
 bool CanvasDock::selected_items(obs_scene_t *, obs_sceneitem_t *item, void *param)
@@ -4842,11 +4842,12 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 
 void CanvasDock::reset_live_state()
 {
-	canvas_split->setSizes({3, 1});
 	panel_split->setSizes({1, 0, 0});
+	canvas_split->setSizes({3, 1});
 }
 
-void CanvasDock::reset_build_state() {
+void CanvasDock::reset_build_state()
+{
 	canvas_split->setSizes({1, 1});
 	panel_split->setSizes({1, 1, 1});
 }

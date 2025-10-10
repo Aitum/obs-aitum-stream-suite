@@ -90,16 +90,15 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	}
 	if (canvas) {
 		obs_video_info ovi;
-		if (obs_canvas_get_video_info(canvas, &ovi)) {
-			if (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
-			    ovi.output_width != canvas_width || ovi.output_height != canvas_height) {
-				obs_get_video_info(&ovi);
-				ovi.base_height = canvas_height;
-				ovi.base_width = canvas_width;
-				ovi.output_height = canvas_height;
-				ovi.output_width = canvas_width;
-				obs_canvas_reset_video(canvas, &ovi);
-			}
+		if (!obs_canvas_get_video_info(canvas, &ovi) ||
+		    (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+		     ovi.output_height != canvas_height)) {
+			obs_get_video_info(&ovi);
+			ovi.base_height = canvas_height;
+			ovi.base_width = canvas_width;
+			ovi.output_height = canvas_height;
+			ovi.output_width = canvas_width;
+			obs_canvas_reset_video(canvas, &ovi);
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
