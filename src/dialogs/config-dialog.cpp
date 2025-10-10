@@ -146,18 +146,22 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	generalCanvasButton = new QToolButton();
 	generalCanvasButton->setText(QString::fromUtf8(obs_module_text("SettingsCanvasButton")));
 	generalCanvasButton->setIcon(QIcon(QString::fromUtf8(":/settings/images/settings/output.svg")));
+	//generalCanvasButton->setIconSize(QSize(100, 100));
 
 	generalOutputsButton = new QToolButton();
 	generalOutputsButton->setText(QString::fromUtf8(obs_module_text("SettingsOutputsButton")));
 	generalOutputsButton->setIcon(QIcon(QString::fromUtf8(":/settings/images/settings/stream.svg")));
+	//generalOutputsButton->setIconSize(QSize(100, 100));
 
 	generalHelpButton = new QToolButton();
 	generalHelpButton->setText(QString::fromUtf8(obs_module_text("SettingsHelpButton")));
 	generalHelpButton->setIcon(main_window->property("defaultIcon").value<QIcon>());
+	//generalHelpButton->setIconSize(QSize(100, 100));
 
 	generalSupportAitumButton = new QToolButton();
 	generalSupportAitumButton->setText(QString::fromUtf8(obs_module_text("SupportButton")));
 	generalSupportAitumButton->setIcon(QIcon(QString::fromUtf8(":/aitum/media/aitum.png")));
+	//generalSupportAitumButton->setIconSize(QSize(100, 100));
 
 	buttonLayout->addWidget(generalCanvasButton, 0);
 	buttonLayout->addWidget(generalOutputsButton, 0);
@@ -253,9 +257,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	addButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	addButton->setProperty("class", "icon-plus");
 
-	connect(addButton, &QPushButton::clicked, [this] {
-		AddCanvas();
-	});
+	connect(addButton, &QPushButton::clicked, [this] { AddCanvas(); });
 
 	//streaming_title_layout->addWidget(guide_link, 0, Qt::AlignRight);
 	canvas_title_layout->addWidget(addButton, 0, Qt::AlignRight);
@@ -511,13 +513,13 @@ void OBSBasicSettings::SetStreamIcon(const QIcon &icon)
 	//listWidget->item(1)->setIcon(icon);
 	listWidget->item(2)->setIcon(icon);
 	generalOutputsButton->setIcon(icon);
-	generalCanvasButton->setIcon(icon);
 }
 
 void OBSBasicSettings::SetOutputIcon(const QIcon &icon)
 {
 	UNUSED_PARAMETER(icon);
 	listWidget->item(1)->setIcon(icon);
+	generalCanvasButton->setIcon(icon);
 }
 
 void OBSBasicSettings::SetAudioIcon(const QIcon &icon)
@@ -1251,7 +1253,8 @@ void OBSBasicSettings::SetNewerVersion(QString newer_version_available)
 	newVersion->setVisible(true);
 }
 
-void OBSBasicSettings::AddCanvas() {
+void OBSBasicSettings::AddCanvas()
+{
 	QString newName = QString::fromUtf8(obs_module_text("AitumStreamSuiteCanvas"));
 	QStringList otherNames;
 	auto canvases = obs_data_get_array(main_settings, "canvas");
