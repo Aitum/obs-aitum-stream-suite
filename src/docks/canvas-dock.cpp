@@ -2131,8 +2131,13 @@ void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 			[](void *param, obs_canvas_t *canvas) {
 				QMenu *m = (QMenu *)param;
 				auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
-				auto cm = m->addMenu(canvas_name);
+				auto cm = new QMenu(canvas_name, m);
 				obs_canvas_enum_scenes(canvas, add_sources_of_type_to_menu, cm);
+				if (cm->actions().count() == 0) {
+					delete cm;
+				} else {
+					m->addMenu(cm);
+				}
 				return true;
 			},
 			menu);

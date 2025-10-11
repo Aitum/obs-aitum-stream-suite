@@ -15,10 +15,17 @@
 #include <QSpacerItem>
 #include <QStyleOptionFocusRect>
 #include <QStylePainter>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <src/docks/canvas-dock.hpp>
 #include <src/utils/icon.hpp>
 #include <string>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 
 /* ========================================================================= */
 
@@ -149,25 +156,7 @@ void SourceTreeItem::paintEvent(QPaintEvent *event)
 
 void SourceTreeItem::DisconnectSignals()
 {
-	obs_scene_t *scene = obs_sceneitem_get_scene(sceneitem);
-	if (scene) {
-		obs_source_t *sceneSource = obs_scene_get_source(scene);
-		signal_handler_t *signal = obs_source_get_signal_handler(sceneSource);
-		signal_handler_disconnect(signal, "remove", removeItem, this);
-		signal_handler_disconnect(signal, "item_remove", removeItem, this);
-		signal_handler_disconnect(signal, "item_visible", itemVisible, this);
-		signal_handler_disconnect(signal, "item_locked", itemLocked, this);
-		signal_handler_disconnect(signal, "item_select", itemSelect, this);
-		signal_handler_disconnect(signal, "item_deselect", itemDeselect, this);
-	}
-
-	obs_source_t *source = obs_sceneitem_get_source(sceneitem);
-	if (source) {
-		signal_handler_t *signal = obs_source_get_signal_handler(source);
-		signal_handler_disconnect(signal, "rename", renamed, this);
-		signal_handler_disconnect(signal, "remove", removeSource, this);
-		signal_handler_disconnect(signal, "reorder", reorderGroup, this);
-	}
+	sigs.clear();
 }
 
 void SourceTreeItem::Clear()
@@ -177,21 +166,22 @@ void SourceTreeItem::Clear()
 }
 extern std::list<CanvasDock *> canvas_docks;
 
+void SourceTreeItem::removeScene(void *data, calldata_t *)
+{
+	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
+	QMetaObject::invokeMethod(this_, "Clear");
+}
+
 void SourceTreeItem::removeItem(void *data, calldata_t *cd)
 {
 	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
+	if (!this_->tree)
+		return;
 	obs_sceneitem_t *curItem = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	obs_scene_t *curScene = (obs_scene_t *)calldata_ptr(cd, "scene");
-
-	if (std::find(canvas_docks.begin(), canvas_docks.end(), this_->tree->canvasDock) == canvas_docks.end())
-		return;
-
 	if (curItem == this_->sceneitem) {
 		QMetaObject::invokeMethod(this_->tree, "Remove", Q_ARG(OBSSceneItem, curItem), Q_ARG(OBSScene, curScene));
-		curItem = nullptr;
 	}
-	if (!curItem)
-		QMetaObject::invokeMethod(this_, "Clear");
 }
 
 void SourceTreeItem::itemVisible(void *data, calldata_t *cd)
@@ -264,24 +254,24 @@ void SourceTreeItem::ReconnectSignals()
 	obs_scene_t *scene = obs_sceneitem_get_scene(sceneitem);
 	obs_source_t *sceneSource = obs_scene_get_source(scene);
 	signal_handler_t *signal = obs_source_get_signal_handler(sceneSource);
-	signal_handler_connect(signal, "remove", removeItem, this);
-	signal_handler_connect(signal, "item_remove", removeItem, this);
-	signal_handler_connect(signal, "item_visible", itemVisible, this);
-	signal_handler_connect(signal, "item_locked", itemLocked, this);
-	signal_handler_connect(signal, "item_select", itemSelect, this);
-	signal_handler_connect(signal, "item_deselect", itemDeselect, this);
+	sigs.emplace_back(signal, "remove", removeScene, this);
+	sigs.emplace_back(signal, "item_remove", removeItem, this);
+	sigs.emplace_back(signal, "item_visible", itemVisible, this);
+	sigs.emplace_back(signal, "item_locked", itemLocked, this);
+	sigs.emplace_back(signal, "item_select", itemSelect, this);
+	sigs.emplace_back(signal, "item_deselect", itemDeselect, this);
 
 	if (obs_sceneitem_is_group(sceneitem)) {
 		obs_source_t *source = obs_sceneitem_get_source(sceneitem);
 		signal = obs_source_get_signal_handler(source);
 
-		signal_handler_connect(signal, "reorder", reorderGroup, this);
+		sigs.emplace_back(signal, "reorder", reorderGroup, this);
 	}
 
 	obs_source_t *source = obs_sceneitem_get_source(sceneitem);
 	signal = obs_source_get_signal_handler(source);
-	signal_handler_connect(signal, "rename", renamed, this);
-	signal_handler_connect(signal, "remove", removeSource, this);
+	sigs.emplace_back(signal, "rename", renamed, this);
+	sigs.emplace_back(signal, "remove", removeSource, this);
 }
 
 void SourceTreeItem::mouseDoubleClickEvent(QMouseEvent *event)
@@ -293,7 +283,23 @@ void SourceTreeItem::mouseDoubleClickEvent(QMouseEvent *event)
 	} else {
 		obs_source_t *source = obs_sceneitem_get_source(sceneitem);
 		if (source) {
+#if defined(_WIN32)
+			/* This timer works around a bug introduced around Qt 6.8.3 that causes
+			 * the application to hang when double clicking the sources list and the
+			 * Windows setting 'Snap mouse to default button in dialog boxes' is enabled.
+			 */
+			BOOL snapEnabled = FALSE;
+			SystemParametersInfo(SPI_GETSNAPTODEFBUTTON, 0, &snapEnabled, 0);
+
+			if (snapEnabled) {
+				QTimer::singleShot(200, this, [source]() { obs_frontend_open_source_properties(source); });
+			} else {
+				obs_frontend_open_source_properties(source);
+			}
+#else
 			obs_frontend_open_source_properties(source);
+#endif
+			
 		}
 	}
 }
