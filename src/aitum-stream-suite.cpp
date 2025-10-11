@@ -22,6 +22,7 @@
 #include <QToolBar>
 #include <util/dstr.h>
 #include "docks/live-scenes-dock.hpp"
+#include "utils/icon.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -49,13 +50,6 @@ QString newer_version_available;
 
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
-
-QIcon create2StateIcon(QString fileOn, QString fileOff)
-{
-	QIcon icon = QIcon(fileOff);
-	icon.addFile(fileOn, QSize(), QIcon::Normal, QIcon::On);
-	return icon;
-}
 
 extern QWidget *aitumSettingsWidget;
 

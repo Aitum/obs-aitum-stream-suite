@@ -1753,8 +1753,6 @@ QListWidget *CanvasDock::GetGlobalScenesList()
 	return sd->findChild<QListWidget *>(QStringLiteral("scenes"));
 }
 
-QIcon create2StateIcon(QString fileOn, QString fileOff);
-
 void CanvasDock::AddScene(QString duplicate, bool ask_name)
 {
 	std::string name = duplicate.isEmpty() ? obs_module_text("Scene") : duplicate.toUtf8().constData();

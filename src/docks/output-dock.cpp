@@ -11,33 +11,9 @@
 #include <util/config-file.h>
 #include <obs-frontend-api.h>
 #include <src/utils/color.hpp>
+#include <src/utils/icon.hpp>
 
-QIcon create2StateIcon(QString fileOn, QString fileOff);
 
-QIcon getPlatformIconFromEndpoint(QString endpoint)
-{
-
-	if (endpoint.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
-	    endpoint.contains(QString::fromUtf8(".contribute.live-video.net")) ||
-	    endpoint.contains(QString::fromUtf8(".twitch.tv"))) { // twitch
-		return QIcon(":/aitum/media/twitch.png");
-	} else if (endpoint.contains(QString::fromUtf8(".youtube.com"))) { // youtube
-		return QIcon(":/aitum/media/youtube.png");
-	} else if (endpoint.contains(QString::fromUtf8("fa723fc1b171.global-contribute.live-video.net"))) { // kick
-		return QIcon(":/aitum/media/kick.png");
-	} else if (endpoint.contains(QString::fromUtf8(".tiktokcdn"))) { // tiktok
-		return QIcon(":/aitum/media/tiktok.png");
-	} else if (endpoint.contains(QString::fromUtf8(".pscp.tv"))) { // twitter
-		return QIcon(":/aitum/media/twitter.png");
-	} else if (endpoint.contains(QString::fromUtf8("livepush.trovo.live"))) { // trovo
-		return QIcon(":/aitum/media/trovo.png");
-	} else if (endpoint.contains(QString::fromUtf8(".facebook.com")) ||
-		   endpoint.contains(QString::fromUtf8(".fbcdn.net"))) { // facebook
-		return QIcon(":/aitum/media/facebook.png");
-	} else { // unknown
-		return QIcon(":/aitum/media/unknown.png");
-	}
-}
 
 OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 {
@@ -69,7 +45,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 
 	l2->addWidget(mainPlatformIconLabel);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("BuiltinStream"))), 1);
-
+	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("MainCanvas"))), 1);
 	mainStreamButton = new QPushButton;
 	mainStreamButton->setObjectName(QStringLiteral("canvasStream"));
 	mainStreamButton->setMinimumHeight(30);
@@ -276,15 +252,15 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 	auto streamGroup = new QFrame;
 	streamGroup->setProperty("class", "stream-group");
 
+	auto canvas_name = obs_data_get_string(output_data, "canvas");
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	auto count = obs_data_array_count(canvas);
-	auto fcn = obs_data_get_string(output_data, "canvas");
 	for (size_t i = 0; i < count; i++) {
 		auto item = obs_data_array_item(canvas,i);
 		if (!item)
 			continue;
 		auto cn = obs_data_get_string(item, "name");
-		if (cn[0] != '\0' && strcmp(cn, fcn) == 0) {
+		if (cn[0] != '\0' && strcmp(cn, canvas_name) == 0) {
 			auto c = color_from_int(obs_data_get_int(item, "color"));
 			streamGroup->setStyleSheet(QString(".stream-group { border: 2px solid %1;}").arg(c.name(QColor::HexRgb)));
 			obs_data_release(item);
@@ -351,6 +327,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		}
 	});
 
+	l2->addWidget(new QLabel(QString::fromUtf8(canvas_name)), 1);
 	//streamButton->setSizePolicy(sp2);
 	streamButton->setToolTip(QString::fromUtf8(obs_module_text("Stream")));
 	l2->addWidget(streamButton);

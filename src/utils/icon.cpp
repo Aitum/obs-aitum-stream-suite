@@ -53,3 +53,37 @@ QIcon GetIconFromType(enum obs_icon_type icon_type)
 		return main_window->property("defaultIcon").value<QIcon>();
 	}
 }
+
+
+
+QIcon getPlatformIconFromEndpoint(QString endpoint)
+{
+
+	if (endpoint.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
+	    endpoint.contains(QString::fromUtf8(".contribute.live-video.net")) ||
+	    endpoint.contains(QString::fromUtf8(".twitch.tv"))) { // twitch
+		return QIcon(":/aitum/media/twitch.png");
+	} else if (endpoint.contains(QString::fromUtf8(".youtube.com"))) { // youtube
+		return QIcon(":/aitum/media/youtube.png");
+	} else if (endpoint.contains(QString::fromUtf8("fa723fc1b171.global-contribute.live-video.net"))) { // kick
+		return QIcon(":/aitum/media/kick.png");
+	} else if (endpoint.contains(QString::fromUtf8(".tiktokcdn"))) { // tiktok
+		return QIcon(":/aitum/media/tiktok.png");
+	} else if (endpoint.contains(QString::fromUtf8(".pscp.tv"))) { // twitter
+		return QIcon(":/aitum/media/twitter.png");
+	} else if (endpoint.contains(QString::fromUtf8("livepush.trovo.live"))) { // trovo
+		return QIcon(":/aitum/media/trovo.png");
+	} else if (endpoint.contains(QString::fromUtf8(".facebook.com")) ||
+		   endpoint.contains(QString::fromUtf8(".fbcdn.net"))) { // facebook
+		return QIcon(":/aitum/media/facebook.png");
+	} else { // unknown
+		return QIcon(":/aitum/media/unknown.png");
+	}
+}
+
+QIcon create2StateIcon(QString fileOn, QString fileOff)
+{
+	QIcon icon = QIcon(fileOff);
+	icon.addFile(fileOn, QSize(), QIcon::Normal, QIcon::On);
+	return icon;
+}
