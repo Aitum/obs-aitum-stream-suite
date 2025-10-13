@@ -1697,6 +1697,9 @@ OBSBasicSettings {
     qproperty-hotkeysIcon: url(theme:Aitum/settings/hotkeys.svg);
     qproperty-accessibilityIcon: url(theme:Aitum/settings/accessibility.svg);
     qproperty-advancedIcon: url(theme:Aitum/settings/advanced.svg);
+    qproperty-helpIcon: url(theme:Aitum/settings/help.svg);
+    qproperty-canvasIcon: url(theme:Aitum/settings/canvas.svg);
+    qproperty-aitumIcon: url(theme:Aitum/aitum.svg);
 }
 
 /* Checkboxes */

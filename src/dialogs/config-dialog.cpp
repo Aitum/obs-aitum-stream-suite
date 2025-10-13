@@ -465,12 +465,12 @@ QIcon OBSBasicSettings::GetAppearanceIcon() const
 
 QIcon OBSBasicSettings::GetStreamIcon() const
 {
-	return listWidget->item(1)->icon();
+	return listWidget->item(2)->icon();
 }
 
 QIcon OBSBasicSettings::GetOutputIcon() const
 {
-	return QIcon();
+	return listWidget->item(1)->icon();
 }
 
 QIcon OBSBasicSettings::GetAudioIcon() const
@@ -496,6 +496,21 @@ QIcon OBSBasicSettings::GetAccessibilityIcon() const
 QIcon OBSBasicSettings::GetAdvancedIcon() const
 {
 	return QIcon();
+}
+
+QIcon OBSBasicSettings::GetHelpIcon() const
+{
+	return listWidget->item(4)->icon();
+}
+
+QIcon OBSBasicSettings::GetCanvasIcon() const
+{
+	return listWidget->item(1)->icon();
+}
+
+QIcon OBSBasicSettings::GetAitumIcon() const
+{
+	return listWidget->item(5)->icon();
 }
 
 void OBSBasicSettings::SetGeneralIcon(const QIcon &icon)
@@ -545,6 +560,24 @@ void OBSBasicSettings::SetAccessibilityIcon(const QIcon &icon)
 void OBSBasicSettings::SetAdvancedIcon(const QIcon &icon)
 {
 	UNUSED_PARAMETER(icon);
+}
+
+void OBSBasicSettings::SetHelpIcon(const QIcon &icon)
+{
+	listWidget->item(4)->setIcon(icon);
+	generalHelpButton->setIcon(icon);
+}
+
+void OBSBasicSettings::SetCanvasIcon(const QIcon &icon)
+{
+	listWidget->item(1)->setIcon(icon);
+	generalCanvasButton->setIcon(icon);
+}
+
+void OBSBasicSettings::SetAitumIcon(const QIcon &icon)
+{
+	listWidget->item(5)->setIcon(icon);
+	generalSupportAitumButton->setIcon(icon);
 }
 
 void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settings, obs_data_array_t *canvas)

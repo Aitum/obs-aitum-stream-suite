@@ -27,6 +27,9 @@ class OBSBasicSettings : public QDialog {
 	Q_PROPERTY(QIcon hotkeysIcon READ GetHotkeysIcon WRITE SetHotkeysIcon DESIGNABLE true)
 	Q_PROPERTY(QIcon accessibilityIcon READ GetAccessibilityIcon WRITE SetAccessibilityIcon DESIGNABLE true)
 	Q_PROPERTY(QIcon advancedIcon READ GetAdvancedIcon WRITE SetAdvancedIcon DESIGNABLE true)
+	Q_PROPERTY(QIcon helpIcon READ GetHelpIcon WRITE SetHelpIcon DESIGNABLE true)
+	Q_PROPERTY(QIcon canvasIcon READ GetCanvasIcon WRITE SetCanvasIcon DESIGNABLE true)
+	Q_PROPERTY(QIcon aitumIcon READ GetAitumIcon WRITE SetAitumIcon DESIGNABLE true)
 private:
 	QListWidget *listWidget;
 
@@ -39,6 +42,9 @@ private:
 	QIcon GetHotkeysIcon() const;
 	QIcon GetAccessibilityIcon() const;
 	QIcon GetAdvancedIcon() const;
+	QIcon GetHelpIcon() const;
+	QIcon GetCanvasIcon() const;
+	QIcon GetAitumIcon() const;
 
 	void AddCanvas(QFormLayout *canvasLayout, obs_data_t *settings, obs_data_array_t *canvas);
 	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs);
@@ -74,6 +80,9 @@ private slots:
 	void SetHotkeysIcon(const QIcon &icon);
 	void SetAccessibilityIcon(const QIcon &icon);
 	void SetAdvancedIcon(const QIcon &icon);
+	void SetHelpIcon(const QIcon &icon);
+	void SetCanvasIcon(const QIcon &icon);
+	void SetAitumIcon(const QIcon &icon);
 
 public:
 	OBSBasicSettings(QMainWindow *parent = nullptr);
