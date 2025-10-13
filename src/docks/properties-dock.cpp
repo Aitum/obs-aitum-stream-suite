@@ -17,6 +17,8 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include <src/utils/color.hpp>
+#include <src/utils/widgets/slider-ignore-scroll.hpp>
+#include <src/utils/widgets/double-slider.hpp>
 
 extern FiltersDock *filters_dock;
 
@@ -294,9 +296,8 @@ void PropertiesDock::SourceDeselected(OBSSource source)
 void PropertiesDock::LoadProperties(OBSSource source)
 {
 	if (current_properties) {
-		if (obs_weak_source_references_source(current_properties, source))
-			return;
 		auto prev_source = obs_weak_source_get_source(current_properties);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "update_properties", update_properties, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", properties_remove, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", properties_remove, this);
 		obs_source_release(prev_source);
@@ -321,6 +322,7 @@ void PropertiesDock::LoadProperties(OBSSource source)
 	if (!properties)
 		return;
 
+	signal_handler_connect(obs_source_get_signal_handler(source), "update_properties", update_properties, this);
 	signal_handler_connect(obs_source_get_signal_handler(source), "remove", properties_remove, this);
 	signal_handler_connect(obs_source_get_signal_handler(source), "destroy", properties_remove, this);
 
@@ -346,18 +348,28 @@ void PropertiesDock::properties_remove(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
-	if (obs_weak_source_references_source(this_->current_properties, source)) {
-		if (this_->current_properties != this_->current_source) {
-			auto s = obs_weak_source_get_source(this_->current_source);
-			if (s) {
-				QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection,
-							  Q_ARG(OBSSource, OBSSource(s)));
-				obs_source_release(s);
-				return;
-			}
+	if (!obs_weak_source_references_source(this_->current_properties, source))
+		return;
+
+	if (this_->current_properties != this_->current_source) {
+		auto s = obs_weak_source_get_source(this_->current_source);
+		if (s) {
+			QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(s)));
+			obs_source_release(s);
+			return;
 		}
-		QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
 	}
+	QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+}
+
+void PropertiesDock::update_properties(void *param, calldata_t *cd)
+{
+	auto this_ = static_cast<PropertiesDock *>(param);
+	auto source = (obs_source_t *)calldata_ptr(cd, "source");
+	if (!obs_weak_source_references_source(this_->current_properties, source))
+		return;
+
+	QMetaObject::invokeMethod(this_, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 }
 
 void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout)
@@ -398,14 +410,35 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 		});
 	} else if (type == OBS_PROPERTY_INT) {
 		obs_number_type int_type = obs_property_int_type(property);
-		auto widget = new QSpinBox();
-		widget->setEnabled(obs_property_enabled(property));
-		widget->setMinimum(obs_property_int_min(property));
-		widget->setMaximum(obs_property_int_max(property));
-		widget->setSingleStep(obs_property_int_step(property));
-		widget->setValue((int)obs_data_get_int(settings, obs_property_name(property)));
-		widget->setToolTip(QString::fromUtf8(obs_property_long_description(property)));
-		widget->setSuffix(QString::fromUtf8(obs_property_int_suffix(property)));
+		QWidget *widget = nullptr;
+
+		auto spin = new QSpinBox();
+		spin->setEnabled(obs_property_enabled(property));
+		spin->setMinimum(obs_property_int_min(property));
+		spin->setMaximum(obs_property_int_max(property));
+		spin->setSingleStep(obs_property_int_step(property));
+		spin->setValue((int)obs_data_get_int(settings, obs_property_name(property)));
+		spin->setToolTip(QString::fromUtf8(obs_property_long_description(property)));
+		spin->setSuffix(QString::fromUtf8(obs_property_int_suffix(property)));
+		if (int_type == OBS_NUMBER_SLIDER) {
+			widget = new QWidget;
+			auto l = new QHBoxLayout();
+			widget->setLayout(l);
+			QSlider *slider = new SliderIgnoreScroll();
+			slider->setMinimum(obs_property_int_min(property));
+			slider->setMaximum(obs_property_int_max(property));
+			slider->setPageStep(obs_property_int_step(property));
+			slider->setValue((int)obs_data_get_int(settings, obs_property_name(property)));
+			slider->setOrientation(Qt::Horizontal);
+			slider->setEnabled(obs_property_enabled(property));
+			l->addWidget(slider);
+			l->addWidget(spin);
+			connect(slider, &QSlider::valueChanged, spin, &QSpinBox::setValue);
+			connect(spin, &QSpinBox::valueChanged, slider, &QSlider::setValue);
+		} else {
+			widget = spin;
+		}
+
 		auto label = new QLabel(QString::fromUtf8(obs_property_description(property)));
 		layout->addRow(label, widget);
 		if (!obs_property_visible(property)) {
@@ -413,10 +446,10 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 			label->setVisible(false);
 		}
 		property_widgets.emplace(property, widget);
-		connect(widget, &QSpinBox::valueChanged, [this, properties, property, settings, widget, layout] {
-			if (obs_data_get_int(settings, obs_property_name(property)) == widget->value())
+		connect(spin, &QSpinBox::valueChanged, [this, properties, property, settings, spin, layout] {
+			if (obs_data_get_int(settings, obs_property_name(property)) == spin->value())
 				return;
-			obs_data_set_int(settings, obs_property_name(property), widget->value());
+			obs_data_set_int(settings, obs_property_name(property), spin->value());
 			if (obs_property_modified(property, settings)) {
 				RefreshProperties(properties, layout);
 			}
@@ -427,25 +460,46 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 			}
 		});
 	} else if (type == OBS_PROPERTY_FLOAT) {
-		auto widget = new QDoubleSpinBox();
-		widget->setEnabled(obs_property_enabled(property));
-		widget->setMinimum(obs_property_float_min(property));
-		widget->setMaximum(obs_property_float_max(property));
-		widget->setSingleStep(obs_property_float_step(property));
-		widget->setValue(obs_data_get_double(settings, obs_property_name(property)));
-		widget->setToolTip(QString::fromUtf8(obs_property_long_description(property)));
-		widget->setSuffix(QString::fromUtf8(obs_property_float_suffix(property)));
+		obs_number_type float_type = obs_property_float_type(property);
+		QWidget *widget = nullptr;
+
+		auto spin = new QDoubleSpinBox();
+		spin->setEnabled(obs_property_enabled(property));
+		spin->setMinimum(obs_property_float_min(property));
+		spin->setMaximum(obs_property_float_max(property));
+		spin->setSingleStep(obs_property_float_step(property));
+		spin->setValue(obs_data_get_double(settings, obs_property_name(property)));
+		spin->setToolTip(QString::fromUtf8(obs_property_long_description(property)));
+		spin->setSuffix(QString::fromUtf8(obs_property_float_suffix(property)));
 		auto label = new QLabel(QString::fromUtf8(obs_property_description(property)));
+		if (float_type == OBS_NUMBER_SLIDER) {
+			widget = new QWidget;
+			auto l = new QHBoxLayout();
+			widget->setLayout(l);
+			DoubleSlider *slider = new DoubleSlider();
+			slider->setDoubleConstraints(obs_property_float_min(property), obs_property_float_max(property),
+						     obs_property_float_step(property),
+						     obs_data_get_double(settings, obs_property_name(property)));
+			slider->setOrientation(Qt::Horizontal);
+			slider->setEnabled(obs_property_enabled(property));
+			l->addWidget(slider);
+			l->addWidget(spin);
+			connect(slider, &DoubleSlider::valueChanged, spin, &QDoubleSpinBox::setValue);
+			connect(spin, &QDoubleSpinBox::valueChanged, slider, &DoubleSlider::setValue);
+		} else {
+			widget = spin;
+		}
+
 		layout->addRow(label, widget);
 		if (!obs_property_visible(property)) {
 			widget->setVisible(false);
 			label->setVisible(false);
 		}
 		property_widgets.emplace(property, widget);
-		connect(widget, &QDoubleSpinBox::valueChanged, [this, properties, property, settings, widget, layout] {
-			if (obs_data_get_double(settings, obs_property_name(property)) == widget->value())
+		connect(spin, &QDoubleSpinBox::valueChanged, [this, properties, property, settings, spin, layout] {
+			if (obs_data_get_double(settings, obs_property_name(property)) == spin->value())
 				return;
-			obs_data_set_double(settings, obs_property_name(property), widget->value());
+			obs_data_set_double(settings, obs_property_name(property), spin->value());
 			if (obs_property_modified(property, settings)) {
 				RefreshProperties(properties, layout);
 			}
@@ -870,7 +924,8 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 					QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
 			} else if (path_type == OBS_PATH_FILE) {
 				path = QFileDialog::getOpenFileName(this, QString::fromUtf8(obs_property_description(property)),
-								    startDir, QString::fromUtf8(obs_property_path_filter(property)));
+								    startDir,
+								    QString::fromUtf8(obs_property_path_filter(property)));
 			} else if (path_type == OBS_PATH_FILE_SAVE) {
 				path = QFileDialog::getSaveFileName(this, QString::fromUtf8(obs_property_description(property)),
 								    startDir,
@@ -880,7 +935,6 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 				return;
 			edit->setText(path);
 			obs_data_set_string(settings, obs_property_name(property), path.toUtf8().constData());
-
 			if (obs_property_modified(property, settings)) {
 				RefreshProperties(properties, layout);
 			}

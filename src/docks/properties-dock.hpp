@@ -38,6 +38,7 @@ private:
 	static void scene_item_deselect(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void properties_remove(void *param, calldata_t *cd);
+	static void update_properties(void *param, calldata_t *cd);
 	static void frontend_event(enum obs_frontend_event event, void *param);
 
 private slots:
