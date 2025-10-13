@@ -551,6 +551,21 @@ void load_current_profile_config()
 		obs_data_array_push_back(canvas, new_canvas);
 		obs_data_release(new_canvas);
 		obs_data_set_array(current_profile_config, "canvas", canvas);
+
+		auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
+		if (!outputs2) {
+			outputs2 = obs_data_array_create();
+			obs_data_set_array(current_profile_config, "outputs", outputs2);
+		}
+		if (obs_data_array_count(outputs2) < 1) {
+			auto new_output = obs_data_create();
+			obs_data_set_bool(new_output, "enabled", true);
+			obs_data_set_string(new_output, "name", "Vertical Stream");
+			obs_data_set_string(new_output, "canvas", "Vertical");
+			obs_data_array_push_back(outputs2, new_output);
+			obs_data_release(new_output);
+		}
+		obs_data_array_release(outputs2);
 	}
 	auto canvas_count = obs_data_array_count(canvas);
 	for (size_t i = 0; i < canvas_count;) {
