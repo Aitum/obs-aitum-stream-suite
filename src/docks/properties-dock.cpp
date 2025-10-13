@@ -55,6 +55,10 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 		auto canvas = obs_get_canvas_by_name(canvasCombo->currentText().toUtf8().constData());
 		if (!canvas)
 			return;
+		if (obs_canvas_removed(canvas)) {
+			obs_canvas_release(canvas);
+			return;
+		}
 		if (obs_weak_object_references_object((obs_weak_object_t *)current_canvas, (obs_object_t *)canvas))
 			return;
 
