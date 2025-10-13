@@ -7,6 +7,7 @@
 #include <QDesktopServices>
 #include <QGroupBox>
 #include <QLabel>
+#include <QFileDialog>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
@@ -284,7 +285,8 @@ void PropertiesDock::SourceChanged(OBSSource source)
 	LoadProperties(source);
 }
 
-void PropertiesDock::SourceDeselected(OBSSource source) {
+void PropertiesDock::SourceDeselected(OBSSource source)
+{
 	if (obs_weak_source_references_source(current_source, source))
 		SourceChanged(nullptr);
 }
@@ -395,6 +397,7 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 			}
 		});
 	} else if (type == OBS_PROPERTY_INT) {
+		obs_number_type int_type = obs_property_int_type(property);
 		auto widget = new QSpinBox();
 		widget->setEnabled(obs_property_enabled(property));
 		widget->setMinimum(obs_property_int_min(property));
@@ -836,8 +839,58 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 				}
 			}
 		});
+	} else if (type == OBS_PROPERTY_PATH) {
+		auto l = new QHBoxLayout();
+		QLineEdit *edit = new QLineEdit();
+		QPushButton *button = new QPushButton(QString::fromUtf8(obs_frontend_get_locale_string("Browse")));
+		edit->setText(QString::fromUtf8(obs_data_get_string(settings, obs_property_name(property))));
+		edit->setReadOnly(true);
+		edit->setToolTip(QString::fromUtf8(obs_property_long_description(property)));
+		l->addWidget(edit);
+		l->addWidget(button);
+		auto label = new QLabel(QString::fromUtf8(obs_property_description(property)));
+		auto widget = new QWidget;
+		widget->setLayout(l);
+		layout->addRow(label, widget);
+		if (!obs_property_visible(property)) {
+			widget->setVisible(false);
+			label->setVisible(false);
+		}
+		property_widgets.emplace(property, widget);
+		connect(button, &QPushButton::clicked, [this, property, settings, properties, layout, edit] {
+			QString startDir = edit->text();
+			if (startDir.isEmpty())
+				startDir = QString::fromUtf8(obs_property_path_default_path(property));
+
+			obs_path_type path_type = obs_property_path_type(property);
+			QString path;
+			if (path_type == OBS_PATH_DIRECTORY) {
+				path = QFileDialog::getExistingDirectory(
+					this, QString::fromUtf8(obs_property_description(property)), startDir,
+					QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+			} else if (path_type == OBS_PATH_FILE) {
+				path = QFileDialog::getOpenFileName(this, QString::fromUtf8(obs_property_description(property)),
+								    startDir, QString::fromUtf8(obs_property_path_filter(property)));
+			} else if (path_type == OBS_PATH_FILE_SAVE) {
+				path = QFileDialog::getSaveFileName(this, QString::fromUtf8(obs_property_description(property)),
+								    startDir,
+								    QString::fromUtf8(obs_property_path_filter(property)));
+			}
+			if (path.isEmpty())
+				return;
+			edit->setText(path);
+			obs_data_set_string(settings, obs_property_name(property), path.toUtf8().constData());
+
+			if (obs_property_modified(property, settings)) {
+				RefreshProperties(properties, layout);
+			}
+			auto source = obs_weak_source_get_source(current_properties);
+			if (source) {
+				obs_source_update(source, settings);
+				obs_source_release(source);
+			}
+		});
 	} else {
-		// OBS_PROPERTY_PATH
 		// OBS_PROPERTY_FONT
 		// OBS_PROPERTY_EDITABLE_LIST
 		// OBS_PROPERTY_FRAME_RATE
