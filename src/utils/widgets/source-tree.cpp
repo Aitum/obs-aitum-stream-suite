@@ -181,6 +181,7 @@ void SourceTreeItem::removeItem(void *data, calldata_t *cd)
 	obs_scene_t *curScene = (obs_scene_t *)calldata_ptr(cd, "scene");
 	if (curItem == this_->sceneitem) {
 		QMetaObject::invokeMethod(this_->tree, "Remove", Q_ARG(OBSSceneItem, curItem), Q_ARG(OBSScene, curScene));
+		QMetaObject::invokeMethod(this_, "Clear");
 	}
 }
 
