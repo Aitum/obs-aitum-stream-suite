@@ -926,6 +926,7 @@ bool obs_module_load(void)
 				config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
 				restart = true;
 			}
+			config_set_bool(user_config, "BasicWindow", "VerticalVolControl", true);
 			config_set_bool(user_config, "Aitum", "ThemeSet", true);
 			config_save_safe(user_config, "tmp", "bak");
 		}
