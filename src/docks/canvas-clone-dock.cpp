@@ -45,7 +45,8 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
 	canvas_height = (uint32_t)obs_data_get_int(settings, "height");
 
-	auto clone_canvas = obs_get_canvas_by_name(obs_data_get_string(settings, "clone"));
+	auto clone_name = obs_data_get_string(settings, "clone");
+	auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
 	if (clone_canvas) {
 		clone = obs_canvas_get_weak_canvas(clone_canvas);
 		obs_video_info ovi;
@@ -233,7 +234,8 @@ void CanvasCloneDock::Tick(void *data, float seconds)
 	UNUSED_PARAMETER(seconds);
 	CanvasCloneDock *ccd = static_cast<CanvasCloneDock *>(data);
 	if (!ccd->clone) {
-		auto clone_canvas = obs_get_canvas_by_name(obs_data_get_string(ccd->settings, "clone"));
+		auto clone_name = obs_data_get_string(ccd->settings, "clone");
+		auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
 		if (clone_canvas) {
 			ccd->clone = obs_canvas_get_weak_canvas(clone_canvas);
 			obs_video_info ovi;
@@ -557,7 +559,8 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s)
 
 	obs_weak_canvas_release(clone);
 	clone = nullptr;
-	auto clone_canvas = obs_get_canvas_by_name(obs_data_get_string(settings, "clone"));
+	auto clone_name = obs_data_get_string(settings, "clone");
+	auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
 	if (clone_canvas) {
 		clone = obs_canvas_get_weak_canvas(clone_canvas);
 		obs_video_info ovi;
@@ -589,4 +592,15 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s)
 		canvas_width = 1080;
 	if (canvas_height < 1)
 		canvas_height = 1920;
+
+	obs_video_info ovi;
+	if (obs_canvas_get_video_info(canvas, &ovi) && (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
+							ovi.output_width != canvas_width || ovi.output_height != canvas_height)) {
+		obs_get_video_info(&ovi);
+		ovi.base_height = canvas_height;
+		ovi.base_width = canvas_width;
+		ovi.output_height = canvas_height;
+		ovi.output_width = canvas_width;
+		obs_canvas_reset_video(canvas, &ovi);
+	}
 }

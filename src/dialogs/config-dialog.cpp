@@ -1451,7 +1451,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, outputVideoEncoder, settings, outputs] {
 		obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		auto canvas_name = obs_data_get_string(settings, "canvas");
-		auto canvas = obs_get_canvas_by_name(canvas_name);
+		auto canvas = canvas_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(canvas_name);
 		auto main_canvas = obs_get_main_canvas();
 		outputVideoEncoder->clear();
 		outputVideoEncoder->addItem(QString::fromUtf8(obs_module_text("None")), QVariant(QString::fromUtf8("")));
