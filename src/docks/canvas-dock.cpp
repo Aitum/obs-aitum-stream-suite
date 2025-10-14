@@ -734,7 +734,7 @@ void CanvasDock::GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int 
 void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 {
 	CanvasDock *window = static_cast<CanvasDock *>(data);
-	if (!window)
+	if (!window || !window->canvas || obs_canvas_removed(window->canvas))
 		return;
 
 	uint32_t sourceCX = window->canvas_width;

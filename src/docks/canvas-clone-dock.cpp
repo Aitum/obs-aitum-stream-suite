@@ -180,7 +180,7 @@ CanvasCloneDock::~CanvasCloneDock()
 void CanvasCloneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 {
 	CanvasCloneDock *window = static_cast<CanvasCloneDock *>(data);
-	if (!window || !window->canvas)
+	if (!window || !window->canvas || obs_canvas_removed(window->canvas))
 		return;
 
 	uint32_t sourceCX = window->canvas_width;
