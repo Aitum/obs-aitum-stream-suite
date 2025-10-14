@@ -635,8 +635,6 @@ static bool enumItem(obs_scene_t *, obs_sceneitem_t *item, void *ptr)
 
 void SourceTreeModel::SceneChanged()
 {
-	if (std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
-		return;
 	obs_scene_t *scene = st->getScene(st->getSceneParam);
 
 	beginResetModel();
