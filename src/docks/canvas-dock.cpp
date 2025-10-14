@@ -3099,7 +3099,7 @@ void CanvasDock::LoadScenes()
 			return true;
 		},
 		this);
-
+	QListWidgetItem *selectedItem = nullptr;
 	sceneList->blockSignals(true);
 	for (int idx = 0; idx < sceneList->count(); idx++) {
 		auto item = sceneList->takeItem(idx);
@@ -3107,10 +3107,15 @@ void CanvasDock::LoadScenes()
 		auto settings = obs_source_get_settings(scene);
 		const int order = (int)obs_data_get_int(settings, "order");
 		sceneList->insertItem(order, item);
+		if (obs_data_get_bool(settings, "canvas_active")) {
+			selectedItem = item;
+		}
 		obs_data_release(settings);
 		obs_source_release(scene);
 	}
 	sceneList->blockSignals(false);
+	if (selectedItem)
+		sceneList->setCurrentItem(selectedItem);
 
 	UpdateLinkedScenes();
 
@@ -4785,6 +4790,7 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 		if (scene) {
 			auto settings = obs_source_get_settings(scene);
 			obs_data_set_int(settings, "order", row);
+			obs_data_set_bool(settings, "canvas_active", scene_name == window->currentSceneName);
 			obs_data_release(settings);
 			obs_source_release(scene);
 		}
