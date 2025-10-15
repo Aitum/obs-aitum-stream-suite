@@ -1926,9 +1926,12 @@ OBSBasic {
 
 /* Scene Tree Grid Mode */
 
-SceneTree, SourceTree, QListWidget{
+SceneTree {
     qproperty-gridItemWidth: 154;
     qproperty-gridItemHeight: var(--input_height_base);
+}
+
+SceneTree, SourceTree, QListWidget{
     padding:5px;
     margin:10px;
     background:rgba(0,0,0,0.2);
