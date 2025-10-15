@@ -88,7 +88,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			}
 		}
 	}
-	if (!canvas){
+	if (!canvas) {
 		canvas = obs_get_canvas_by_name(canvas_name.c_str());
 		if (canvas && obs_canvas_removed(canvas)) {
 			obs_canvas_release(canvas);

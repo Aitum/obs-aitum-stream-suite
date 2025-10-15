@@ -327,7 +327,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		}
 	});
 
-	l2->addWidget(new QLabel(QString::fromUtf8(canvas_name)), 1);
+	l2->addWidget(new QLabel(QString::fromUtf8(canvas_name[0] == '\0' ? obs_module_text("MainCanvas") : canvas_name)), 1);
 	//streamButton->setSizePolicy(sp2);
 	streamButton->setToolTip(QString::fromUtf8(obs_module_text("Stream")));
 	l2->addWidget(streamButton);
@@ -669,4 +669,40 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 void OutputDock::UpdateMainStreamStatus(bool active)
 {
 	mainStreamButton->setChecked(active);
+	if (!active)
+		return;
+	if (!current_profile_config)
+		return;
+	struct obs_video_info ovi = {0};
+	obs_get_video_info(&ovi);
+	double fps = ovi.fps_den > 0 ? (double)ovi.fps_num / (double)ovi.fps_den : 0.0;
+	auto output = obs_frontend_get_streaming_output();
+	bool found = false;
+	for (auto i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
+		auto encoder = obs_output_get_video_encoder2(output, i);
+		QString settingName = QString::fromUtf8("video_encoder_description") + QString::number(i);
+		if (encoder) {
+			found = true;
+			auto mainEncoderDescription = QString::number(obs_encoder_get_width(encoder)) + "x" +
+						      QString::number(obs_encoder_get_height(encoder));
+			auto divisor = obs_encoder_get_frame_rate_divisor(encoder);
+			if (divisor > 0)
+				mainEncoderDescription +=
+					QString::fromUtf8(" ") + QString::number(fps / divisor, 'g', 4) + QString::fromUtf8("fps");
+
+			auto settings = obs_encoder_get_settings(encoder);
+			auto bitrate = settings ? obs_data_get_int(settings, "bitrate") : 0;
+			if (bitrate > 0)
+				mainEncoderDescription +=
+					QString::fromUtf8(" ") + QString::number(bitrate) + QString::fromUtf8("Kbps");
+			obs_data_release(settings);
+
+			obs_data_set_string(current_profile_config, settingName.toUtf8().constData(),
+					    mainEncoderDescription.toUtf8().constData());
+
+		} else if (found && obs_data_has_user_value(current_profile_config, settingName.toUtf8().constData())) {
+			obs_data_unset_user_value(current_profile_config, settingName.toUtf8().constData());
+		}
+	}
+	obs_output_release(output);
 }
