@@ -147,7 +147,6 @@ private:
 	QColor GetCropColor() const;
 	QColor GetHoverColor() const;
 
-	void SaveSettings();
 	void DrawBackdrop(float cx, float cy);
 	void DrawSpacingHelpers(obs_scene_t *scene, float x, float y, float cx, float cy, float scale, float sourceX,
 				float sourceY);
@@ -162,6 +161,7 @@ private:
 	void ChangeSceneIndex(bool relative, int offset, int invalidIdx);
 	QListWidget *GetGlobalScenesList();
 	void LoadScenes();
+	void LoadTransitions();
 	void UpdateLinkedScenes();
 	void AddScene(QString duplicate = "", bool ask_name = true);
 	void RemoveScene(const QString &sceneName);
@@ -245,6 +245,7 @@ private slots:
 	void SwitchScene(const QString &scene_name, bool transition = true);
 	void MainSceneChanged();
 	void LoadMode(int index);
+	void SaveSettings(bool closing = false);
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasDock();

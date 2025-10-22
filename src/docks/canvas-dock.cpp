@@ -666,30 +666,10 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		index = modesTabBar->currentIndex();
 	LoadMode(index);
 
-	size_t idx = 0;
-	const char *id;
-	while (obs_enum_transition_types(idx++, &id)) {
-		if (obs_is_source_configurable(id))
-			continue;
-		const char *name = obs_source_get_display_name(id);
+	LoadScenes();
 
-		OBSSourceAutoRelease tr = obs_source_create_private(id, name, NULL);
-		transitions.emplace_back(tr);
+	LoadTransitions();
 
-		//signals "transition_stop" and "transition_video_stop"
-		//        TransitionFullyStopped TransitionStopped
-	}
-
-	for (auto t : transitions) {
-		auto name = QString::fromUtf8(obs_source_get_name(t));
-		transition->addItem(name);
-		if (obs_weak_source_references_source(source, t)) {
-			transition->setCurrentText(name);
-			bool config = obs_is_source_configurable(obs_source_get_unversioned_id(t));
-			removeButton->setEnabled(config);
-			propsButton->setEnabled(config);
-		}
-	}
 	connect(transition, &QComboBox::currentTextChanged, [this, removeButton, propsButton] {
 		auto tn = transition->currentText().toUtf8();
 		auto t = GetTransition(tn.constData());
@@ -703,8 +683,6 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	connect(canvas_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
 	connect(panel_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
-
-	LoadScenes();
 
 	obs_frontend_add_save_callback(save_load, this);
 }
@@ -825,7 +803,7 @@ CanvasDock::~CanvasDock()
 	obs_frontend_remove_save_callback(save_load, this);
 	canvas_docks.remove(this);
 	obs_display_remove_draw_callback(preview->GetDisplay(), DrawPreview, this);
-	SaveSettings();
+	SaveSettings(true);
 	obs_data_release(settings);
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
@@ -833,32 +811,49 @@ CanvasDock::~CanvasDock()
 	obs_canvas_release(canvas);
 }
 
-void CanvasDock::SaveSettings()
+void CanvasDock::SaveSettings(bool closing)
 {
-	auto state = canvas_split->saveState();
-	auto b64 = state.toBase64();
-	auto state_chars = b64.constData();
-	auto index = modesTabBar->currentIndex();
-	if (index == 0) {
-		obs_data_set_string(settings, "canvas_split_live", state_chars);
-	} else if (index == 1) {
-		obs_data_set_string(settings, "canvas_split_build", state_chars);
-	} else if (index == 2) {
-		obs_data_set_string(settings, "canvas_split_design", state_chars);
-	}
-	obs_data_set_string(settings, "canvas_split", state_chars);
-	state = panel_split->saveState();
-	b64 = state.toBase64();
-	state_chars = b64.constData();
-	if (index == 0) {
-		obs_data_set_string(settings, "panel_split_live", state_chars);
-	} else if (index == 1) {
-		obs_data_set_string(settings, "panel_split_build", state_chars);
-	} else if (index == 2) {
-		obs_data_set_string(settings, "panel_split_design", state_chars);
+	if (!closing) {
+		auto state = canvas_split->saveState();
+		auto b64 = state.toBase64();
+		auto state_chars = b64.constData();
+		auto index = modesTabBar->currentIndex();
+		if (index == 0) {
+			obs_data_set_string(settings, "canvas_split_live", state_chars);
+		} else if (index == 1) {
+			obs_data_set_string(settings, "canvas_split_build", state_chars);
+		} else if (index == 2) {
+			obs_data_set_string(settings, "canvas_split_design", state_chars);
+		}
+		obs_data_set_string(settings, "canvas_split", state_chars);
+		state = panel_split->saveState();
+		b64 = state.toBase64();
+		state_chars = b64.constData();
+		if (index == 0) {
+			obs_data_set_string(settings, "panel_split_live", state_chars);
+		} else if (index == 1) {
+			obs_data_set_string(settings, "panel_split_build", state_chars);
+		} else if (index == 2) {
+			obs_data_set_string(settings, "panel_split_design", state_chars);
+		}
+		obs_data_set_string(settings, "panel_split", state_chars);
 	}
 
-	obs_data_set_string(settings, "panel_split", state_chars);
+	obs_data_array_t *transition_array = obs_data_array_create();
+	for (auto transition : transitions) {
+		const char *id = obs_source_get_unversioned_id(transition);
+		if (!obs_is_source_configurable(id))
+			continue;
+		obs_data_t *transition_data = obs_save_source(transition);
+		if (!transition_data)
+			continue;
+		obs_data_array_push_back(transition_array, transition_data);
+		obs_data_release(transition_data);
+	}
+	obs_data_set_array(settings, "transitions", transition_array);
+	obs_data_array_release(transition_array);
+
+	obs_data_set_string(settings, "transition", transition->currentText().toUtf8().constData());
 }
 
 void CanvasDock::DrawBackdrop(float cx, float cy)
@@ -3128,6 +3123,53 @@ void CanvasDock::LoadScenes()
 
 	if (sceneList->currentRow() < 0)
 		sceneList->setCurrentRow(0);
+}
+
+void CanvasDock::LoadTransitions()
+{
+	size_t idx = 0;
+	const char *id;
+	while (obs_enum_transition_types(idx++, &id)) {
+		if (obs_is_source_configurable(id))
+			continue;
+		const char *name = obs_source_get_display_name(id);
+
+		OBSSourceAutoRelease tr = obs_source_create_private(id, name, NULL);
+		transitions.emplace_back(tr);
+
+		//signals "transition_stop" and "transition_video_stop"
+		//        TransitionFullyStopped TransitionStopped
+	}
+
+	obs_data_array_t *transition_array = obs_data_get_array(settings, "transitions");
+	if (transition_array) {
+		size_t c = obs_data_array_count(transition_array);
+		for (size_t i = 0; i < c; i++) {
+			obs_data_t *td = obs_data_array_item(transition_array, i);
+			if (!td)
+				continue;
+			OBSSourceAutoRelease transition = obs_load_private_source(td);
+			if (transition)
+				transitions.emplace_back(transition);
+
+			obs_data_release(td);
+		}
+		obs_data_array_release(transition_array);
+	}
+
+	auto current_transition = GetTransition(obs_data_get_string(settings, "transition"));
+	if (!current_transition)
+		current_transition = GetTransition(obs_source_get_display_name("fade_transition"));
+
+	SwapTransition(current_transition);
+
+	for (auto t : transitions) {
+		auto name = QString::fromUtf8(obs_source_get_name(t));
+		transition->addItem(name);
+		if (obs_weak_source_references_source(source, t)) {
+			transition->setCurrentText(name);
+		}
+	}
 }
 
 void CanvasDock::UpdateLinkedScenes()
