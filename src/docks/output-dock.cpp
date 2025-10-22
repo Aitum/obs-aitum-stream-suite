@@ -13,8 +13,6 @@
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
 
-
-
 OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 {
 	auto t = new QWidget;
@@ -256,7 +254,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	auto count = obs_data_array_count(canvas);
 	for (size_t i = 0; i < count; i++) {
-		auto item = obs_data_array_item(canvas,i);
+		auto item = obs_data_array_item(canvas, i);
 		if (!item)
 			continue;
 		auto cn = obs_data_get_string(item, "name");
@@ -269,7 +267,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		obs_data_release(item);
 	}
 	obs_data_array_release(canvas);
-	
+
 	streamGroup->setObjectName(name);
 	auto streamLayout = new QVBoxLayout;
 
@@ -407,6 +405,10 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 	} else {
 		canvas = obs_get_canvas_by_name(canvas_name);
 	}
+	if (canvas && obs_canvas_removed(canvas)) {
+		obs_canvas_release(canvas);
+		canvas = nullptr;
+	}
 	obs_canvas_release(main_canvas);
 	bool main = canvas == main_canvas;
 	if (!canvas) {
@@ -432,7 +434,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			}
 			if (!venc) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start stream '%s' because '%s' was not started",
-				     obs_data_get_string(settings, "name"), output_video_encoder_name);
+				     name, output_video_encoder_name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("OtherOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("OtherOutputNotActive")));
 				return false;
@@ -448,7 +450,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 						obs_output_release(main_output);
 						blog(LOG_WARNING,
 						     "[Aitum Stream Suite] failed to start stream '%s' because main was not started",
-						     obs_data_get_string(settings, "name"));
+						     name);
 						QMessageBox::warning(this,
 								     QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 								     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
@@ -460,7 +462,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 					if (!venc) {
 						blog(LOG_WARNING,
 						     "[Aitum Stream Suite] failed to start stream '%s' because encoder index %d was not found",
-						     obs_data_get_string(settings, "name"), vei);
+						     name, vei);
 						QMessageBox::warning(
 							this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 							QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
@@ -502,7 +504,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			if (!obs_output_active(main_output)) {
 				obs_output_release(main_output);
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start stream '%s' because main was not started",
-				     obs_data_get_string(settings, "name"));
+				     name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return false;
@@ -513,7 +515,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			if (!aenc) {
 				blog(LOG_WARNING,
 				     "[Aitum Stream Suite] failed to start stream '%s' because encoder index %d was not found",
-				     obs_data_get_string(settings, "name"), aei);
+				     name, aei);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
 				return false;
@@ -561,11 +563,30 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			obs_output_release(main_output);
 			if (!venc || !obs_output_active(main_output)) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start stream '%s' because main was not started",
-				     obs_data_get_string(settings, "name"));
+				     name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return false;
 			}
+		} else if (!venc) {
+			auto videoEncoderIds = {"obs_nvenc_h264_tex", "jim_nvenc", "ffmpeg_nvenc", "obs_qsv11_v2",
+						"h264_texture_amf"};
+			const char *vencid = "obs_x264";
+			foreach(auto videoEncoderId, videoEncoderIds)
+			{
+				if (EncoderAvailable(videoEncoderId)) {
+					vencid = videoEncoderId;
+					break;
+				}
+			}
+			std::string venc_name = "aitum_stream_suite_video_encoder_";
+			venc_name += name;
+			venc = obs_video_encoder_create(vencid, venc_name.c_str(), nullptr, nullptr);
+			auto video_settings = obs_data_create();
+			obs_data_set_string(video_settings, "rate_control", "CBR");
+			obs_data_set_int(video_settings, "bitrate", 6000);
+			obs_encoder_update(venc, video_settings);
+			obs_data_release(video_settings);
 		}
 		if (!aenc && main) {
 			auto main_output = obs_frontend_get_streaming_output();
@@ -573,7 +594,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			obs_output_release(main_output);
 			if (!aenc || !obs_output_active(main_output)) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start stream '%s' because main was not started",
-				     obs_data_get_string(settings, "name"));
+				     name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return false;
@@ -586,7 +607,16 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 		}
 	}
 
-	if (!aenc || !venc) {
+	if (!venc) {
+		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to start '%s', no video encoder found", name);
+		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoVideoEncoder")),
+				     QString::fromUtf8(obs_module_text("NoVideoEncoder")));
+		return false;
+	}
+	if (!aenc) {
+		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to start '%s', no audio encoder found", name);
+		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoAudioEncoder")),
+				     QString::fromUtf8(obs_module_text("NoAudioEncoder")));
 		return false;
 	}
 	auto server = obs_data_get_string(settings, "stream_server");
@@ -661,7 +691,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 
 	obs_output_start(output);
 
-	outputs.push_back({obs_data_get_string(settings, "name"), output, streamButton});
+	outputs.push_back({name, output, streamButton});
 
 	return true;
 }
@@ -705,4 +735,16 @@ void OutputDock::UpdateMainStreamStatus(bool active)
 		}
 	}
 	obs_output_release(output);
+}
+
+bool OutputDock::EncoderAvailable(const char *encoder)
+{
+	const char *val;
+	int i = 0;
+
+	while (obs_enum_encoder_types(i++, &val))
+		if (strcmp(val, encoder) == 0)
+			return true;
+
+	return false;
 }

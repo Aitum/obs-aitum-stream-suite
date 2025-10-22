@@ -28,6 +28,8 @@ private:
 	static void stream_output_stop(void *data, calldata_t *calldata);
 	static void stream_output_start(void *data, calldata_t *calldata);
 
+	static bool EncoderAvailable(const char *encoder);
+
 public:
 	OutputDock(QWidget *parent = nullptr);
 	~OutputDock();
