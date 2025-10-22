@@ -2296,7 +2296,6 @@ QMainWindow > QToolBar > QToolButton{
     height:12px;
     padding:10px 8px;
     margin:0;
-    qproperty-sourceSize:10px;
 }
 
 

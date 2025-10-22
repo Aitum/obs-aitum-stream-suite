@@ -110,6 +110,8 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 			ovi.output_height = canvas_height;
 			ovi.output_width = canvas_width;
 			obs_canvas_reset_video(canvas, &ovi);
+			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", canvas_name.c_str(), canvas_width,
+			     canvas_height);
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
@@ -122,6 +124,8 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
 		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, PROGRAM | EPHEMERAL);
+		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u", canvas_name.c_str(), canvas_width,
+		     canvas_height);
 		if (canvas) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
 			obs_data_set_int(settings, "width", canvas_width);
@@ -286,6 +290,8 @@ void CanvasCloneDock::Tick(void *data, float seconds)
 			ovi.output_height = ccd->canvas_height;
 			ovi.output_width = ccd->canvas_width;
 			obs_canvas_reset_video(ccd->canvas, &ovi);
+			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(ccd->canvas),
+			     ccd->canvas_width, ccd->canvas_height);
 		}
 	}
 	for (int i = 0; i < MAX_CHANNELS; i++) {
@@ -602,5 +608,7 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s)
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
 		obs_canvas_reset_video(canvas, &ovi);
+		blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas), canvas_width,
+		     canvas_height);
 	}
 }
