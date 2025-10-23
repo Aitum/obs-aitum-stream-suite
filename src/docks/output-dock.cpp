@@ -582,6 +582,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 			std::string venc_name = "aitum_stream_suite_video_encoder_";
 			venc_name += name;
 			venc = obs_video_encoder_create(vencid, venc_name.c_str(), nullptr, nullptr);
+			obs_encoder_set_video(venc, obs_canvas_get_video(canvas));
 			auto video_settings = obs_data_create();
 			obs_data_set_string(video_settings, "rate_control", "CBR");
 			obs_data_set_int(video_settings, "bitrate", 6000);
