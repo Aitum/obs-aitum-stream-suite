@@ -1,6 +1,6 @@
 #include "../utils/widgets/stream-key-input.hpp"
 #include "obs-module.h"
-#include "output-dialog.hpp"
+#include "stream-output-dialog.hpp"
 #include "util/platform.h"
 #include <QAbstractButton>
 #include <QComboBox>
@@ -16,7 +16,7 @@
 #include <QVBoxLayout>
 
 // Reset output values, e.g. when user hits the back button
-void OutputDialog::resetOutputs()
+void StreamOutputDialog::resetOutputs()
 {
 	outputName = QString("");
 	outputServer = QString("");
@@ -24,13 +24,13 @@ void OutputDialog::resetOutputs()
 }
 
 // For when we're done
-void OutputDialog::acceptOutputs()
+void StreamOutputDialog::acceptOutputs()
 {
 	accept();
 }
 
 // For validating the current values and then updating the confirm button state
-void OutputDialog::validateOutputs(QPushButton *confirmButton)
+void StreamOutputDialog::validateOutputs(QPushButton *confirmButton)
 {
 
 	if (outputName.isEmpty() || otherNames.contains(outputName)) {
@@ -67,7 +67,7 @@ QLabel *generateFormLabel(std::string text)
 }
 
 // Helper for generating output name field
-QLineEdit *OutputDialog::generateOutputNameField(std::string text, QPushButton *confirmButton, bool edit)
+QLineEdit *StreamOutputDialog::generateOutputNameField(std::string text, QPushButton *confirmButton, bool edit)
 {
 	auto field = new QLineEdit;
 	field->setText(QString::fromUtf8(obs_module_text(text.c_str())));
@@ -86,7 +86,7 @@ QLineEdit *OutputDialog::generateOutputNameField(std::string text, QPushButton *
 }
 
 // Helper for generating output server field
-QLineEdit *OutputDialog::generateOutputServerField(QPushButton *confirmButton, bool locked, bool edit)
+QLineEdit *StreamOutputDialog::generateOutputServerField(QPushButton *confirmButton, bool locked, bool edit)
 {
 	auto field = new QLineEdit;
 	field->setStyleSheet("padding: 4px 8px;");
@@ -107,7 +107,7 @@ QLineEdit *OutputDialog::generateOutputServerField(QPushButton *confirmButton, b
 }
 
 // Helper for generating QComboBoxes for server selection
-QComboBox *OutputDialog::generateOutputServerCombo(std::string service, QPushButton *confirmButton, bool edit)
+QComboBox *StreamOutputDialog::generateOutputServerCombo(std::string service, QPushButton *confirmButton, bool edit)
 {
 	auto combo = new QComboBox;
 	combo->setMinimumHeight(30);
@@ -169,7 +169,7 @@ QComboBox *OutputDialog::generateOutputServerCombo(std::string service, QPushBut
 }
 
 // Helper for generating output key field
-QLineEdit *OutputDialog::generateOutputKeyField(QPushButton *confirmButton, bool edit)
+QLineEdit *StreamOutputDialog::generateOutputKeyField(QPushButton *confirmButton, bool edit)
 {
 	auto field = new StreamKeyInput;
 	field->setStyleSheet("padding: 4px 8px;");
@@ -196,7 +196,7 @@ QLineEdit *OutputDialog::generateOutputKeyField(QPushButton *confirmButton, bool
 }
 
 // Helper for generating wizard button layout
-QHBoxLayout *OutputDialog::generateWizardButtonLayout(QPushButton *confirmButton, QPushButton *serviceButton, bool edit)
+QHBoxLayout *StreamOutputDialog::generateWizardButtonLayout(QPushButton *confirmButton, QPushButton *serviceButton, bool edit)
 {
 	auto layout = new QHBoxLayout;
 	layout->setSpacing(0);
@@ -226,7 +226,7 @@ QPushButton *generateButton(QString text)
 }
 
 // Helper for generating back button
-QPushButton *OutputDialog::generateBackButton()
+QPushButton *StreamOutputDialog::generateBackButton()
 {
 	auto button = generateButton(QString("< Back"));
 
@@ -238,7 +238,7 @@ QPushButton *OutputDialog::generateBackButton()
 	return button;
 }
 
-QToolButton *OutputDialog::selectionButton(std::string title, QIcon icon, int selectionStep)
+QToolButton *StreamOutputDialog::selectionButton(std::string title, QIcon icon, int selectionStep)
 {
 	auto button = new QToolButton;
 
@@ -255,7 +255,7 @@ QToolButton *OutputDialog::selectionButton(std::string title, QIcon icon, int se
 }
 
 // Gets a service from the service array matched by name
-obs_data_t *OutputDialog::getService(std::string serviceName)
+obs_data_t *StreamOutputDialog::getService(std::string serviceName)
 {
 	auto total = obs_data_array_count(servicesData);
 
@@ -271,7 +271,7 @@ obs_data_t *OutputDialog::getService(std::string serviceName)
 	return nullptr;
 }
 
-OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(parent), otherNames(_otherNames)
+StreamOutputDialog::StreamOutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(parent), otherNames(_otherNames)
 {
 	// Load the services from rtmp-services plugin
 	auto servicesPath = obs_module_get_config_path(obs_get_module("rtmp-services"), "services.json");
@@ -312,7 +312,7 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(p
 	stackedWidget->setCurrentIndex(0);
 
 	stackedWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-	setWindowTitle(obs_module_text("NewOutputWindowTitle"));
+	setWindowTitle(obs_module_text("NewStreamOutputWindowTitle"));
 
 	auto stackedLayout = new QVBoxLayout;
 	stackedLayout->setContentsMargins(0, 0, 0, 0);
@@ -323,7 +323,7 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(p
 }
 
 // Edit mode
-OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList _otherNames)
+StreamOutputDialog::StreamOutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList _otherNames)
 	: QDialog(parent),
 	  otherNames(_otherNames)
 {
@@ -379,12 +379,12 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 
 	setLayout(layout);
 
-	setWindowTitle(obs_module_text("EditOutputWindowTitle"));
+	setWindowTitle(obs_module_text("EditStreamOutputWindowTitle"));
 
 	show();
 }
 
-QWidget *OutputDialog::WizardServicePage()
+QWidget *StreamOutputDialog::WizardServicePage()
 {
 	auto page = new QWidget(this);
 	auto pageLayout = new QVBoxLayout;
@@ -430,7 +430,7 @@ QWidget *OutputDialog::WizardServicePage()
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoKick(bool edit)
+QWidget *StreamOutputDialog::WizardInfoKick(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -513,7 +513,7 @@ QWidget *OutputDialog::WizardInfoKick(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoYouTube(bool edit)
+QWidget *StreamOutputDialog::WizardInfoYouTube(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -593,7 +593,7 @@ QWidget *OutputDialog::WizardInfoYouTube(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoTwitter(bool edit)
+QWidget *StreamOutputDialog::WizardInfoTwitter(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -673,7 +673,7 @@ QWidget *OutputDialog::WizardInfoTwitter(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoUnknown(bool edit)
+QWidget *StreamOutputDialog::WizardInfoUnknown(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -755,7 +755,7 @@ QWidget *OutputDialog::WizardInfoUnknown(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoTwitch(bool edit)
+QWidget *StreamOutputDialog::WizardInfoTwitch(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -837,7 +837,7 @@ QWidget *OutputDialog::WizardInfoTwitch(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoTrovo(bool edit)
+QWidget *StreamOutputDialog::WizardInfoTrovo(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -921,7 +921,7 @@ QWidget *OutputDialog::WizardInfoTrovo(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoTikTok(bool edit)
+QWidget *StreamOutputDialog::WizardInfoTikTok(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
@@ -1003,7 +1003,7 @@ QWidget *OutputDialog::WizardInfoTikTok(bool edit)
 	return page;
 }
 
-QWidget *OutputDialog::WizardInfoFacebook(bool edit)
+QWidget *StreamOutputDialog::WizardInfoFacebook(bool edit)
 {
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");

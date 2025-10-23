@@ -11,7 +11,7 @@
 #include <QString>
 #include "obs-data.h"
 
-class OutputDialog : public QDialog {
+class StreamOutputDialog : public QDialog {
 	Q_OBJECT
 private:
 	QWidget *WizardServicePage();
@@ -57,8 +57,8 @@ private:
 	QStringList otherNames;
 
 public:
-	OutputDialog(QDialog *parent, QStringList otherNames);
-	OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList otherNames);
+	StreamOutputDialog(QDialog *parent, QStringList otherNames);
+	StreamOutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList otherNames);
 
 	QString outputName;
 	QString outputServer;

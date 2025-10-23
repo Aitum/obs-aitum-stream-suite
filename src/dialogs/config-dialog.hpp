@@ -47,7 +47,7 @@ private:
 	QIcon GetAitumIcon() const;
 
 	void AddCanvas(QFormLayout *canvasLayout, obs_data_t *settings, obs_data_array_t *canvas);
-	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs);
+	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew = false);
 	void AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout);
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
 
@@ -64,7 +64,6 @@ private:
 
 	QTextEdit *troubleshooterText;
 
-	QPushButton *outputAddButton;
 	QToolButton *generalCanvasButton;
 	QToolButton *generalOutputsButton;
 	QToolButton *generalHelpButton;

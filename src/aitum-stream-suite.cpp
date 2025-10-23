@@ -188,6 +188,10 @@ void save_dock_state(int index)
 	} else if (index == 2) {
 		obs_data_set_string(current_profile_config, "dock_state_design", state_chars);
 	}
+
+	for (const auto &it : canvas_docks) {
+		QMetaObject::invokeMethod(it, "SaveSettings");
+	}
 }
 
 void reset_live_dock_state()
@@ -486,29 +490,29 @@ void load_dock_state(int index)
 {
 	if (!current_profile_config)
 		return;
-	const char *state = nullptr;
+	std::string state;
 	if (index == 0) {
 		state = obs_data_get_string(current_profile_config, "dock_state_live");
-		if (!state || state[0] == '\0') {
+		if (state.empty()) {
 			reset_live_dock_state();
 			return;
 		}
 	} else if (index == 1) {
 		state = obs_data_get_string(current_profile_config, "dock_state_build");
-		if (!state || state[0] == '\0') {
+		if (state.empty()) {
 			reset_build_dock_state();
 			return;
 		}
 	} else if (index == 2) {
 		state = obs_data_get_string(current_profile_config, "dock_state_design");
-		if (!state || state[0] == '\0') {
+		if (state.empty()) {
 			reset_design_dock_state();
 			return;
 		}
 	}
-	if (state && strlen(state) > 0) {
+	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-		main_window->restoreState(QByteArray::fromBase64(state));
+		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
 	}
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));

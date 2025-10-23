@@ -1,43 +1,42 @@
+#include "../version.h"
 #include "config-dialog.hpp"
-#include "output-dialog.hpp"
-
+#include "obs-module.h"
+#include "stream-output-dialog.hpp"
+#include "record-output-dialog.hpp"
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QComboBox>
+#include <QCompleter>
+#include <QDesktopServices>
+#include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
+#include <QPlainTextEdit>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QStackedWidget>
-#include <QTextEdit>
-#include <QRadioButton>
-#include <QPlainTextEdit>
-#include <QCompleter>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QIcon>
 #include <QTabWidget>
-#include <QDialogButtonBox>
-
-#include "obs-module.h"
-#include "../version.h"
-#include <util/dstr.h>
-
+#include <QTextEdit>
+#include <QUrl>
+#include <src/docks/canvas-dock.hpp>
+#include <src/utils/color.hpp>
 #include <sstream>
-#include <util/platform.h>
 #include <util/config-file.h>
+#include <util/dstr.h>
+#include <util/platform.h>
 
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
-#include <src/docks/canvas-dock.hpp>
-#include <src/utils/color.hpp>
-#include <QColorDialog>
 
 template<typename T> std::string to_string_with_precision(const T a_value, const int n = 6)
 {
@@ -312,39 +311,89 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	//		obs_data_release(s);
 	//	});
 
-	outputAddButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddStreamOutput")));
+	auto outputAddButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddOutput")));
 	outputAddButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	outputAddButton->setProperty("class", "icon-plus");
-
 	connect(outputAddButton, &QPushButton::clicked, [this] {
-		QStringList otherNames;
-		obs_data_array_enum(
-			extra_outputs,
-			[](obs_data_t *data2, void *param) {
-				((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-			},
-			&otherNames);
-		otherNames.removeDuplicates();
-		auto outputDialog = new OutputDialog(this, otherNames);
+		QMenu addMenu;
 
-		outputDialog->setWindowModality(Qt::WindowModal);
-		outputDialog->setModal(true);
+		auto a =
+			addMenu.addAction(QIcon(":/aitum/media/stream.svg"), QString::fromUtf8(obs_module_text("AddStreamOutput")));
+		connect(a, &QAction::triggered, [this] {
+			QStringList otherNames;
+			obs_data_array_enum(
+				extra_outputs,
+				[](obs_data_t *data2, void *param) {
+					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+				},
+				&otherNames);
+			otherNames.removeDuplicates();
+			auto outputDialog = new StreamOutputDialog(this, otherNames);
 
-		if (outputDialog->exec() == QDialog::Accepted) {
-			// create a new output
-			if (!extra_outputs)
-				return;
-			auto s = obs_data_create();
-			obs_data_set_bool(s, "enabled", true);
-			obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
-			obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
-			obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
-			obs_data_array_push_back(extra_outputs, s);
-			AddOutput(outputsLayout, s, extra_outputs);
-			obs_data_release(s);
-		}
+			outputDialog->setWindowModality(Qt::WindowModal);
+			outputDialog->setModal(true);
 
-		delete outputDialog;
+			if (outputDialog->exec() == QDialog::Accepted) {
+				// create a new output
+				if (!extra_outputs)
+					return;
+				auto s = obs_data_create();
+				obs_data_set_bool(s, "enabled", true);
+				obs_data_set_bool(s, "expanded", true);
+				obs_data_set_string(s, "type", "stream");
+				obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
+				obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
+				obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
+				obs_data_array_push_back(extra_outputs, s);
+				AddOutput(outputsLayout, s, extra_outputs, true);
+				obs_data_release(s);
+			}
+
+			delete outputDialog;
+		});
+
+		a = addMenu.addAction(QIcon(":/aitum/media/record.svg"), QString::fromUtf8(obs_module_text("AddRecordOutput")));
+		connect(a, &QAction::triggered, [this] {
+			QStringList otherNames;
+			obs_data_array_enum(
+				extra_outputs,
+				[](obs_data_t *data2, void *param) {
+					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+				},
+				&otherNames);
+			otherNames.removeDuplicates();
+			auto outputDialog = new RecordOutputDialog(this, otherNames);
+
+			outputDialog->setWindowModality(Qt::WindowModal);
+			outputDialog->setModal(true);
+
+			if (outputDialog->exec() == QDialog::Accepted) {
+				// create a new output
+				if (!extra_outputs)
+					return;
+				auto s = obs_data_create();
+				obs_data_set_bool(s, "enabled", true);
+				obs_data_set_bool(s, "expanded", true);
+				obs_data_set_string(s, "type", "record");
+				obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
+				obs_data_set_string(s, "path", outputDialog->recordPath.toUtf8().constData());
+				obs_data_set_string(s, "filename", outputDialog->filenameFormat.toUtf8().constData());
+				obs_data_set_string(s, "format", outputDialog->fileFormat.toUtf8().constData());
+				obs_data_array_push_back(extra_outputs, s);
+				AddOutput(outputsLayout, s, extra_outputs, true);
+				obs_data_release(s);
+			}
+
+			delete outputDialog;
+		});
+		//a->setEnabled(false);
+		a = addMenu.addAction(QIcon(":/aitum/media/backtrack_off.svg"),
+				      QString::fromUtf8(obs_module_text("AddBacktrackOutput")));
+		a->setEnabled(false);
+		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
+				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
+		a->setEnabled(false);
+		addMenu.exec(QCursor::pos());
 	});
 
 	output_title_layout->addWidget(outputAddButton, 0, Qt::AlignRight);
@@ -1321,7 +1370,7 @@ void OBSBasicSettings::AddCanvas()
 
 QIcon getPlatformIconFromEndpoint(QString endpoint);
 
-void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs)
+void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew)
 {
 	auto outputGroup = new QGroupBox;
 	outputGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
@@ -1340,10 +1389,19 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	// Title
 	auto output_title_layout = new QHBoxLayout;
 
-	auto platformIconLabel = new QLabel;
-	auto platformIcon = getPlatformIconFromEndpoint(QString::fromUtf8(obs_data_get_string(settings, "stream_server")));
-	platformIconLabel->setPixmap(platformIcon.pixmap(36, 36));
-	output_title_layout->addWidget(platformIconLabel, 0);
+	auto iconLabel = new QLabel;
+	auto output_type = obs_data_get_string(settings, "type");
+	if (strcmp(output_type, "record") == 0) {
+		iconLabel->setPixmap(QIcon(":/aitum/media/record.svg").pixmap(36, 36));
+	} else if (strcmp(output_type, "backtrack") == 0) {
+		iconLabel->setPixmap(QIcon(":/aitum/media/backtrack_off.svg").pixmap(36, 36));
+	} else if (strcmp(output_type, "virtual_cam") == 0) {
+		iconLabel->setPixmap(QIcon(":/aitum/media/virtual_cam_off.svg").pixmap(36, 36));
+	} else {
+		auto platformIcon = getPlatformIconFromEndpoint(QString::fromUtf8(obs_data_get_string(settings, "stream_server")));
+		iconLabel->setPixmap(platformIcon.pixmap(36, 36));
+	}
+	output_title_layout->addWidget(iconLabel, 0);
 
 	//auto streaming_title = new QLabel(QString::fromUtf8(obs_data_get_string(settings, "name")));
 	auto streaming_title = new QToolButton;
@@ -1649,9 +1707,11 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		uint32_t caps = obs_get_encoder_caps(type);
 		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
 			continue;
-		const char *codec = obs_get_encoder_codec(type);
-		if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
-			continue;
+		if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+			const char *codec = obs_get_encoder_codec(type);
+			if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
+				continue;
+		}
 		videoEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
 		if (strcmp(type, current_type) == 0)
 			videoEncoder->setCurrentIndex(videoEncoder->count() - 1);
@@ -1698,9 +1758,11 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		uint32_t caps = obs_get_encoder_caps(type);
 		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
 			continue;
-		const char *codec = obs_get_encoder_codec(type);
-		if (astrcmpi(codec, "aac") != 0 && astrcmpi(codec, "opus") != 0)
-			continue;
+		if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+			const char *codec = obs_get_encoder_codec(type);
+			if (astrcmpi(codec, "aac") != 0 && astrcmpi(codec, "opus") != 0)
+				continue;
+		}
 		audioEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
 		if (strcmp(type, current_type) == 0)
 			audio_encoder_index = audioEncoder->count() - 1;
@@ -1826,28 +1888,62 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			&otherNames);
 		otherNames.removeDuplicates();
 		otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
-		auto outputDialog = new OutputDialog(this, obs_data_get_string(settings, "name"),
-						     obs_data_get_string(settings, "stream_server"),
-						     obs_data_get_string(settings, "stream_key"), otherNames);
 
-		outputDialog->setWindowModality(Qt::WindowModal);
-		outputDialog->setModal(true);
+		auto output_type = obs_data_get_string(settings, "type");
+		if (strcmp(output_type, "record") == 0) {
+			auto outputDialog = new RecordOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
+								   QString::fromUtf8(obs_data_get_string(settings, "path")),
+								   QString::fromUtf8(obs_data_get_string(settings, "filename")),
+								   QString::fromUtf8(obs_data_get_string(settings, "format")),
+								   otherNames);
 
-		if (outputDialog->exec() == QDialog::Accepted) { // edit an output
-			if (!settings)
-				return;
+			outputDialog->setWindowModality(Qt::WindowModal);
+			outputDialog->setModal(true);
 
-			obs_data_set_bool(settings, "enabled", true);
-			// Set the info from the output dialog
-			obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
-			obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
-			obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
+			if (outputDialog->exec() == QDialog::Accepted) { // edit an output
+				if (!settings)
+					return;
 
-			// Reload
-			LoadSettings(main_settings);
+				obs_data_set_bool(settings, "enabled", true);
+				// Set the info from the output dialog
+				obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
+				obs_data_set_string(settings, "path", outputDialog->recordPath.toUtf8().constData());
+				obs_data_set_string(settings, "filename", outputDialog->filenameFormat.toUtf8().constData());
+				obs_data_set_string(settings, "format", outputDialog->fileFormat.toUtf8().constData());
+
+				// Reload
+				LoadSettings(main_settings);
+			}
+
+			delete outputDialog;
+		} else if (strcmp(output_type, "backtrack") == 0) {
+
+		} else if (strcmp(output_type, "virtual_cam") == 0) {
+
+		} else {
+			auto outputDialog = new StreamOutputDialog(this, obs_data_get_string(settings, "name"),
+								   obs_data_get_string(settings, "stream_server"),
+								   obs_data_get_string(settings, "stream_key"), otherNames);
+
+			outputDialog->setWindowModality(Qt::WindowModal);
+			outputDialog->setModal(true);
+
+			if (outputDialog->exec() == QDialog::Accepted) { // edit an output
+				if (!settings)
+					return;
+
+				obs_data_set_bool(settings, "enabled", true);
+				// Set the info from the output dialog
+				obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
+				obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
+				obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
+
+				// Reload
+				LoadSettings(main_settings);
+			}
+
+			delete outputDialog;
 		}
-
-		delete outputDialog;
 	});
 
 	// Buttons to layout
@@ -1865,4 +1961,10 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	outputGroup->setLayout(outputLayout);
 
 	outputsLayout->addRow(outputGroup);
+
+	if (isNew) {
+		canvasCombo->show();
+		canvasCombo->setFocus();
+		//canvasCombo->setFocus(Qt::OtherFocusReason);
+	}
 }
