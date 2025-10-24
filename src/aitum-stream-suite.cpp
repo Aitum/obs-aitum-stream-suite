@@ -1037,7 +1037,7 @@ bool obs_module_load(void)
 
 		configDialog->LoadSettings(settings);
 		configDialog->SetNewerVersion(newer_version_available);
-		configDialog->AddCanvas();
+		configDialog->ShowCanvas();
 
 		if (configDialog->exec() == QDialog::Accepted) {
 			if (current_profile_config) {

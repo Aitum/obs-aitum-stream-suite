@@ -50,6 +50,7 @@ private:
 	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew = false);
 	void AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout);
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
+	void AddCanvas();
 
 	obs_data_t *main_settings = nullptr;
 	obs_data_array_t *extra_outputs = nullptr;
@@ -90,7 +91,8 @@ public:
 	void LoadSettings(obs_data_t *settings);
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
 	void SetNewerVersion(QString newer_version_available);
-	void AddCanvas();
+	void ShowCanvas();
+	void ShowOutputs();
 
 public slots:
 };

@@ -1368,6 +1368,16 @@ void OBSBasicSettings::AddCanvas()
 	listWidget->setCurrentRow(1);
 }
 
+void OBSBasicSettings::ShowCanvas()
+{
+	listWidget->setCurrentRow(1);
+}
+
+void OBSBasicSettings::ShowOutputs()
+{
+	listWidget->setCurrentRow(2);
+}
+
 QIcon getPlatformIconFromEndpoint(QString endpoint);
 
 void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew)
@@ -1506,7 +1516,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	    !config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo"))
 		videoPageLayout->setRowVisible(videoEncoderIndex, false);
 
-	connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, outputVideoEncoder, settings, outputs] {
+	auto canvasComboChanged = [canvasCombo, outputVideoEncoder, settings, outputs] {
 		obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		auto canvas_name = obs_data_get_string(settings, "canvas");
 		auto canvas = canvas_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(canvas_name);
@@ -1531,7 +1541,13 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		}
 		obs_canvas_release(main_canvas);
 		obs_canvas_release(canvas);
-	});
+		auto ovei = outputVideoEncoder->findData(QString::fromUtf8(obs_data_get_string(settings, "output_video_encoder")));
+		if (ovei >= 0)
+			outputVideoEncoder->setCurrentIndex(ovei);
+	};
+
+	connect(canvasCombo, &QComboBox::currentTextChanged, canvasComboChanged);
+	canvasComboChanged();
 
 	auto videoEncoderGroup = new QWidget();
 	videoEncoderGroup->setProperty("altColor", QVariant(true));
@@ -1626,23 +1642,26 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	videoEncoderGroupLayout->addRow(scale);
 
-	connect(outputVideoEncoder, &QComboBox::currentTextChanged,
-		[settings, outputVideoEncoder, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoPageLayout] {
-			obs_data_set_string(settings, "output_video_encoder",
-					    outputVideoEncoder->currentData().toString().toUtf8().constData());
-			auto ove = obs_data_get_string(settings, "output_video_encoder");
-			if (!ove || ove[0] == '\0') {
-				videoPageLayout->setRowVisible(videoEncoder, true);
-				QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
-			} else if (strcmp(ove, "MainEncoder") == 0) {
-				videoEncoder->setCurrentIndex(0);
-				QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
-			} else {
-				videoPageLayout->setRowVisible(videoEncoder, false);
-				videoPageLayout->setRowVisible(videoEncoderIndex, false);
-				videoEncoderGroup->setVisible(false);
-			}
-		});
+	auto ouputVideoEncoderChanged = [settings, outputVideoEncoder, videoEncoder, videoEncoderIndex, videoEncoderGroup,
+					 videoPageLayout] {
+		obs_data_set_string(settings, "output_video_encoder",
+				    outputVideoEncoder->currentData().toString().toUtf8().constData());
+		auto ove = obs_data_get_string(settings, "output_video_encoder");
+		if (!ove || ove[0] == '\0') {
+			videoPageLayout->setRowVisible(videoEncoder, true);
+			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+		} else if (strcmp(ove, "MainEncoder") == 0) {
+			videoEncoder->setCurrentIndex(0);
+			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+		} else {
+			videoPageLayout->setRowVisible(videoEncoder, false);
+			videoPageLayout->setRowVisible(videoEncoderIndex, false);
+			videoEncoderGroup->setVisible(false);
+		}
+	};
+	connect(outputVideoEncoder, &QComboBox::currentTextChanged, ouputVideoEncoderChanged);
+
+	ouputVideoEncoderChanged();
 
 	connect(videoEncoder, &QComboBox::currentIndexChanged,
 		[this, outputGroup, advancedGroupLayout, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup,
