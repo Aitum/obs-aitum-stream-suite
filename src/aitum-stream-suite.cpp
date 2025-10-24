@@ -519,58 +519,19 @@ void load_dock_state(int index)
 	}
 }
 
-void load_current_profile_config()
-{
-	obs_data_release(current_profile_config);
-	current_profile_config = nullptr;
+void load_outputs() {
+	QMetaObject::invokeMethod(
+		output_dock,
+		[] {
+			if (output_dock)
+				output_dock->LoadSettings();
+		},
+		Qt::QueuedConnection);
+}
 
-	char *profile_path = obs_frontend_get_current_profile_path();
-	if (!profile_path)
-		return;
-
-	struct dstr path;
-	dstr_init_copy(&path, profile_path);
-	bfree(profile_path);
-
-	if (!dstr_is_empty(&path) && dstr_end(&path) != '/')
-		dstr_cat_ch(&path, '/');
-	dstr_cat(&path, "aitum.json");
-
-	current_profile_config = obs_data_create_from_json_file_safe(path.array, "bak");
-	dstr_free(&path);
-	if (!current_profile_config) {
-		current_profile_config = obs_data_create();
-		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
-	} else {
-		blog(LOG_INFO, "[Aitum Stream Suite] Loaded configuration file");
-	}
-
+void load_canvas() {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
-	if (!canvas) {
-		canvas = obs_data_array_create();
-		auto new_canvas = obs_data_create();
-		obs_data_set_string(new_canvas, "name", "Vertical");
-		obs_data_set_int(new_canvas, "color", 0x1F1A17);
-		obs_data_array_push_back(canvas, new_canvas);
-		obs_data_release(new_canvas);
-		obs_data_set_array(current_profile_config, "canvas", canvas);
-
-		auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
-		if (!outputs2) {
-			outputs2 = obs_data_array_create();
-			obs_data_set_array(current_profile_config, "outputs", outputs2);
-		}
-		if (obs_data_array_count(outputs2) < 1) {
-			auto new_output = obs_data_create();
-			obs_data_set_bool(new_output, "enabled", true);
-			obs_data_set_string(new_output, "name", "Vertical Stream");
-			obs_data_set_string(new_output, "canvas", "Vertical");
-			obs_data_array_push_back(outputs2, new_output);
-			obs_data_release(new_output);
-		}
-		obs_data_array_release(outputs2);
-	}
 	auto canvas_count = obs_data_array_count(canvas);
 	for (size_t i = 0; i < canvas_count;) {
 		obs_data_t *t = obs_data_array_item(canvas, i);
@@ -692,7 +653,62 @@ void load_current_profile_config()
 	for (const auto &it : canvas_clone_docks) {
 		it->UpdateSettings(nullptr);
 	}
+}
 
+void load_current_profile_config()
+{
+	obs_data_release(current_profile_config);
+	current_profile_config = nullptr;
+
+	char *profile_path = obs_frontend_get_current_profile_path();
+	if (!profile_path)
+		return;
+
+	struct dstr path;
+	dstr_init_copy(&path, profile_path);
+	bfree(profile_path);
+
+	if (!dstr_is_empty(&path) && dstr_end(&path) != '/')
+		dstr_cat_ch(&path, '/');
+	dstr_cat(&path, "aitum.json");
+
+	current_profile_config = obs_data_create_from_json_file_safe(path.array, "bak");
+	dstr_free(&path);
+	if (!current_profile_config) {
+		current_profile_config = obs_data_create();
+		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
+	} else {
+		blog(LOG_INFO, "[Aitum Stream Suite] Loaded configuration file");
+	}
+
+	auto canvas = obs_data_get_array(current_profile_config, "canvas");
+	if (!canvas) {
+		canvas = obs_data_array_create();
+		auto new_canvas = obs_data_create();
+		obs_data_set_string(new_canvas, "name", "Vertical");
+		obs_data_set_int(new_canvas, "color", 0x1F1A17);
+		obs_data_array_push_back(canvas, new_canvas);
+		obs_data_release(new_canvas);
+		obs_data_set_array(current_profile_config, "canvas", canvas);
+
+		auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
+		if (!outputs2) {
+			outputs2 = obs_data_array_create();
+			obs_data_set_array(current_profile_config, "outputs", outputs2);
+		}
+		if (obs_data_array_count(outputs2) < 1) {
+			auto new_output = obs_data_create();
+			obs_data_set_bool(new_output, "enabled", true);
+			obs_data_set_string(new_output, "name", "Vertical Stream");
+			obs_data_set_string(new_output, "canvas", "Vertical");
+			obs_data_array_push_back(outputs2, new_output);
+			obs_data_release(new_output);
+		}
+		obs_data_array_release(outputs2);
+	} else {
+		obs_data_array_release(canvas);
+	}
+	load_canvas();
 	auto index = obs_data_get_int(current_profile_config, "dock_state_mode");
 	if (modesTabBar->currentIndex() == index) {
 		QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
@@ -701,13 +717,7 @@ void load_current_profile_config()
 		modesTabBar->setCurrentIndex(index);
 	}
 
-	QMetaObject::invokeMethod(
-		output_dock,
-		[] {
-			if (output_dock)
-				output_dock->LoadSettings();
-		},
-		Qt::QueuedConnection);
+	load_outputs();
 }
 
 void save_current_profile_config()
@@ -902,6 +912,68 @@ QIcon generateEmojiQIcon(QString emoji)
 
 QWidget *aitumSettingsWidget = nullptr;
 
+bool obs_data_array_equal(obs_data_array_t *a, obs_data_array_t *b)
+{
+	size_t a_count = obs_data_array_count(a);
+	size_t b_count = obs_data_array_count(b);
+	if (a_count != b_count)
+		return false;
+	for (size_t i = 0; i < a_count; i++) {
+		obs_data_t *a_item = obs_data_array_item(a, i);
+		obs_data_t *b_item = obs_data_array_item(b, i);
+		const char *a_json = obs_data_get_json(a_item);
+		const char *b_json = obs_data_get_json(b_item);
+		bool equal = (strcmp(a_json, b_json) == 0);
+		obs_data_release(a_item);
+		obs_data_release(b_item);
+		if (!equal)
+			return false;
+	}
+	return true;
+}
+
+static void open_config_dialog(int tab)
+{
+	if (!configDialog)
+		configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
+	auto settings = obs_data_create();
+	if (current_profile_config)
+		obs_data_apply(settings, current_profile_config);
+
+	configDialog->LoadSettings(settings);
+	configDialog->SetNewerVersion(newer_version_available);
+	if (tab > 0)
+		configDialog->ShowTab(tab);
+
+	if (configDialog->exec() == QDialog::Accepted) {
+		bool canvas_changed = true;
+		bool outputs_changed = true;
+		if (current_profile_config) {
+			obs_data_array_t *a = obs_data_get_array(current_profile_config, "canvas");
+			obs_data_array_t *b = obs_data_get_array(settings, "canvas");
+			canvas_changed = !obs_data_array_equal(a, b);
+			obs_data_array_release(a);
+			obs_data_array_release(b);
+			a = obs_data_get_array(current_profile_config, "outputs");
+			b = obs_data_get_array(settings, "outputs");
+			outputs_changed = !obs_data_array_equal(a, b);
+			obs_data_array_release(a);
+			obs_data_array_release(b);
+			obs_data_apply(current_profile_config, settings);
+			obs_data_release(settings);
+		} else {
+			current_profile_config = settings;
+		}
+		save_current_profile_config();
+		if (canvas_changed)
+			load_canvas();
+		if (outputs_changed)
+			load_outputs();
+	} else {
+		obs_data_release(settings);
+	}
+}
+
 bool obs_module_load(void)
 {
 	blog(LOG_INFO, "[Aitum Stream Suite] loaded version %s", PROJECT_VERSION);
@@ -985,27 +1057,7 @@ bool obs_module_load(void)
 	aitumSettingsWidget->setProperty("class", "icon-gear");
 	aitumSettingsWidget->setObjectName("AitumStreamSuiteSettingsButton");
 	QObject::connect(aitumSettingsAction, &QAction::triggered, [] {
-		if (!configDialog)
-			configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
-		auto settings = obs_data_create();
-		if (current_profile_config)
-			obs_data_apply(settings, current_profile_config);
-
-		configDialog->LoadSettings(settings);
-		configDialog->SetNewerVersion(newer_version_available);
-
-		if (configDialog->exec() == QDialog::Accepted) {
-			if (current_profile_config) {
-				obs_data_apply(current_profile_config, settings);
-				obs_data_release(settings);
-			} else {
-				current_profile_config = settings;
-			}
-			save_current_profile_config();
-			load_current_profile_config();
-		} else {
-			obs_data_release(settings);
-		}
+		open_config_dialog(0);
 	});
 
 	// Contribute Button
@@ -1028,30 +1080,7 @@ bool obs_module_load(void)
 	QAction::connect(aitumButton, &QAction::triggered, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
 
 	auto addCanvas = toolbar->addAction(QString::fromUtf8(obs_module_text("AddCanvas")));
-	QAction::connect(addCanvas, &QAction::triggered, [] {
-		if (!configDialog)
-			configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
-		auto settings = obs_data_create();
-		if (current_profile_config)
-			obs_data_apply(settings, current_profile_config);
-
-		configDialog->LoadSettings(settings);
-		configDialog->SetNewerVersion(newer_version_available);
-		configDialog->ShowCanvas();
-
-		if (configDialog->exec() == QDialog::Accepted) {
-			if (current_profile_config) {
-				obs_data_apply(current_profile_config, settings);
-				obs_data_release(settings);
-			} else {
-				current_profile_config = settings;
-			}
-			save_current_profile_config();
-			load_current_profile_config();
-		} else {
-			obs_data_release(settings);
-		}
-	});
+	QAction::connect(addCanvas, &QAction::triggered, [] { open_config_dialog(1); });
 
 	//tb->addAction(QString::fromUtf8(obs_module_text("Reset")));
 	//tb->layout()->addItem(new QSpacerItem(0, 0));

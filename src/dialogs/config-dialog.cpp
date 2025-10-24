@@ -1368,14 +1368,9 @@ void OBSBasicSettings::AddCanvas()
 	listWidget->setCurrentRow(1);
 }
 
-void OBSBasicSettings::ShowCanvas()
+void OBSBasicSettings::ShowTab(int i)
 {
-	listWidget->setCurrentRow(1);
-}
-
-void OBSBasicSettings::ShowOutputs()
-{
-	listWidget->setCurrentRow(2);
+	listWidget->setCurrentRow(i);
 }
 
 QIcon getPlatformIconFromEndpoint(QString endpoint);
