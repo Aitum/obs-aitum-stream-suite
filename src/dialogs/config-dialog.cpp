@@ -353,43 +353,11 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		});
 
 		a = addMenu.addAction(QIcon(":/aitum/media/record.svg"), QString::fromUtf8(obs_module_text("AddRecordOutput")));
-		connect(a, &QAction::triggered, [this] {
-			QStringList otherNames;
-			obs_data_array_enum(
-				extra_outputs,
-				[](obs_data_t *data2, void *param) {
-					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-				},
-				&otherNames);
-			otherNames.removeDuplicates();
-			auto outputDialog = new RecordOutputDialog(this, otherNames);
-
-			outputDialog->setWindowModality(Qt::WindowModal);
-			outputDialog->setModal(true);
-
-			if (outputDialog->exec() == QDialog::Accepted) {
-				// create a new output
-				if (!extra_outputs)
-					return;
-				auto s = obs_data_create();
-				obs_data_set_bool(s, "enabled", true);
-				obs_data_set_bool(s, "expanded", true);
-				obs_data_set_string(s, "type", "record");
-				obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
-				obs_data_set_string(s, "path", outputDialog->recordPath.toUtf8().constData());
-				obs_data_set_string(s, "filename", outputDialog->filenameFormat.toUtf8().constData());
-				obs_data_set_string(s, "format", outputDialog->fileFormat.toUtf8().constData());
-				obs_data_array_push_back(extra_outputs, s);
-				AddOutput(outputsLayout, s, extra_outputs, true);
-				obs_data_release(s);
-			}
-
-			delete outputDialog;
-		});
+		connect(a, &QAction::triggered, [this] {AddRecord(false);});
 		//a->setEnabled(false);
 		a = addMenu.addAction(QIcon(":/aitum/media/backtrack_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddBacktrackOutput")));
-		a->setEnabled(false);
+		connect(a, &QAction::triggered, [this] { AddRecord(true); });
 		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
 		a->setEnabled(false);
@@ -1360,6 +1328,7 @@ void OBSBasicSettings::AddCanvas()
 	// Set the info from the output dialog
 	obs_data_set_string(s, "name", newName.toUtf8().constData());
 	obs_data_set_int(s, "color", 0x1F1A17);
+	obs_data_set_bool(s, "expanded", true);
 	obs_data_array_push_back(canvases, s);
 	AddCanvas(canvasLayout, s, canvases);
 	obs_data_release(s);
@@ -1644,10 +1613,10 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		auto ove = obs_data_get_string(settings, "output_video_encoder");
 		if (!ove || ove[0] == '\0') {
 			videoPageLayout->setRowVisible(videoEncoder, true);
-			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged", Q_ARG(int, videoEncoder->currentIndex()));
 		} else if (strcmp(ove, "MainEncoder") == 0) {
 			videoEncoder->setCurrentIndex(0);
-			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged");
+			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged", Q_ARG(int, 0));
 		} else {
 			videoPageLayout->setRowVisible(videoEncoder, false);
 			videoPageLayout->setRowVisible(videoEncoderIndex, false);
@@ -1904,12 +1873,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
 
 		auto output_type = obs_data_get_string(settings, "type");
-		if (strcmp(output_type, "record") == 0) {
+		if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
 			auto outputDialog = new RecordOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
 								   QString::fromUtf8(obs_data_get_string(settings, "path")),
 								   QString::fromUtf8(obs_data_get_string(settings, "filename")),
 								   QString::fromUtf8(obs_data_get_string(settings, "format")),
-								   otherNames);
+								   obs_data_get_int(settings, "max_size_mb"),
+								   obs_data_get_int(settings, "max_time_sec"),
+								   otherNames, strcmp(output_type, "backtrack") == 0);
 
 			outputDialog->setWindowModality(Qt::WindowModal);
 			outputDialog->setModal(true);
@@ -1924,13 +1895,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				obs_data_set_string(settings, "path", outputDialog->recordPath.toUtf8().constData());
 				obs_data_set_string(settings, "filename", outputDialog->filenameFormat.toUtf8().constData());
 				obs_data_set_string(settings, "format", outputDialog->fileFormat.toUtf8().constData());
+				obs_data_set_int(settings, "max_size_mb", outputDialog->maxSize);
+				obs_data_set_int(settings, "max_time_sec", outputDialog->maxTime);
 
 				// Reload
 				LoadSettings(main_settings);
 			}
 
 			delete outputDialog;
-		} else if (strcmp(output_type, "backtrack") == 0) {
 
 		} else if (strcmp(output_type, "virtual_cam") == 0) {
 
@@ -1981,4 +1953,41 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		canvasCombo->setFocus();
 		//canvasCombo->setFocus(Qt::OtherFocusReason);
 	}
+}
+
+void OBSBasicSettings::AddRecord(bool backtrack)
+{
+	QStringList otherNames;
+	obs_data_array_enum(
+		extra_outputs,
+		[](obs_data_t *data2, void *param) {
+			((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+		},
+		&otherNames);
+	otherNames.removeDuplicates();
+	auto outputDialog = new RecordOutputDialog(this, otherNames, backtrack);
+
+	outputDialog->setWindowModality(Qt::WindowModal);
+	outputDialog->setModal(true);
+
+	if (outputDialog->exec() == QDialog::Accepted) {
+		// create a new output
+		if (!extra_outputs)
+			return;
+		auto s = obs_data_create();
+		obs_data_set_bool(s, "enabled", true);
+		obs_data_set_bool(s, "expanded", true);
+		obs_data_set_string(s, "type", backtrack ? "backtrack" : "record");
+		obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
+		obs_data_set_string(s, "path", outputDialog->recordPath.toUtf8().constData());
+		obs_data_set_string(s, "filename", outputDialog->filenameFormat.toUtf8().constData());
+		obs_data_set_string(s, "format", outputDialog->fileFormat.toUtf8().constData());
+		obs_data_set_int(s, "max_size_mb", outputDialog->maxSize);
+		obs_data_set_int(s, "max_time_sec", outputDialog->maxTime);
+		obs_data_array_push_back(extra_outputs, s);
+		AddOutput(outputsLayout, s, extra_outputs, true);
+		obs_data_release(s);
+	}
+
+	delete outputDialog;
 }

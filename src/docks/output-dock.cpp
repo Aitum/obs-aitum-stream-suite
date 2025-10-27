@@ -1,17 +1,18 @@
 #include "output-dock.hpp"
 
 #include "../version.h"
+#include <obs-frontend-api.h>
 #include <obs-module.h>
+#include <QCheckBox>
 #include <QGroupBox>
 #include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
-#include <util/config-file.h>
-#include <obs-frontend-api.h>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
+#include <util/config-file.h>
 #include <util/platform.h>
 
 OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
@@ -247,6 +248,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 			}
 		}
 		std::get<QPushButton *>(*it) = streamButton;
+		streamButton->setChecked(obs_output_active(std::get<obs_output_t *>(*it)));
 	}
 	auto streamGroup = new QFrame;
 	streamGroup->setProperty("class", "stream-group");
@@ -286,13 +288,71 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 	}
 
 	l2->addWidget(new QLabel(name), 1);
-
+	QPushButton *extraButton = nullptr;
 	streamButton->setMinimumHeight(30);
 	streamButton->setObjectName(QStringLiteral("canvasStream"));
 	if (strcmp(output_type, "record") == 0) {
 		streamButton->setIcon(create2StateIcon(":/aitum/media/recording.svg", ":/aitum/media/record.svg"));
 		streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(255,0,0);}");
 		streamButton->setToolTip(QString::fromUtf8(obs_module_text("Record")));
+	} else if (strcmp(output_type, "backtrack") == 0) {
+		//auto replayEnableButton = new QPushButton;
+		//replayEnableButton->setMinimumHeight(30);
+		//replayEnableButton->setObjectName(QStringLiteral("canvasBacktrackEnable"));
+		//replayEnableButton->setToolTip(QString::fromUtf8(obs_module_text("BacktrackOn")));
+		//replayEnableButton->setCheckable(true);
+		//replayEnableButton->setChecked(false);
+
+		streamButton->setStyleSheet(QString::fromUtf8(
+			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{ border-top-right-radius: 0; border-bottom-right-radius: 0; width: 32px; padding-left: 0px; padding-right: 0px;}"));
+
+		auto replayEnable = new QCheckBox;
+		auto testl = new QHBoxLayout;
+		streamButton->setLayout(testl);
+		testl->addWidget(replayEnable);
+		//streamButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
+		//streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(26,87,255);}");
+		streamButton->setToolTip(QString::fromUtf8(obs_module_text("Backtrack")));
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+		connect(replayEnable, &QCheckBox::checkStateChanged, [this, replayEnable, streamButton] {
+#else
+		connect(replayEnable, &QCheckBox::stateChanged, [this, replayEnable, streamButton] {
+#endif
+			if (replayEnable->isChecked() != streamButton->isChecked()) {
+				streamButton->setChecked(replayEnable->isChecked());
+			}
+		});
+
+		extraButton = new QPushButton;
+		extraButton->setCheckable(true);
+		extraButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
+		extraButton->setStyleSheet(QString::fromUtf8(
+			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}"));
+
+		connect(extraButton, &QPushButton::clicked, [this, streamButton] {
+			for (auto it = outputs.begin(); it != outputs.end(); it++) {
+				if (std::get<QPushButton *>(*it) != streamButton)
+					continue;
+
+				auto output = std::get<obs_output_t *>(*it);
+				calldata_t cd = {0};
+				proc_handler_t *ph = obs_output_get_proc_handler(output);
+				proc_handler_call(ph, "save", &cd);
+				calldata_free(&cd);
+			}
+		});
+
+		connect(streamButton, &QPushButton::toggled, [this, replayEnable, streamButton, extraButton] {
+			bool enabled = streamButton->isChecked();
+			replayEnable->setChecked(enabled);
+			extraButton->setChecked(enabled);
+		});
+
+	} else if (strcmp(output_type, "virtual_cam") == 0) {
+		streamButton->setIcon(create2StateIcon(":/aitum/media/virtual_cam_on.svg", ":/aitum/media/virtual_cam_off.svg"));
+		streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(192,128,0);}");
+		streamButton->setToolTip(QString::fromUtf8(obs_module_text("VirtualCam")));
 	} else {
 		streamButton->setIcon(create2StateIcon(":/aitum/media/streaming.svg", ":/aitum/media/stream.svg"));
 		streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(0,210,153);}");
@@ -301,25 +361,28 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 	streamButton->setCheckable(true);
 	streamButton->setChecked(false);
 
-	connect(streamButton, &QPushButton::clicked, [this, streamButton, output_data] {
+	connect(streamButton, &QPushButton::clicked, [this, streamButton, output_data]() {
 		if (streamButton->isChecked()) {
-			blog(LOG_INFO, "[Aitum Stream Suite] start stream clicked '%s'", obs_data_get_string(output_data, "name"));
+			blog(LOG_INFO, "[Aitum Stream Suite] start output clicked '%s'", obs_data_get_string(output_data, "name"));
 			if (!StartOutput(output_data, streamButton))
 				streamButton->setChecked(false);
 		} else {
 			bool stop = true;
-			bool warnBeforeStreamStop =
-				config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
-			if (warnBeforeStreamStop && isVisible()) {
-				auto button = QMessageBox::question(
-					this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
-					QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
-					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-				if (button == QMessageBox::No)
-					stop = false;
+			auto output_type = obs_data_get_string(output_data, "type");
+			if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+				bool warnBeforeStreamStop =
+					config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
+				if (warnBeforeStreamStop && isVisible()) {
+					auto button = QMessageBox::question(
+						this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
+						QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
+						QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+					if (button == QMessageBox::No)
+						stop = false;
+				}
 			}
 			if (stop) {
-				blog(LOG_INFO, "[Aitum Stream Suite] stop stream clicked '%s'",
+				blog(LOG_INFO, "[Aitum Stream Suite] stop output clicked '%s'",
 				     obs_data_get_string(output_data, "name"));
 				const char *name2 = obs_data_get_string(output_data, "name");
 				for (auto it = outputs.begin(); it != outputs.end(); it++) {
@@ -338,7 +401,16 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 
 	l2->addWidget(new QLabel(QString::fromUtf8(canvas_name[0] == '\0' ? obs_module_text("MainCanvas") : canvas_name)), 1);
 	//streamButton->setSizePolicy(sp2);
-	l2->addWidget(streamButton);
+	if (extraButton) {
+		auto l3 = new QHBoxLayout;
+		l3->setContentsMargins(0, 0, 0, 0);
+		l3->setSpacing(0);
+		l3->addWidget(streamButton);
+		l3->addWidget(extraButton);
+		l2->addLayout(l3);
+	} else {
+		l2->addWidget(streamButton);
+	}
 	streamLayout->addLayout(l2);
 
 	streamGroup->setLayout(streamLayout);
@@ -364,18 +436,23 @@ void OutputDock::stream_output_stop(void *data, calldata_t *calldata)
 {
 	auto md = (OutputDock *)data;
 	auto output = (obs_output_t *)calldata_ptr(calldata, "output");
-	for (auto it = md->outputs.begin(); it != md->outputs.end(); it++) {
-		if (std::get<obs_output_t *>(*it) != output)
-			continue;
-		auto button = std::get<QPushButton *>(*it);
-		if (button->isChecked()) {
-			QMetaObject::invokeMethod(button, [button, md] { button->setChecked(false); }, Qt::QueuedConnection);
+
+	QMetaObject::invokeMethod(md, [md, output] {
+		for (auto it = md->outputs.begin(); it != md->outputs.end(); it++) {
+			if (std::get<obs_output_t *>(*it) != output)
+				continue;
+			auto button = std::get<QPushButton *>(*it);
+			if (button->isChecked()) {
+				QMetaObject::invokeMethod(
+					button, [button, md] { button->setChecked(false); }, Qt::QueuedConnection);
+			}
+			if (!md->exiting)
+				QMetaObject::invokeMethod(button, [output] { obs_output_release(output); }, Qt::QueuedConnection);
+
+			md->outputs.erase(it);
+			break;
 		}
-		if (!md->exiting)
-			QMetaObject::invokeMethod(button, [output] { obs_output_release(output); }, Qt::QueuedConnection);
-		md->outputs.erase(it);
-		break;
-	}
+	});
 	//const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
 }
 
@@ -462,11 +539,21 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 				if (main) {
 					//use main encoder
 					obs_output_t *main_output = nullptr;
-					if (strcmp(output_type, "record") == 0)
-						main_output = obs_frontend_get_recording_output();
+					if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
+						main_output = obs_frontend_get_replay_buffer_output();
+						if (main_output && !obs_output_active(main_output)) {
+							obs_output_release(main_output);
+							main_output = nullptr;
+						}
+						if (!main_output)
+							main_output = obs_frontend_get_recording_output();
+						if (main_output && !obs_output_active(main_output)) {
+							obs_output_release(main_output);
+							main_output = nullptr;
+						}
+					}
 					if (!main_output)
 						main_output = obs_frontend_get_streaming_output();
-
 
 					if (!obs_output_active(main_output)) {
 						obs_output_release(main_output);
@@ -581,8 +668,19 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 
 		if (!venc && main) {
 			obs_output_t *main_output = nullptr;
-			if (strcmp(output_type, "record") == 0)
-				main_output = obs_frontend_get_recording_output();
+			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
+				main_output = obs_frontend_get_replay_buffer_output();
+				if (main_output && !obs_output_active(main_output)) {
+					obs_output_release(main_output);
+					main_output = nullptr;
+				}
+				if (!main_output)
+					main_output = obs_frontend_get_recording_output();
+				if (main_output && !obs_output_active(main_output)) {
+					obs_output_release(main_output);
+					main_output = nullptr;
+				}
+			}
 			if (!main_output)
 				main_output = obs_frontend_get_streaming_output();
 			venc = main_output ? obs_output_get_video_encoder(main_output) : nullptr;
@@ -617,8 +715,19 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 		}
 		if (!aenc && main) {
 			obs_output_t *main_output = nullptr;
-			if (strcmp(output_type, "record") == 0)
-				main_output = obs_frontend_get_recording_output();
+			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
+				main_output = obs_frontend_get_replay_buffer_output();
+				if (main_output && !obs_output_active(main_output)) {
+					obs_output_release(main_output);
+					main_output = nullptr;
+				}
+				if (!main_output)
+					main_output = obs_frontend_get_recording_output();
+				if (main_output && !obs_output_active(main_output)) {
+					obs_output_release(main_output);
+					main_output = nullptr;
+				}
+			}
 			if (!main_output)
 				main_output = obs_frontend_get_streaming_output();
 			aenc = main_output ? obs_output_get_audio_encoder(main_output, 0) : nullptr;
@@ -653,7 +762,7 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 	}
 
 	obs_output_t *output = nullptr;
-	if (strcmp(output_type, "record") == 0) {
+	if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
 		std::string filenameFormat = obs_data_get_string(settings, "filename");
 		if (filenameFormat.empty())
 			filenameFormat = "%CCYY-%MM-%DD %hh-%mm-%ss";
@@ -678,7 +787,9 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 		std::string output_name = "aitum_stream_suite_output_";
 		output_name += name;
 		const char *output_id = "ffmpeg_muxer";
-		if (strcmp(format, "hybrid_mp4") == 0)
+		if (strcmp(output_type, "backtrack") == 0)
+			output_id = "replay_buffer";
+		else if (strcmp(format, "hybrid_mp4") == 0)
 			output_id = "mp4_output";
 		else if (strcmp(format, "hybrid_mov") == 0)
 			output_id = "mov_output";
@@ -690,12 +801,15 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 		obs_data_set_string(ps, "directory", dir);
 		obs_data_set_string(ps, "format", filenameFormat.c_str());
 		obs_data_set_string(ps, "extension", ext.c_str());
-		//obs_data_set_bool(ps, "split_file", true);
-		//obs_data_set_int(ps, "max_size_mb", max_size_mb);
-		//obs_data_set_int(ps, "max_time_sec", max_time_sec);
+		obs_data_set_bool(ps, "split_file", true);
+		obs_data_set_int(ps, "max_size_mb", obs_data_get_int(settings, "max_size_mb"));
+		obs_data_set_int(ps, "max_time_sec", obs_data_get_int(settings, "max_time_sec"));
 		obs_output_update(output, ps);
 		obs_data_release(ps);
-
+	} else if (strcmp(output_type, "virtual_cam") == 0) {
+		//std::string output_name = "aitum_stream_suite_output_";
+		//output_name += name;
+		//output = obs_output_create("dshow_output", output_name.c_str(), nullptr, nullptr);
 	} else {
 
 		auto server = obs_data_get_string(settings, "stream_server");

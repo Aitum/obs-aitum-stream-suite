@@ -70,6 +70,8 @@ private:
 	QToolButton *generalHelpButton;
 	QToolButton *generalSupportAitumButton;
 
+	void AddRecord(bool backtrack);
+
 private slots:
 	void SetGeneralIcon(const QIcon &icon);
 	void SetAppearanceIcon(const QIcon &icon);

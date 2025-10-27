@@ -1,6 +1,7 @@
 #include "record-output-dialog.hpp"
 #include <obs-frontend-api.h>
 #include <obs-module.h>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QCompleter>
 #include <QFileDialog>
@@ -8,19 +9,23 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
-RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(parent), otherNames(_otherNames)
+RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames, bool backtrack)
+	: QDialog(parent),
+	  otherNames(_otherNames)
 {
 
-	setWindowTitle(obs_module_text("NewRecordOutputWindowTitle"));
+	setWindowTitle(obs_module_text(backtrack ? "NewBacktrackOutputWindowTitle" : "NewRecordOutputWindowTitle"));
 
 	auto pageLayout = new QVBoxLayout;
 	setModal(true);
 	setContentsMargins(0, 0, 0, 0);
 	setMinimumSize(650, 400);
 
-	auto confirmButton = new QPushButton(QString::fromUtf8(obs_module_text("CreateRecordOutput")));
+	auto confirmButton =
+		new QPushButton(QString::fromUtf8(obs_module_text(backtrack ? "CreateBacktrackOutput" : "CreateRecordOutput")));
 	confirmButton->setEnabled(false);
 
 	auto formLayout = new QFormLayout;
@@ -33,7 +38,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames)
 		outputName = nameField->text();
 		validateOutputs(confirmButton);
 	});
-	nameField->setText(QString::fromUtf8(obs_module_text("RecordOutput")));
+	nameField->setText(QString::fromUtf8(obs_module_text(backtrack ? "BacktrackOutput" : "RecordOutput")));
 	outputName = nameField->text();
 	formLayout->addRow(QString::fromUtf8(obs_module_text("OutputName")), nameField);
 
@@ -108,6 +113,52 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames)
 
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Format")), fileFormatCombo);
 
+	auto maxTime = new QSpinBox();
+	maxTime->setMinimum(0);
+	maxTime->setMaximum(31536000);
+	maxTime->setSuffix(" s");
+	if (backtrack)
+		maxTime->setValue(30);
+	connect(maxTime, &QSpinBox::valueChanged, [this](int value) { this->maxTime = value; });
+
+	auto maxSize = new QSpinBox();
+	maxSize->setMinimum(0);
+	maxSize->setMaximum(1073741824);
+	maxSize->setSuffix(" MB");
+	connect(maxSize, &QSpinBox::valueChanged, [this](int value) { this->maxSize = value; });
+
+	if (!backtrack) {
+		auto enableSplitFile =
+			new QCheckBox(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.EnableSplitFile")));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+		connect(enableSplitFile, &QCheckBox::checkStateChanged, [this, maxTime, maxSize, enableSplitFile] {
+#else
+		connect(enableSplitFile, &QCheckBox::stateChanged, [this, maxTime, maxSize, enableSplitFile] {
+#endif
+			maxTime->setEnabled(enableSplitFile->isChecked());
+			maxSize->setEnabled(enableSplitFile->isChecked());
+			if (enableSplitFile->isChecked()) {
+				this->maxTime = maxTime->value();
+				this->maxSize = maxSize->value();
+			} else {
+				this->maxTime = 0;
+				this->maxSize = 0;
+			}
+		});
+
+		formLayout->addRow(enableSplitFile);
+	}
+
+	formLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string(backtrack ? "Basic.Settings.Output.ReplayBuffer.SecondsMax"
+									   : "Basic.Settings.Output.SplitFile.Time")),
+		maxTime);
+
+	formLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string(backtrack ? "Basic.Settings.Output.ReplayBuffer.MegabytesMax"
+									   : "Basic.Settings.Output.SplitFile.Size")),
+		maxSize);
+
 	auto controlsLayout = new QHBoxLayout;
 	controlsLayout->setSpacing(0);
 	controlsLayout->setContentsMargins(0, 0, 0, 0);
@@ -122,7 +173,8 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames)
 }
 
 RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString path, QString filename, QString format,
-				       QStringList _otherNames)
+				       long long max_size, long long max_time,
+				       QStringList _otherNames, bool backtrack)
 	: QDialog(parent),
 	  otherNames(_otherNames)
 {
@@ -130,15 +182,18 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	recordPath = path;
 	filenameFormat = filename;
 	fileFormat = format;
+	maxSize = max_size;
+	maxTime = max_time;
 
-	setWindowTitle(obs_module_text("EditRecordOutputWindowTitle"));
+	setWindowTitle(obs_module_text(backtrack ? "EditBacktrackOutputWindowTitle" : "EditRecordOutputWindowTitle"));
 
 	auto pageLayout = new QVBoxLayout;
 	setModal(true);
 	setContentsMargins(0, 0, 0, 0);
 	setMinimumSize(650, 400);
 
-	auto confirmButton = new QPushButton(QString::fromUtf8(obs_module_text("SaveRecordOutput")));
+	auto confirmButton =
+		new QPushButton(QString::fromUtf8(obs_module_text(backtrack ? "SaveBacktrackOutput" : "SaveRecordOutput")));
 	confirmButton->setEnabled(false);
 
 	auto formLayout = new QFormLayout;
@@ -224,6 +279,65 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	});
 
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Format")), fileFormatCombo);
+
+	auto maxTime = new QSpinBox();
+	maxTime->setMinimum(0);
+	maxTime->setMaximum(31536000);
+	maxTime->setSuffix(" s");
+	maxTime->setValue(max_time);
+	connect(maxTime, &QSpinBox::valueChanged, [this, confirmButton](int value) {
+		this->maxTime = value;
+		validateOutputs(confirmButton);
+	});
+
+	auto maxSize = new QSpinBox();
+	maxSize->setMinimum(0);
+	maxSize->setMaximum(1073741824);
+	maxSize->setSuffix(" MB");
+	maxSize->setValue(max_size);
+	connect(maxSize, &QSpinBox::valueChanged, [this, confirmButton](int value) {
+		this->maxSize = value;
+		validateOutputs(confirmButton);
+	});
+
+	if (!backtrack) {
+		auto enableSplitFile =
+			new QCheckBox(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.EnableSplitFile")));
+		enableSplitFile->setChecked(max_size > 0 || max_time > 0);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+		connect(enableSplitFile, &QCheckBox::checkStateChanged, [this, maxTime, maxSize, enableSplitFile, confirmButton] {
+#else
+		connect(enableSplitFile, &QCheckBox::stateChanged, [this, maxTime, maxSize, enableSplitFile, confirmButton] {
+#endif
+			maxTime->setEnabled(enableSplitFile->isChecked());
+			maxSize->setEnabled(enableSplitFile->isChecked());
+			if (enableSplitFile->isChecked()) {
+				this->maxTime = maxTime->value();
+				this->maxSize = maxSize->value();
+			} else {
+				this->maxTime = 0;
+				this->maxSize = 0;
+			}
+			validateOutputs(confirmButton);
+		});
+		if (!enableSplitFile->isChecked()) {
+			maxTime->setEnabled(false);
+			maxSize->setEnabled(false);
+		}
+
+		formLayout->addRow(enableSplitFile);
+	}
+
+	formLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string(backtrack ? "Basic.Settings.Output.ReplayBuffer.SecondsMax"
+									   : "Basic.Settings.Output.SplitFile.Time")),
+		maxTime);
+
+	formLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string(backtrack ? "Basic.Settings.Output.ReplayBuffer.MegabytesMax"
+									   : "Basic.Settings.Output.SplitFile.Size")),
+		maxSize);
+
 
 	auto controlsLayout = new QHBoxLayout;
 	controlsLayout->setSpacing(0);
