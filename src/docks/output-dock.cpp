@@ -38,8 +38,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setFloatable(false);
 	auto a = toolbar->addAction(QIcon(QString::fromUtf8(":/res/images/plus.svg")),
-				    QString::fromUtf8(obs_frontend_get_locale_string("Add")), [this] { open_config_dialog(2);
-		});
+				    QString::fromUtf8(obs_frontend_get_locale_string("Add")), [this] { open_config_dialog(2); });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 	layout->addWidget(toolbar);
@@ -366,7 +365,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 	} else if (strcmp(output_type, "virtual_cam") == 0) {
 		streamButton->setIcon(create2StateIcon(":/aitum/media/virtual_cam_on.svg", ":/aitum/media/virtual_cam_off.svg"));
 		streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(192,128,0);}");
-		streamButton->setToolTip(QString::fromUtf8(obs_module_text("VirtualCam")));
+		streamButton->setToolTip(QString::fromUtf8(obs_module_text("VirtualCamera")));
 	} else {
 		streamButton->setIcon(create2StateIcon(":/aitum/media/streaming.svg", ":/aitum/media/stream.svg"));
 		streamButton->setStyleSheet("QAbstractButton:checked{background: rgb(0,210,153);}");
@@ -527,6 +526,26 @@ bool OutputDock::StartOutput(obs_data_t *settings, QPushButton *streamButton)
 	}
 
 	obs_canvas_release(canvas);
+	if (strcmp(output_type, "virtual_cam") == 0) {
+		const auto output = obs_frontend_get_virtualcam_output();
+		if (obs_output_active(output)) {
+			streamButton->setChecked(false);
+			obs_output_release(output);
+			return false;
+		}
+		signal_handler_t *signal = obs_output_get_signal_handler(output);
+		signal_handler_disconnect(signal, "start", stream_output_start, this);
+		signal_handler_disconnect(signal, "stop", stream_output_stop, this);
+		signal_handler_connect(signal, "start", stream_output_start, this);
+		signal_handler_connect(signal, "stop", stream_output_stop, this);
+
+		obs_output_set_media(output, obs_canvas_get_video(canvas), obs_get_audio());
+		if (!obs_output_start(output))
+			return false;
+		outputs.push_back({name, output, streamButton});
+		return true;
+	}
+
 	obs_encoder_t *venc = nullptr;
 	obs_encoder_t *aenc = nullptr;
 	auto advanced = obs_data_get_bool(settings, "advanced");
