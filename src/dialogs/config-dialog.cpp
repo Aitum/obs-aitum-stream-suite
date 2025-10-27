@@ -723,6 +723,8 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	});
 
 	auto replaceLayout = new QGridLayout;
+	replaceLayout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplace"))), 0, 0);
+	replaceLayout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplacement"))), 0, 1);
 	auto replace_sources = obs_data_get_array(settings, "replace_sources");
 	if (!replace_sources) {
 		replace_sources = obs_data_array_create();
@@ -780,8 +782,8 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 			auto text = replaceCombo->currentText().trimmed();
 			obs_data_set_string(item, "replacement", text.toUtf8().constData());
 		});
-		replaceLayout->addWidget(sourceCombo, i, 0);
-		replaceLayout->addWidget(replaceCombo, i, 1);
+		replaceLayout->addWidget(sourceCombo, i+1, 0);
+		replaceLayout->addWidget(replaceCombo, i+1, 1);
 
 		obs_data_release(item);
 	}
@@ -811,7 +813,7 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	advancedGroupLayout->setRowVisible(resolution, !clone);
 	advancedGroupLayout->addRow(QString::fromUtf8(obs_module_text("CanvasClone")), cloneCombo);
 	advancedGroupLayout->setRowVisible(cloneCombo, clone);
-	advancedGroupLayout->addRow(QString::fromUtf8(obs_module_text("CanvasCloneReplace")), replaceLayout);
+	advancedGroupLayout->addRow(replaceLayout);
 	advancedGroupLayout->setRowVisible(replaceLayout, clone);
 
 	// Remove button

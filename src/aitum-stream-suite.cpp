@@ -932,7 +932,7 @@ bool obs_data_array_equal(obs_data_array_t *a, obs_data_array_t *b)
 	return true;
 }
 
-static void open_config_dialog(int tab)
+void open_config_dialog(int tab)
 {
 	if (!configDialog)
 		configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
