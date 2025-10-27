@@ -10,10 +10,13 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QToolBar>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
 #include <util/config-file.h>
 #include <util/platform.h>
+
+void open_config_dialog(int tab);
 
 OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 {
@@ -29,6 +32,17 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	auto layout = new QVBoxLayout;
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->addWidget(scrollArea);
+
+	auto toolbar = new QToolBar();
+	toolbar->setObjectName(QStringLiteral("outputsToolbar"));
+	toolbar->setIconSize(QSize(16, 16));
+	toolbar->setFloatable(false);
+	auto a = toolbar->addAction(QIcon(QString::fromUtf8(":/res/images/plus.svg")),
+				    QString::fromUtf8(obs_frontend_get_locale_string("Add")), [this] { open_config_dialog(2);
+		});
+	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
+	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
+	layout->addWidget(toolbar);
 
 	setLayout(layout);
 
