@@ -333,7 +333,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		connect(replayEnable, &QCheckBox::stateChanged, [this, replayEnable, streamButton] {
 #endif
 			if (replayEnable->isChecked() != streamButton->isChecked()) {
-				streamButton->setChecked(replayEnable->isChecked());
+				streamButton->click();
 			}
 		});
 
