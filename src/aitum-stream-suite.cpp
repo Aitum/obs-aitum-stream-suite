@@ -805,7 +805,6 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		save_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_EXIT || event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
 		if (current_profile_config) {
-			save_current_profile_config();
 			obs_data_release(current_profile_config);
 			current_profile_config = nullptr;
 		}
@@ -1207,6 +1206,13 @@ QSize TabToolBar::minimumSizeHint() const{
 	return size;
 }*/
 
+static void save_load(obs_data_t* save_data, bool saving, void* private_data) {
+	UNUSED_PARAMETER(save_data);
+	UNUSED_PARAMETER(private_data);
+	if (saving)
+		save_current_profile_config();
+}
+
 void obs_module_post_load()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -1218,10 +1224,13 @@ void obs_module_post_load()
 				    new BrowserDock("https://chat.aitumsuite.tv/info", main_window));
 	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
 				    new BrowserDock("https://chat.aitumsuite.tv/portal", main_window));
+
+	obs_frontend_add_save_callback(save_load, nullptr);
 }
 
 void obs_module_unload()
 {
+	obs_frontend_remove_save_callback(save_load, nullptr);
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
