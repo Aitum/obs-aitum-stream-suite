@@ -342,6 +342,7 @@ void OutputDock::LoadOutput(obs_data_t *output_data)
 		extraButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
 		extraButton->setStyleSheet(QString::fromUtf8(
 			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}"));
+		extraButton->setToolTip(QString::fromUtf8(obs_module_text("SaveBacktrack")));
 
 		connect(extraButton, &QPushButton::clicked, [this, streamButton] {
 			for (auto it = outputs.begin(); it != outputs.end(); it++) {
