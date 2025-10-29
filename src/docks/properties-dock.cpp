@@ -165,6 +165,30 @@ void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 	}
 }
 
+void PropertiesDock::scene_item_remove(void *param, calldata_t *cd)
+{
+	UNUSED_PARAMETER(param);
+	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
+	if (obs_sceneitem_is_group(item)) {
+		auto group = obs_sceneitem_get_source(item);
+		auto gsh = obs_source_get_signal_handler(group);
+		signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
+		signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
+	}
+}
+
+void PropertiesDock::scene_item_add(void *param, calldata_t *cd)
+{
+	UNUSED_PARAMETER(param);
+	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
+	if (obs_sceneitem_is_group(item)) {
+		auto group = obs_sceneitem_get_source(item);
+		auto gsh = obs_source_get_signal_handler(group);
+		signal_handler_connect(gsh, "item_select", scene_item_select, param);
+		signal_handler_connect(gsh, "item_deselect", scene_item_deselect, param);
+	}
+}
+
 void PropertiesDock::SceneChanged(OBSSource scene)
 {
 	if (current_scene) {
@@ -173,6 +197,21 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 		auto prev_scene = obs_weak_source_get_source(current_scene);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_select", scene_item_select, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_deselect", scene_item_deselect, this);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_remove", scene_item_remove, this);
+		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_add", scene_item_add, this);
+		obs_scene_enum_items(
+			obs_scene_from_source(scene),
+			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+				UNUSED_PARAMETER(scene);
+				if (!obs_sceneitem_is_group(item))
+					return true;
+				auto group = obs_sceneitem_get_source(item);
+				auto gsh = obs_source_get_signal_handler(group);
+				signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
+				signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
+				return true;
+			},
+			this);
 		obs_source_release(prev_scene);
 
 		obs_weak_source_release(current_scene);
@@ -184,6 +223,8 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 	current_scene = obs_source_get_weak_source(scene);
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_select", scene_item_select, this);
 	signal_handler_connect(obs_source_get_signal_handler(scene), "item_deselect", scene_item_deselect, this);
+	signal_handler_connect(obs_source_get_signal_handler(scene), "item_remove", scene_item_remove, this);
+	signal_handler_connect(obs_source_get_signal_handler(scene), "item_add", scene_item_add, this);
 	QMetaObject::invokeMethod(this, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
 	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(scene)));
 	obs_scene_enum_items(
@@ -191,11 +232,18 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 		[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
 			UNUSED_PARAMETER(scene);
 			auto this_ = static_cast<PropertiesDock *>(param);
+			if (obs_sceneitem_is_group(item)) {
+				auto group = obs_sceneitem_get_source(item);
+				auto gsh = obs_source_get_signal_handler(group);
+				signal_handler_connect(gsh, "item_select", scene_item_select, this_);
+				signal_handler_connect(gsh, "item_deselect", scene_item_deselect, this_);
+				return true;
+			}
 			if (!obs_sceneitem_selected(item))
 				return true;
 			QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection,
 						  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
-			return false;
+			return true;
 		},
 		this);
 }
