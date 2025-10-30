@@ -615,6 +615,7 @@ void load_canvas() {
 			for (const auto &it : canvas_clone_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					break;
 				}
 			}
 			CanvasDock *cd = nullptr;
@@ -630,6 +631,7 @@ void load_canvas() {
 				} else {
 					cd = it;
 				}
+				break;
 			}
 			if (cd) {
 				cd->UpdateSettings(t);
@@ -1015,6 +1017,7 @@ bool obs_module_load(void)
 	modesTabBar = new QTabBar();
 	modesTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
 	toolbar = new TabToolBar(modesTabBar);
+	toolbar->setObjectName(QStringLiteral("AitumToolbar"));
 	main_window->addToolBar(toolbar);
 	toolbar->setFloatable(false);
 	//tb->setMovable(false);
