@@ -21,8 +21,6 @@ private:
 
 	QTimer videoCheckTimer;
 
-	void LoadOutput(obs_data_t *output_data);
-
 	std::vector<OutputWidget *> outputWidgets;
 
 public:

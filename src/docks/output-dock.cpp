@@ -232,8 +232,6 @@ void OutputDock::SaveSettings()
 	}
 }
 
-void OutputDock::LoadOutput(obs_data_t *output_data) {}
-
 void OutputDock::UpdateMainStreamStatus(bool active)
 {
 	mainStreamButton->setChecked(active);
