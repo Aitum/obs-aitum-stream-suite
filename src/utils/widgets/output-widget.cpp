@@ -182,6 +182,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 	StartStopHotkey = obs_hotkey_pair_register_frontend(
 		startName.c_str(), startDescription.c_str(), stopName.c_str(), stopDescription.c_str(),
 		[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
 			if (!pressed)
 				return false;
 			auto this_ = (OutputWidget *)data;
@@ -192,6 +194,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 			return false;
 		},
 		[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
 			if (!pressed)
 				return false;
 			auto this_ = (OutputWidget *)data;
@@ -235,6 +239,7 @@ void OutputWidget::output_start(void *data, calldata_t *calldata)
 
 void OutputWidget::output_stop(void *data, calldata_t *calldata)
 {
+	UNUSED_PARAMETER(calldata);
 	auto this_ = (OutputWidget *)data;
 	if (this_->outputButton->isChecked()) {
 		QMetaObject::invokeMethod(
