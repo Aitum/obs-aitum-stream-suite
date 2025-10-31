@@ -99,6 +99,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/double-slider.cpp
   src/utils/widgets/hotkey-edit.cpp
   src/utils/widgets/locked-checkbox.cpp
+  src/utils/widgets/output-widget.cpp
   src/utils/widgets/pixmap-label.cpp
   src/utils/widgets/slider-ignore-scroll.cpp
   src/utils/widgets/source-tree.cpp
@@ -113,6 +114,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/double-slider.hpp
   src/utils/widgets/hotkey-edit.hpp
   src/utils/widgets/locked-checkbox.hpp
+  src/utils/widgets/output-widget.hpp
   src/utils/widgets/pixmap-label.hpp
   src/utils/widgets/slider-ignore-scroll.hpp
   src/utils/widgets/source-tree.hpp

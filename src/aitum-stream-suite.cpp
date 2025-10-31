@@ -741,6 +741,8 @@ void save_current_profile_config()
 	auto index = modesTabBar->currentIndex();
 	save_dock_state(index);
 	obs_data_set_int(current_profile_config, "dock_state_mode", index);
+	if (output_dock)
+		output_dock->SaveSettings();
 
 	if (!obs_data_save_json_safe(current_profile_config, path.array, "tmp", "bak")) {
 		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to save configuration file");
