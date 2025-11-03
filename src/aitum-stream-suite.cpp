@@ -23,6 +23,7 @@
 #include <util/dstr.h>
 #include "docks/live-scenes-dock.hpp"
 #include "utils/icon.hpp"
+#include "utils/obs-websocket-api.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -519,7 +520,8 @@ void load_dock_state(int index)
 	}
 }
 
-void load_outputs() {
+void load_outputs()
+{
 	QMetaObject::invokeMethod(
 		output_dock,
 		[] {
@@ -529,7 +531,8 @@ void load_outputs() {
 		Qt::QueuedConnection);
 }
 
-void load_canvas() {
+void load_canvas()
+{
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	auto canvas_count = obs_data_array_count(canvas);
@@ -1069,9 +1072,7 @@ bool obs_module_load(void)
 	aitumSettingsWidget->setProperty("themeID", "configIconSmall");
 	aitumSettingsWidget->setProperty("class", "icon-gear");
 	aitumSettingsWidget->setObjectName("AitumStreamSuiteSettingsButton");
-	QObject::connect(aitumSettingsAction, &QAction::triggered, [] {
-		open_config_dialog(0);
-	});
+	QObject::connect(aitumSettingsAction, &QAction::triggered, [] { open_config_dialog(0); });
 
 	// Contribute Button
 	auto contributeButton = toolbar->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
@@ -1220,11 +1221,229 @@ QSize TabToolBar::minimumSizeHint() const{
 	return size;
 }*/
 
-static void save_load(obs_data_t* save_data, bool saving, void* private_data) {
+static void save_load(obs_data_t *save_data, bool saving, void *private_data)
+{
 	UNUSED_PARAMETER(save_data);
 	UNUSED_PARAMETER(private_data);
 	if (saving)
 		save_current_profile_config();
+}
+
+obs_websocket_vendor vendor = nullptr;
+
+void vendor_request_version(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	obs_data_set_string(response_data, "version", PROJECT_VERSION);
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_get_canvas(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	auto ca = obs_data_array_create();
+	for (const auto &it : canvas_docks) {
+		auto c = obs_data_create();
+		obs_data_set_string(c, "type", "extra");
+		obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
+		obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
+		obs_video_info ovi;
+		if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
+			obs_data_set_int(c, "width", ovi.base_width);
+			obs_data_set_int(c, "height", ovi.base_height);
+		}
+		obs_data_array_push_back(ca, c);
+		obs_data_release(c);
+	}
+	for (const auto &it : canvas_clone_docks) {
+		auto c = obs_data_create();
+		obs_data_set_string(c, "type", "clone");
+		obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
+		obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
+		obs_video_info ovi;
+		if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
+			obs_data_set_int(c, "width", ovi.base_width);
+			obs_data_set_int(c, "height", ovi.base_height);
+		}
+		obs_data_array_push_back(ca, c);
+		obs_data_release(c);
+	}
+	obs_data_set_bool(response_data, "success", true);
+	obs_data_set_array(response_data, "canvas", ca);
+	obs_data_array_release(ca);
+}
+
+void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *scene_name = obs_data_get_string(request_data, "scene");
+	if (scene_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'scene' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	const char *canvas_name = obs_data_get_string(request_data, "canvas");
+	for (const auto &it : canvas_docks) {
+		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0)
+			QMetaObject::invokeMethod(it, "SwitchScene", Q_ARG(QString, QString::fromUtf8(scene_name)));
+	}
+
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *canvas_name = obs_data_get_string(request_data, "canvas");
+	if (canvas_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'canvas' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	for (const auto &it : canvas_docks) {
+		auto canvas = it->GetCanvas();
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0)
+			continue;
+
+		auto source = obs_canvas_get_channel(canvas, 0);
+		if (source && obs_source_get_type(source) == OBS_SOURCE_TYPE_TRANSITION) {
+			obs_source_release(source);
+			source = obs_transition_get_active_source(source);
+		}
+		if (source) {
+			obs_data_set_string(response_data, "scene", obs_source_get_name(source));
+			obs_source_release(source);
+		} else {
+			obs_data_set_string(response_data, "scene", "");
+		}
+		obs_data_set_bool(response_data, "success", true);
+		return;
+	}
+	obs_data_set_bool(response_data, "success", false);
+}
+
+void vendor_request_get_scenes(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *canvas_name = obs_data_get_string(request_data, "canvas");
+	if (canvas_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'canvas' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+
+	for (const auto &it : canvas_docks) {
+		auto canvas = it->GetCanvas();
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0)
+			continue;
+
+		auto sa = obs_data_array_create();
+		obs_canvas_enum_scenes(
+			canvas,
+			[](void *param, obs_source_t *scene) {
+				auto a = (obs_data_array_t *)param;
+				auto s = obs_data_create();
+				obs_data_set_string(s, "name", obs_source_get_name(scene));
+				obs_data_set_string(s, "uuid", obs_source_get_uuid(scene));
+				obs_data_array_push_back(a, s);
+				obs_data_release(s);
+				return true;
+			},
+			sa);
+		obs_data_set_bool(response_data, "success", true);
+		obs_data_set_array(response_data, "scenes", sa);
+		obs_data_array_release(sa);
+		return;
+	}
+	obs_data_set_string(response_data, "error", "'canvas' not found");
+	obs_data_set_bool(response_data, "success", false);
+}
+
+void vendor_request_get_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	auto oa = output_dock->GetOutputsArray();
+	obs_data_set_bool(response_data, "success", true);
+	obs_data_set_array(response_data, "outputs", oa);
+	obs_data_array_release(oa);
+}
+
+void vendor_request_start_output(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *output_name = obs_data_get_string(request_data, "output");
+	if (output_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'output' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+
+	std::string startName = "AitumStreamSuiteStartOutput";
+	startName += output_name;
+
+	struct find_hotkey {
+		obs_hotkey_t *hotkey;
+		const char *name;
+	};
+	find_hotkey t = {};
+	t.name = startName.c_str();
+	obs_enum_hotkeys(
+		[](void *param, obs_hotkey_id id, obs_hotkey_t *key) {
+			UNUSED_PARAMETER(id);
+			const auto hp = (struct find_hotkey *)param;
+			const auto hn = obs_hotkey_get_name(key);
+			if (strcmp(hp->name, hn) == 0)
+				hp->hotkey = key;
+			return true;
+		},
+		&t);
+	if (t.hotkey) {
+		obs_hotkey_trigger_routed_callback(obs_hotkey_get_id(t.hotkey), true);
+		obs_hotkey_trigger_routed_callback(obs_hotkey_get_id(t.hotkey), false);
+		obs_data_set_bool(response_data, "success", true);
+		return;
+	}
+	obs_data_set_string(response_data, "error", "'output' not found");
+	obs_data_set_bool(response_data, "success", false);
+}
+
+void vendor_request_stop_output(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *output_name = obs_data_get_string(request_data, "output");
+	if (output_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'output' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+
+	std::string stopName = "AitumStreamSuiteStopOutput";
+	stopName += output_name;
+
+	struct find_hotkey {
+		obs_hotkey_t *hotkey;
+		const char *name;
+	};
+	find_hotkey t = {};
+	t.name = stopName.c_str();
+	obs_enum_hotkeys(
+		[](void *param, obs_hotkey_id id, obs_hotkey_t *key) {
+			UNUSED_PARAMETER(id);
+			const auto hp = (struct find_hotkey *)param;
+			const auto hn = obs_hotkey_get_name(key);
+			if (strcmp(hp->name, hn) == 0)
+				hp->hotkey = key;
+			return true;
+		},
+		&t);
+	if (t.hotkey) {
+		obs_hotkey_trigger_routed_callback(obs_hotkey_get_id(t.hotkey), true);
+		obs_hotkey_trigger_routed_callback(obs_hotkey_get_id(t.hotkey), false);
+		obs_data_set_bool(response_data, "success", true);
+		return;
+	}
+	obs_data_set_string(response_data, "error", "'output' not found");
+	obs_data_set_bool(response_data, "success", false);
 }
 
 void obs_module_post_load()
@@ -1240,6 +1459,17 @@ void obs_module_post_load()
 				    new BrowserDock("https://chat.aitumsuite.tv/portal", main_window));
 
 	obs_frontend_add_save_callback(save_load, nullptr);
+
+	vendor = obs_websocket_register_vendor("aitum-stream-suite");
+
+	obs_websocket_vendor_register_request(vendor, "version", vendor_request_version, nullptr);
+	obs_websocket_vendor_register_request(vendor, "get_canvas", vendor_request_get_canvas, nullptr);
+	obs_websocket_vendor_register_request(vendor, "switch_scene", vendor_request_switch_scene, nullptr);
+	obs_websocket_vendor_register_request(vendor, "current_scene", vendor_request_current_scene, nullptr);
+	obs_websocket_vendor_register_request(vendor, "get_scenes", vendor_request_get_scenes, nullptr);
+	obs_websocket_vendor_register_request(vendor, "get_outputs", vendor_request_get_outputs, nullptr);
+	obs_websocket_vendor_register_request(vendor, "start_output", vendor_request_start_output, nullptr);
+	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
 }
 
 void obs_module_unload()

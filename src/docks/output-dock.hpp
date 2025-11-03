@@ -27,6 +27,8 @@ public:
 	OutputDock(QWidget *parent = nullptr);
 	~OutputDock();
 
+	obs_data_array_t *GetOutputsArray();
+
 	void UpdateMainStreamStatus(bool active);
 	void Exiting() { exiting = true; }
 	void LoadSettings();

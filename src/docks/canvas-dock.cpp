@@ -25,6 +25,7 @@
 #include <obs-module.h>
 #include <util/dstr.h>
 #include <util/platform.h>
+#include <src/utils/obs-websocket-api.h>
 
 #define HANDLE_RADIUS 4.0f
 #define HELPER_ROT_BREAKPONT 45.0f
@@ -1832,6 +1833,8 @@ void CanvasDock::RemoveScene(const QString &sceneName)
 	obs_source_release(s);
 }
 
+extern obs_websocket_vendor vendor;
+
 void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 {
 	auto s = scene_name.isEmpty() ? nullptr : obs_canvas_get_source_by_name(canvas, scene_name.toUtf8().constData());
@@ -1932,15 +1935,16 @@ void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 	sourceList->GetStm()->SceneChanged();
 
 	obs_source_release(s);
-	/* if (vendor && oldName != currentSceneName) {
+	if (vendor && oldName != currentSceneName) {
 		const auto d = obs_data_create();
 		obs_data_set_int(d, "width", canvas_width);
 		obs_data_set_int(d, "height", canvas_height);
+		obs_data_set_string(d, "canvas", obs_canvas_get_name(canvas));
 		obs_data_set_string(d, "old_scene", oldName.toUtf8().constData());
 		obs_data_set_string(d, "new_scene", currentSceneName.toUtf8().constData());
 		obs_websocket_vendor_emit_event(vendor, "switch_scene", d);
 		obs_data_release(d);
-	}*/
+	}
 }
 
 void CanvasDock::SceneItemAdded(void *data, calldata_t *params)

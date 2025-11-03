@@ -31,6 +31,8 @@ public:
 	OutputWidget(obs_data_t *output_data, QWidget *parent = nullptr);
 	~OutputWidget();
 
+	obs_output_t *GetOutput() const { return output; }
+
 	void CheckActive();
 	void SaveSettings();
 	void UpdateSettings(obs_data_t *data);
