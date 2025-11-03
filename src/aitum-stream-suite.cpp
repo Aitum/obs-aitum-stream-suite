@@ -974,6 +974,8 @@ void open_config_dialog(int tab)
 			current_profile_config = settings;
 		}
 		obs_data_set_string(current_profile_config, "config_geometry", configDialog->saveGeometry().toBase64().constData());
+		configDialog->SaveHotkeys();
+
 		save_current_profile_config();
 		if (canvas_changed)
 			load_canvas();

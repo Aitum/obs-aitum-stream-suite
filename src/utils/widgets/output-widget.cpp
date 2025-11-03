@@ -84,7 +84,7 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		});
 
 		std::string ebName = "AitumStreamSuiteSaveBacktrack";
-		ebName += ebName;
+		ebName += nameChars;
 		std::string ebDescription = obs_module_text("SaveBacktrack");
 		ebDescription = ebDescription + " " + nameChars;
 
@@ -172,11 +172,11 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 
 	std::string startName = "AitumStreamSuiteStartOutput";
 	startName += nameChars;
-	std::string startDescription = obs_module_text("Start");
+	std::string startDescription = obs_module_text("StartHotkey");
 	startDescription = startDescription + " " + nameChars;
 	std::string stopName = "AitumStreamSuiteStopOutput";
 	stopName += nameChars;
-	std::string stopDescription = obs_module_text("Stop");
+	std::string stopDescription = obs_module_text("StopHotkey");
 	stopDescription = stopDescription + " " + nameChars;
 
 	StartStopHotkey = obs_hotkey_pair_register_frontend(

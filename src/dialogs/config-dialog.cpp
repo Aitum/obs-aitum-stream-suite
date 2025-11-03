@@ -873,6 +873,7 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		RemoveLayoutItem(i);
 		canvasLayout->removeRow(2);
 	}
+	hotkeys.clear();
 	main_settings = settings;
 	auto canvas = obs_data_get_array(settings, "canvas");
 
@@ -1408,13 +1409,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	}
 	output_title_layout->addWidget(iconLabel, 0);
 
-	//auto streaming_title = new QLabel(QString::fromUtf8(obs_data_get_string(settings, "name")));
+	const bool expanded = obs_data_get_bool(settings, "expanded");
+
 	auto streaming_title = new QToolButton;
 	streaming_title->setText(QString::fromUtf8(obs_data_get_string(settings, "name")));
 	streaming_title->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	streaming_title->setArrowType(Qt::ArrowType::RightArrow);
+	streaming_title->setArrowType(expanded ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
 	streaming_title->setCheckable(true);
-	streaming_title->setChecked(false);
+	streaming_title->setChecked(expanded);
 	streaming_title->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
 	output_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
 
@@ -1428,9 +1430,9 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		canvasCombo);
 	canvasCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(settings, "canvas")));
 
-	const bool expanded = obs_data_get_bool(settings, "expanded");
+	
 
-		// Remove button
+	// Remove button
 	auto removeButton =
 		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
@@ -1553,8 +1555,71 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	outputLayout->addRow(output_title_layout);
 	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasCombo);
-	if (!expanded)
+
+	OBSHotkeyWidget *startHotkeyWidget = nullptr;
+	std::string startName = "AitumStreamSuiteStartOutput";
+	startName += obs_data_get_string(settings, "name");
+	auto hotkey = GetHotkeyByName(startName.c_str());
+	if (hotkey) {
+		auto id = obs_hotkey_get_id(hotkey);
+		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+		auto hn = obs_hotkey_get_name(hotkey);
+		startHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+		auto label = new OBSHotkeyLabel;
+		label->setText(QString::fromUtf8(obs_module_text("StartHotkey")));
+		startHotkeyWidget->label = label;
+		outputLayout->addRow(label, startHotkeyWidget);
+		hotkeys.push_back(startHotkeyWidget);
+	}
+
+	OBSHotkeyWidget *stopHotkeyWidget = nullptr;
+	std::string stopName = "AitumStreamSuiteStopOutput";
+	stopName += obs_data_get_string(settings, "name");
+	hotkey = GetHotkeyByName(stopName.c_str());
+	if (hotkey) {
+		auto id = obs_hotkey_get_id(hotkey);
+		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+		auto hn = obs_hotkey_get_name(hotkey);
+		stopHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+		auto label = new OBSHotkeyLabel;
+		label->setText(QString::fromUtf8(obs_module_text("StopHotkey")));
+		stopHotkeyWidget->label = label;
+		outputLayout->addRow(label, stopHotkeyWidget);
+		hotkeys.push_back(stopHotkeyWidget);
+		if (startHotkeyWidget) {
+			stopHotkeyWidget->label->pairPartner = startHotkeyWidget->label;
+			startHotkeyWidget->label->pairPartner = stopHotkeyWidget->label;
+		}
+	}
+
+	OBSHotkeyWidget *extraHotkeyWidget = nullptr;
+	std::string ebName = "AitumStreamSuiteSaveBacktrack";
+	ebName += obs_data_get_string(settings, "name");
+	hotkey = GetHotkeyByName(ebName.c_str());
+	if (hotkey) {
+		auto id = obs_hotkey_get_id(hotkey);
+		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+		auto hn = obs_hotkey_get_name(hotkey);
+		extraHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+		auto label = new OBSHotkeyLabel;
+		label->setText(QString::fromUtf8(obs_module_text("SaveBacktrack")));
+		extraHotkeyWidget->label = label;
+		outputLayout->addRow(label, extraHotkeyWidget);
+		hotkeys.push_back(extraHotkeyWidget);
+	}
+
+
+	if (!expanded) {
 		outputLayout->setRowVisible(canvasCombo, false);
+		if (startHotkeyWidget)
+			outputLayout->setRowVisible(startHotkeyWidget, false);
+		if (stopHotkeyWidget)
+			outputLayout->setRowVisible(stopHotkeyWidget, false);
+		if (extraHotkeyWidget)
+			outputLayout->setRowVisible(extraHotkeyWidget, false);
+
+		streaming_title->setArrowType(Qt::ArrowType::RightArrow);
+	}
 
 	outputGroup->setLayout(outputLayout);
 
@@ -1562,8 +1627,15 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	if (strcmp(output_type, "virtual_cam") == 0) {
 		connect(streaming_title, &QToolButton::toggled,
-			[streaming_title, settings, canvasCombo, outputLayout](bool checked) {
+			[streaming_title, settings, canvasCombo, outputLayout, startHotkeyWidget, stopHotkeyWidget,
+			 extraHotkeyWidget](bool checked) {
 				outputLayout->setRowVisible(canvasCombo, checked);
+				if (startHotkeyWidget)
+					outputLayout->setRowVisible(startHotkeyWidget, checked);
+				if (stopHotkeyWidget)
+					outputLayout->setRowVisible(stopHotkeyWidget, checked);
+				if (extraHotkeyWidget)
+					outputLayout->setRowVisible(extraHotkeyWidget, checked);
 				obs_data_set_bool(settings, "expanded", checked);
 				streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
 			});
@@ -1988,10 +2060,17 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	});
 
 	connect(streaming_title, &QToolButton::toggled,
-		[advancedGroup, advancedButton, streaming_title, settings, canvasCombo, outputLayout](bool checked) {
+		[advancedGroup, advancedButton, streaming_title, settings, canvasCombo, outputLayout, startHotkeyWidget,
+		 stopHotkeyWidget, extraHotkeyWidget](bool checked) {
 			const bool advanced = obs_data_get_bool(settings, "advanced");
 			advancedButton->setVisible(checked);
 			outputLayout->setRowVisible(canvasCombo, checked);
+			if (startHotkeyWidget)
+				outputLayout->setRowVisible(startHotkeyWidget, checked);
+			if (stopHotkeyWidget)
+				outputLayout->setRowVisible(stopHotkeyWidget, checked);
+			if (extraHotkeyWidget)
+				outputLayout->setRowVisible(extraHotkeyWidget, checked);
 			advancedGroup->setVisible(checked && advanced);
 			obs_data_set_bool(settings, "expanded", checked);
 			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
@@ -2057,4 +2136,52 @@ void OBSBasicSettings::AddRecord(bool backtrack)
 	}
 
 	delete outputDialog;
+}
+
+obs_hotkey_t *OBSBasicSettings::GetHotkeyByName(const char *name)
+{
+	struct find_hotkey {
+		obs_hotkey_t *hotkey;
+		const char *name;
+	};
+	find_hotkey t = {};
+	t.name = name;
+	obs_enum_hotkeys(
+		[](void *param, obs_hotkey_id id, obs_hotkey_t *key) {
+			UNUSED_PARAMETER(id);
+			const auto hp = (struct find_hotkey *)param;
+			const auto hn = obs_hotkey_get_name(key);
+			if (strcmp(hp->name, hn) == 0)
+				hp->hotkey = key;
+			return true;
+		},
+		&t);
+	return t.hotkey;
+}
+
+std::vector<obs_key_combination_t> OBSBasicSettings::GetCombosForHotkey(obs_hotkey_id hotkey)
+{
+	struct find_combos {
+		obs_hotkey_id hotkey;
+		std::vector<obs_key_combination_t> combos;
+	};
+	find_combos t = {hotkey, {}};
+	obs_enum_hotkey_bindings(
+		[](void *param, size_t idx, obs_hotkey_binding_t *binding) {
+			UNUSED_PARAMETER(idx);
+			auto fc = (struct find_combos *)param;
+			if (fc->hotkey == obs_hotkey_binding_get_hotkey_id(binding)) {
+				fc->combos.push_back(obs_hotkey_binding_get_key_combination(binding));
+			}
+			return true;
+		},
+		&t);
+	return t.combos;
+}
+
+void OBSBasicSettings::SaveHotkeys()
+{
+	for (auto &hw : hotkeys) {
+		hw->Save();
+	}
 }

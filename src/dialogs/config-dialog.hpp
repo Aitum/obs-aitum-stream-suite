@@ -15,6 +15,7 @@
 #include <QIcon>
 #include <QString>
 #include <QToolButton>
+#include <src/utils/widgets/hotkey-edit.hpp>
 
 class OBSBasicSettings : public QDialog {
 	Q_OBJECT
@@ -70,7 +71,12 @@ private:
 	QToolButton *generalHelpButton;
 	QToolButton *generalSupportAitumButton;
 
+	std::vector<OBSHotkeyWidget *> hotkeys;
+
 	void AddRecord(bool backtrack);
+
+	obs_hotkey_t *GetHotkeyByName(const char* name);
+	std::vector<obs_key_combination_t> GetCombosForHotkey(obs_hotkey_id hotkey);
 
 private slots:
 	void SetGeneralIcon(const QIcon &icon);
@@ -94,5 +100,6 @@ public:
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
 	void SetNewerVersion(QString newer_version_available);
 	void ShowTab(int i);
+	void SaveHotkeys();
 public slots:
 };
