@@ -940,8 +940,14 @@ void open_config_dialog(int tab)
 	if (!configDialog)
 		configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
 	auto settings = obs_data_create();
-	if (current_profile_config)
+	if (current_profile_config) {
+		const char *geom = obs_data_get_string(current_profile_config, "config_geometry");
+		if (geom && strlen(geom)) {
+			QByteArray ba = QByteArray::fromBase64(QByteArray(geom));
+			configDialog->restoreGeometry(ba);
+		}
 		obs_data_apply(settings, current_profile_config);
+	}
 
 	configDialog->LoadSettings(settings);
 	configDialog->SetNewerVersion(newer_version_available);
@@ -967,6 +973,7 @@ void open_config_dialog(int tab)
 		} else {
 			current_profile_config = settings;
 		}
+		obs_data_set_string(current_profile_config, "config_geometry", configDialog->saveGeometry().toBase64().constData());
 		save_current_profile_config();
 		if (canvas_changed)
 			load_canvas();
