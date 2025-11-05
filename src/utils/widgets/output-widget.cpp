@@ -334,6 +334,7 @@ bool OutputWidget::StartOutput()
 
 	obs_encoder_t *venc = nullptr;
 	std::vector<obs_encoder_t *> aencs;
+	size_t mixers = 0;
 	auto advanced = obs_data_get_bool(settings, "advanced");
 	if (advanced) {
 		auto output_video_encoder_name = obs_data_get_string(settings, "output_video_encoder");
@@ -492,6 +493,7 @@ bool OutputWidget::StartOutput()
 				return false;
 			}
 			aencs.push_back(aenc);
+			mixers |= 1;
 		} else {
 			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
 				auto tracks = obs_data_get_int(settings, "audio_tracks");
@@ -517,6 +519,7 @@ bool OutputWidget::StartOutput()
 					obs_data_release(s);
 					obs_encoder_set_audio(aenc, obs_get_audio());
 					aencs.push_back(aenc);
+					mixers |= (1ll << i);
 				}
 			} else {
 
@@ -530,11 +533,14 @@ bool OutputWidget::StartOutput()
 
 				std::string audio_encoder_name = "Aitum Stream Suite Audio ";
 				audio_encoder_name += name;
-				auto aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s,
-								     obs_data_get_int(settings, "audio_track"), nullptr);
+				auto audio_track = obs_data_get_int(settings, "audio_track");
+				auto aenc =
+					obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, audio_track
+								    , nullptr);
 				obs_data_release(s);
 				obs_encoder_set_audio(aenc, obs_get_audio());
 				aencs.push_back(aenc);
+				mixers |= (1ll << audio_track);
 			}
 		}
 	} else {
@@ -625,14 +631,18 @@ bool OutputWidget::StartOutput()
 				
 				for (size_t idx = 0; idx < MAX_OUTPUT_AUDIO_ENCODERS; idx++) {
 					auto aenc = main_output ? obs_output_get_audio_encoder(main_output, idx) : nullptr;
-					if (aenc)
+					if (aenc) {
 						aencs.push_back(aenc);
+						mixers |= (1ll << idx);
+					}
 				}
 			} else {
 				main_output = obs_frontend_get_streaming_output();
 				auto aenc = main_output ? obs_output_get_audio_encoder(main_output, 0) : nullptr;
-				if (aenc)
+				if (aenc) {
 					aencs.push_back(aenc);
+					mixers |= 1;
+				}
 			}
 
 			
@@ -656,6 +666,7 @@ bool OutputWidget::StartOutput()
 									     nullptr);
 					obs_encoder_set_audio(aenc, obs_get_audio());
 					aencs.push_back(aenc);
+					mixers |= (1ll << i);
 				}
 			} else {
 				std::string audio_encoder_name = "Aitum Stream Suite Audio ";
@@ -663,6 +674,7 @@ bool OutputWidget::StartOutput()
 				auto aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, 0, nullptr);
 				obs_encoder_set_audio(aenc, obs_get_audio());
 				aencs.push_back(aenc);
+				mixers |= 1;
 			}
 		}
 	}
@@ -790,9 +802,13 @@ bool OutputWidget::StartOutput()
 	signal_handler_connect(signal, "stop", output_stop, this);
 
 	obs_output_set_video_encoder(output, venc);
+	
 	for (size_t i = 0; i < aencs.size(); i++) {
 		obs_output_set_audio_encoder(output, aencs[i], i);
 	}
+	if (!mixers)
+		mixers = 1;
+	obs_output_set_mixers(output, mixers);
 
 	return obs_output_start(output);
 }
