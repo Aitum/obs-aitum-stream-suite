@@ -433,7 +433,7 @@ bool OutputWidget::StartOutput()
 								break;
 							}
 						}
-						std::string venc_name = "aitum_stream_suite_video_encoder_";
+						std::string venc_name = "Aitum Stream Suite Video ";
 						venc_name += name;
 						venc = obs_video_encoder_create(vencid, venc_name.c_str(), nullptr, nullptr);
 						obs_encoder_set_video(venc, obs_canvas_get_video(canvas));
@@ -452,7 +452,7 @@ bool OutputWidget::StartOutput()
 					obs_data_apply(s, ves);
 					obs_data_release(ves);
 				}
-				std::string video_encoder_name = "aitum_stream_suite_video_encoder_";
+				std::string video_encoder_name = "Aitum Stream Suite Video ";
 				video_encoder_name += name;
 				venc = obs_video_encoder_create(venc_name, video_encoder_name.c_str(), s, nullptr);
 				obs_data_release(s);
@@ -509,9 +509,9 @@ bool OutputWidget::StartOutput()
 						obs_data_release(aes);
 					}
 
-					std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+					std::string audio_encoder_name = "Aitum Stream Suite Audio ";
 					audio_encoder_name += name;
-					audio_encoder_name += "_";
+					audio_encoder_name += " ";
 					audio_encoder_name += std::to_string(i + 1);
 					auto aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, i, nullptr);
 					obs_data_release(s);
@@ -528,7 +528,7 @@ bool OutputWidget::StartOutput()
 					obs_data_release(aes);
 				}
 
-				std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+				std::string audio_encoder_name = "Aitum Stream Suite Audio ";
 				audio_encoder_name += name;
 				auto aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s,
 								     obs_data_get_int(settings, "audio_track"), nullptr);
@@ -596,7 +596,7 @@ bool OutputWidget::StartOutput()
 					break;
 				}
 			}
-			std::string venc_name = "aitum_stream_suite_video_encoder_";
+			std::string venc_name = "Aitum Stream Suite Video ";
 			venc_name += name;
 			venc = obs_video_encoder_create(vencid, venc_name.c_str(), nullptr, nullptr);
 			obs_encoder_set_video(venc, obs_canvas_get_video(canvas));
@@ -648,9 +648,9 @@ bool OutputWidget::StartOutput()
 		if (venc && aencs.empty()) {
 			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
 				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
-					std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+					std::string audio_encoder_name = "Aitum Stream Suite Audio ";
 					audio_encoder_name += name;
-					audio_encoder_name += "_";
+					audio_encoder_name += " ";
 					audio_encoder_name += std::to_string(i);
 					auto aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, i,
 									     nullptr);
@@ -658,7 +658,7 @@ bool OutputWidget::StartOutput()
 					aencs.push_back(aenc);
 				}
 			} else {
-				std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+				std::string audio_encoder_name = "Aitum Stream Suite Audio ";
 				audio_encoder_name += name;
 				auto aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, 0, nullptr);
 				obs_encoder_set_audio(aenc, obs_get_audio());
