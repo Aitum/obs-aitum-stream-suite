@@ -689,11 +689,18 @@ void load_current_profile_config()
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	if (!canvas) {
 		canvas = obs_data_array_create();
+		const char *canvas_name = "Vertical";
+		auto vertical_canvas = obs_get_canvas_by_name("Aitum Vertical");
+		if (vertical_canvas) {
+			obs_canvas_release(vertical_canvas);
+			canvas_name = "Aitum Vertical";
+		}
 		auto new_canvas = obs_data_create();
-		obs_data_set_string(new_canvas, "name", "Vertical");
+		obs_data_set_string(new_canvas, "name", canvas_name);
 		obs_data_set_int(new_canvas, "color", 0x1F1A17);
 		obs_data_array_push_back(canvas, new_canvas);
 		obs_data_release(new_canvas);
+
 		obs_data_set_array(current_profile_config, "canvas", canvas);
 
 		auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
@@ -705,7 +712,7 @@ void load_current_profile_config()
 			auto new_output = obs_data_create();
 			obs_data_set_bool(new_output, "enabled", true);
 			obs_data_set_string(new_output, "name", "Vertical Stream");
-			obs_data_set_string(new_output, "canvas", "Vertical");
+			obs_data_set_string(new_output, "canvas", canvas_name);
 			obs_data_array_push_back(outputs2, new_output);
 			obs_data_release(new_output);
 		}
