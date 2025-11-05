@@ -1430,8 +1430,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		canvasCombo);
 	canvasCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(settings, "canvas")));
 
-	
-
 	// Remove button
 	auto removeButton =
 		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
@@ -1607,7 +1605,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		outputLayout->addRow(label, extraHotkeyWidget);
 		hotkeys.push_back(extraHotkeyWidget);
 	}
-
 
 	if (!expanded) {
 		outputLayout->setRowVisible(canvasCombo, false);
@@ -1952,27 +1949,67 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	auto audioEncoder = new QComboBox;
 	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
-
-	auto audioTrack = new QComboBox;
-	for (int i = 0; i < 6; i++) {
-		auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
-		auto trackName = QString::fromUtf8(
-			config_get_string(obs_frontend_get_profile_config(), "AdvOut", trackConfigName.toUtf8().constData()));
-		if (trackName.isEmpty()) {
-			auto trackTranslationName =
-				QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
-			trackName = QString::fromUtf8(obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+		auto audioTrack = new QComboBox;
+		for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
+			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
+									     trackConfigName.toUtf8().constData()));
+			if (trackName.isEmpty()) {
+				auto trackTranslationName =
+					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
+				trackName = QString::fromUtf8(
+					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+			}
+			if (trackName.isEmpty())
+				trackName = QString::number(i + 1);
+			audioTrack->addItem(trackName);
 		}
-		if (trackName.isEmpty())
-			trackName = QString::number(i + 1);
-		audioTrack->addItem(trackName);
+		audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
+		connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
+			if (audioTrack->currentIndex() >= 0)
+				obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
+		});
+		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
+	} else {
+		auto at = obs_data_get_int(settings, "audio_tracks");
+		std::vector<QCheckBox *> audioTracks;
+		auto al = new QHBoxLayout;
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
+			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
+									     trackConfigName.toUtf8().constData()));
+			if (trackName.isEmpty()) {
+				auto trackTranslationName =
+					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
+				trackName = QString::fromUtf8(
+					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+			}
+			if (trackName.isEmpty())
+				trackName = QString::number(i + 1);
+			auto check = new QCheckBox(trackName);
+			check->setChecked((at & (1ll << i)) != 0);
+			audioTracks.push_back(check);
+			al->addWidget(check);
+		}
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+			connect(audioTracks[i], &QCheckBox::checkStateChanged, [this, settings, audioTracks] {
+#else
+			connect(audioTracks[i], &QCheckBox::stateChanged, [this, settings, audioTracks] {
+#endif
+				long long tracks = 0;
+				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+					if (audioTracks[i]->isChecked())
+						tracks += (1ll << i);
+				}
+				if (!tracks)
+					tracks = 1;
+				obs_data_set_int(settings, "audio_tracks", tracks);
+			});
+		}
+		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTracks")), al);
 	}
-	audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
-	connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
-		if (audioTrack->currentIndex() >= 0)
-			obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
-	});
-	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
 
 	auto audioEncoderGroup = new QWidget();
 	audioEncoderGroup->setProperty("altColor", QVariant(true));
@@ -2001,7 +2038,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	connect(audioEncoder, &QComboBox::currentIndexChanged,
 		[this, outputGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup, audioEncoderGroupLayout,
-		 audioTrack, settings, audioPage] {
+		 settings, audioPage] {
 			auto encoder_string = audioEncoder->currentData().toString().toUtf8();
 			auto encoder = encoder_string.constData();
 			const bool encoder_changed = !encoder_string.isEmpty() &&

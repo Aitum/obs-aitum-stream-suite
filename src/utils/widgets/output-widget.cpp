@@ -333,7 +333,7 @@ bool OutputWidget::StartOutput()
 	}
 
 	obs_encoder_t *venc = nullptr;
-	obs_encoder_t *aenc = nullptr;
+	std::vector<obs_encoder_t *> aencs;
 	auto advanced = obs_data_get_bool(settings, "advanced");
 	if (advanced) {
 		auto output_video_encoder_name = obs_data_get_string(settings, "output_video_encoder");
@@ -482,31 +482,60 @@ bool OutputWidget::StartOutput()
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return false;
 			}
-			auto aei = (int)obs_data_get_int(settings, "audio_encoder_index");
-			aenc = obs_output_get_audio_encoder(main_output, aei);
+			auto aenc = obs_output_get_audio_encoder(main_output, 0);
 			obs_output_release(main_output);
 			if (!aenc) {
 				blog(LOG_WARNING,
-				     "[Aitum Stream Suite] failed to start stream '%s' because encoder index %d was not found",
-				     name, aei);
+				     "[Aitum Stream Suite] failed to start stream '%s' because audio encoder was not found", name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
 				return false;
 			}
+			aencs.push_back(aenc);
 		} else {
-			obs_data_t *s = nullptr;
-			auto aes = obs_data_get_obj(settings, "audio_encoder_settings");
-			if (aes) {
-				s = obs_data_create();
-				obs_data_apply(s, aes);
-				obs_data_release(aes);
+			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
+				auto tracks = obs_data_get_int(settings, "audio_tracks");
+				if (!tracks)
+					tracks = 1;
+
+				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+					if ((tracks & (1ll << i)) == 0)
+						continue;
+					obs_data_t *s = nullptr;
+					auto aes = obs_data_get_obj(settings, "audio_encoder_settings");
+					if (aes) {
+						s = obs_data_create();
+						obs_data_apply(s, aes);
+						obs_data_release(aes);
+					}
+
+					std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+					audio_encoder_name += name;
+					audio_encoder_name += "_";
+					audio_encoder_name += std::to_string(i + 1);
+					auto aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, i, nullptr);
+					obs_data_release(s);
+					obs_encoder_set_audio(aenc, obs_get_audio());
+					aencs.push_back(aenc);
+				}
+			} else {
+
+				obs_data_t *s = nullptr;
+				auto aes = obs_data_get_obj(settings, "audio_encoder_settings");
+				if (aes) {
+					s = obs_data_create();
+					obs_data_apply(s, aes);
+					obs_data_release(aes);
+				}
+
+				std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+				audio_encoder_name += name;
+				auto aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s,
+								     obs_data_get_int(settings, "audio_track"), nullptr);
+				obs_data_release(s);
+				obs_encoder_set_audio(aenc, obs_get_audio());
+				aencs.push_back(aenc);
 			}
-			std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
-			audio_encoder_name += name;
-			aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s,
-							obs_data_get_int(settings, "audio_track"), nullptr);
-			obs_data_release(s);
-			obs_encoder_set_audio(aenc, obs_get_audio());
 		}
 	} else {
 		std::pair<obs_encoder_t **, video_t *> d = {&venc, obs_canvas_get_video(canvas)};
@@ -577,7 +606,7 @@ bool OutputWidget::StartOutput()
 			obs_encoder_update(venc, video_settings);
 			obs_data_release(video_settings);
 		}
-		if (!aenc && main) {
+		if (aencs.empty() && main) {
 			obs_output_t *main_output = nullptr;
 			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
 				main_output = obs_frontend_get_replay_buffer_output();
@@ -591,12 +620,24 @@ bool OutputWidget::StartOutput()
 					obs_output_release(main_output);
 					main_output = nullptr;
 				}
-			}
-			if (!main_output)
+				if (!main_output)
+					main_output = obs_frontend_get_streaming_output();
+				
+				for (size_t idx = 0; idx < MAX_OUTPUT_AUDIO_ENCODERS; idx++) {
+					auto aenc = main_output ? obs_output_get_audio_encoder(main_output, idx) : nullptr;
+					if (aenc)
+						aencs.push_back(aenc);
+				}
+			} else {
 				main_output = obs_frontend_get_streaming_output();
-			aenc = main_output ? obs_output_get_audio_encoder(main_output, 0) : nullptr;
+				auto aenc = main_output ? obs_output_get_audio_encoder(main_output, 0) : nullptr;
+				if (aenc)
+					aencs.push_back(aenc);
+			}
+
+			
 			obs_output_release(main_output);
-			if (!aenc || !obs_output_active(main_output)) {
+			if (aencs.empty() || !obs_output_active(main_output)) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start output '%s' because main was not started",
 				     name);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
@@ -604,11 +645,25 @@ bool OutputWidget::StartOutput()
 				return false;
 			}
 		}
-		if (venc && !aenc) {
-			std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
-			audio_encoder_name += name;
-			aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, 0, nullptr);
-			obs_encoder_set_audio(aenc, obs_get_audio());
+		if (venc && aencs.empty()) {
+			if (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0) {
+				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+					std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+					audio_encoder_name += name;
+					audio_encoder_name += "_";
+					audio_encoder_name += std::to_string(i);
+					auto aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, i,
+									     nullptr);
+					obs_encoder_set_audio(aenc, obs_get_audio());
+					aencs.push_back(aenc);
+				}
+			} else {
+				std::string audio_encoder_name = "aitum_stream_suite_audio_encoder_";
+				audio_encoder_name += name;
+				auto aenc = obs_audio_encoder_create("ffmpeg_aac", audio_encoder_name.c_str(), nullptr, 0, nullptr);
+				obs_encoder_set_audio(aenc, obs_get_audio());
+				aencs.push_back(aenc);
+			}
 		}
 	}
 
@@ -618,7 +673,7 @@ bool OutputWidget::StartOutput()
 				     QString::fromUtf8(obs_module_text("NoVideoEncoder")));
 		return false;
 	}
-	if (!aenc) {
+	if (aencs.empty()) {
 		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to start '%s', no audio encoder found", name);
 		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoAudioEncoder")),
 				     QString::fromUtf8(obs_module_text("NoAudioEncoder")));
@@ -735,7 +790,9 @@ bool OutputWidget::StartOutput()
 	signal_handler_connect(signal, "stop", output_stop, this);
 
 	obs_output_set_video_encoder(output, venc);
-	obs_output_set_audio_encoder(output, aenc, 0);
+	for (size_t i = 0; i < aencs.size(); i++) {
+		obs_output_set_audio_encoder(output, aencs[i], i);
+	}
 
 	return obs_output_start(output);
 }
