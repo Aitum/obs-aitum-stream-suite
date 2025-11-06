@@ -59,8 +59,10 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 			obs_canvas_release(canvas);
 			return;
 		}
-		if (obs_weak_object_references_object((obs_weak_object_t *)current_canvas, (obs_object_t *)canvas))
+		if (obs_weak_object_references_object((obs_weak_object_t *)current_canvas, (obs_object_t *)canvas)) {
+			obs_canvas_release(canvas);
 			return;
+		}
 
 		if (current_canvas) {
 			auto prev_canvas = obs_weak_canvas_get_canvas(current_canvas);
@@ -131,15 +133,20 @@ void PropertiesDock::canvas_channel_change(void *param, calldata_t *cd)
 
 	//auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
 	auto channel = calldata_int(cd, "channel");
-	//auto prev_source = (obs_source_t *)calldata_ptr(cd, "prev_source");
-	auto source = (obs_source_t *)calldata_ptr(cd, "source");
-	auto source_type = obs_source_get_type(source);
 	if (channel != 0)
 		return;
+	//auto prev_source = (obs_source_t *)calldata_ptr(cd, "prev_source");
+	auto source = (obs_source_t *)calldata_ptr(cd, "source");
+	if (!source) {
+		QMetaObject::invokeMethod(this_, "SceneChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+		QMetaObject::invokeMethod(this_, "TransitionChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+		return;
+	}
+	auto source_type = obs_source_get_type(source);
 	if (source_type == OBS_SOURCE_TYPE_SCENE) {
-		QMetaObject::invokeMethod(this_, "SceneChanged", Q_ARG(OBSSource, OBSSource(source)));
+		QMetaObject::invokeMethod(this_, "SceneChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 	} else if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
-		QMetaObject::invokeMethod(this_, "TransitionChanged", Q_ARG(OBSSource, OBSSource(source)));
+		QMetaObject::invokeMethod(this_, "TransitionChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 	}
 }
 
@@ -1041,16 +1048,20 @@ void PropertiesDock::frontend_event(enum obs_frontend_event event, void *param)
 				if (source) {
 					auto source_type = obs_source_get_type(source);
 					if (source_type == OBS_SOURCE_TYPE_SCENE) {
-						QMetaObject::invokeMethod(this_, "SceneChanged",
-									  Q_ARG(OBSSource, OBSSource(source)));
+						QMetaObject::invokeMethod(this_, "SceneChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 					} else if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
-						QMetaObject::invokeMethod(this_, "TransitionChanged",
-									  Q_ARG(OBSSource, OBSSource(source)));
+						QMetaObject::invokeMethod(this_, "TransitionChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
 					}
 					obs_source_release(source);
 				}
 				obs_canvas_release(canvas);
 			}
+		}
+	} else if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN || event == OBS_FRONTEND_EVENT_EXIT) {
+		auto this_ = static_cast<PropertiesDock *>(param);
+		if (this_->current_canvas) {
+			obs_weak_canvas_release(this_->current_canvas);
+			this_->current_canvas = nullptr;
 		}
 	}
 }
