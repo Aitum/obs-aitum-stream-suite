@@ -253,6 +253,11 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 		if (vendor) {
 			const auto d = obs_data_create();
 			obs_data_set_string(d, "output", obs_output_get_name(this_->output));
+			const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
+			if (last_error)
+				obs_data_set_string(d, "last_error", last_error);
+			obs_data_set_int(d, "code", calldata_int(calldata, "code"));
+
 			obs_websocket_vendor_emit_event(vendor, "stop_output", d);
 			obs_data_release(d);
 		}

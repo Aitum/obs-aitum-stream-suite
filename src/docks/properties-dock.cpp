@@ -223,7 +223,7 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 
 		obs_weak_source_release(current_scene);
 	}
-	if (!scene) {
+	if (!scene || obs_source_removed(scene)) {
 		current_scene = nullptr;
 		return;
 	}
@@ -277,7 +277,7 @@ void PropertiesDock::TransitionChanged(OBSSource transition)
 
 		obs_weak_source_release(current_transition);
 	}
-	if (!transition) {
+	if (!transition || obs_source_removed(transition)) {
 		current_transition = nullptr;
 		return;
 	}

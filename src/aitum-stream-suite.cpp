@@ -971,14 +971,17 @@ void open_config_dialog(int tab)
 			obs_data_array_t *a = obs_data_get_array(current_profile_config, "canvas");
 			obs_data_array_t *b = obs_data_get_array(settings, "canvas");
 			canvas_changed = !obs_data_array_equal(a, b);
+			if (canvas_changed)
+				obs_data_set_array(current_profile_config, "canvas", b);
 			obs_data_array_release(a);
 			obs_data_array_release(b);
 			a = obs_data_get_array(current_profile_config, "outputs");
 			b = obs_data_get_array(settings, "outputs");
 			outputs_changed = !obs_data_array_equal(a, b);
+			if (outputs_changed)
+				obs_data_set_array(current_profile_config, "outputs", b);
 			obs_data_array_release(a);
 			obs_data_array_release(b);
-			obs_data_apply(current_profile_config, settings);
 			obs_data_release(settings);
 		} else {
 			current_profile_config = settings;
