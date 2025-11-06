@@ -10,6 +10,7 @@
 #include <obs-frontend-api.h>
 #include <util/config-file.h>
 #include <util/platform.h>
+#include <src/utils/obs-websocket-api.h>
 
 extern obs_data_t *current_profile_config;
 
@@ -237,6 +238,8 @@ void OutputWidget::output_start(void *data, calldata_t *calldata)
 	QMetaObject::invokeMethod(this_->outputButton, [this_] { this_->outputButton->setChecked(true); }, Qt::QueuedConnection);
 }
 
+extern obs_websocket_vendor vendor;
+
 void OutputWidget::output_stop(void *data, calldata_t *calldata)
 {
 	UNUSED_PARAMETER(calldata);
@@ -247,6 +250,12 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 	}
 
 	if (this_->output) {
+		if (vendor) {
+			const auto d = obs_data_create();
+			obs_data_set_string(d, "output", obs_output_get_name(this_->output));
+			obs_websocket_vendor_emit_event(vendor, "stop_output", d);
+			obs_data_release(d);
+		}
 		QMetaObject::invokeMethod(
 			this_->outputButton,
 			[this_] {
@@ -329,6 +338,13 @@ bool OutputWidget::StartOutput()
 		if (!obs_output_start(vco))
 			return false;
 		output = vco;
+		if (vendor) {
+			const auto d = obs_data_create();
+			obs_data_set_string(d, "output", name);
+			obs_data_set_string(d, "canvas", obs_canvas_get_name(canvas));
+			obs_websocket_vendor_emit_event(vendor, "start_output", d);
+			obs_data_release(d);
+		}
 		return true;
 	}
 
@@ -535,8 +551,7 @@ bool OutputWidget::StartOutput()
 				audio_encoder_name += name;
 				auto audio_track = obs_data_get_int(settings, "audio_track");
 				auto aenc =
-					obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, audio_track
-								    , nullptr);
+					obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, audio_track, nullptr);
 				obs_data_release(s);
 				obs_encoder_set_audio(aenc, obs_get_audio());
 				aencs.push_back(aenc);
@@ -628,7 +643,7 @@ bool OutputWidget::StartOutput()
 				}
 				if (!main_output)
 					main_output = obs_frontend_get_streaming_output();
-				
+
 				for (size_t idx = 0; idx < MAX_OUTPUT_AUDIO_ENCODERS; idx++) {
 					auto aenc = main_output ? obs_output_get_audio_encoder(main_output, idx) : nullptr;
 					if (aenc) {
@@ -645,7 +660,6 @@ bool OutputWidget::StartOutput()
 				}
 			}
 
-			
 			obs_output_release(main_output);
 			if (aencs.empty() || !obs_output_active(main_output)) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start output '%s' because main was not started",
@@ -802,7 +816,7 @@ bool OutputWidget::StartOutput()
 	signal_handler_connect(signal, "stop", output_stop, this);
 
 	obs_output_set_video_encoder(output, venc);
-	
+
 	for (size_t i = 0; i < aencs.size(); i++) {
 		obs_output_set_audio_encoder(output, aencs[i], i);
 	}
@@ -810,7 +824,19 @@ bool OutputWidget::StartOutput()
 		mixers = 1;
 	obs_output_set_mixers(output, mixers);
 
-	return obs_output_start(output);
+	if (!obs_output_start(output)) {
+		obs_output_release(output);
+		output = nullptr;
+		return false;
+	}
+	if (vendor) {
+		const auto d = obs_data_create();
+		obs_data_set_string(d, "output", name);
+		obs_data_set_string(d, "canvas", obs_canvas_get_name(canvas));
+		obs_websocket_vendor_emit_event(vendor, "start_output", d);
+		obs_data_release(d);
+	}
+	return true;
 }
 
 bool OutputWidget::EncoderAvailable(const char *encoder)
