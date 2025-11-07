@@ -26,6 +26,7 @@ private:
 	static void output_stop(void *data, calldata_t *calldata);
 	static void output_start(void *data, calldata_t *calldata);
 	static bool EncoderAvailable(const char *encoder);
+	static void ensure_directory(char *path);
 
 public:
 	OutputWidget(obs_data_t *output_data, QWidget *parent = nullptr);

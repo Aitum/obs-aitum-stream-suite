@@ -733,6 +733,8 @@ bool OutputWidget::StartOutput()
 		snprintf(path, 512, "%s/%s", dir, filename);
 		bfree(filename);
 
+		ensure_directory(path);
+
 		std::string output_name = "Aitum Stream Suite Output ";
 		output_name += name;
 		const char *output_id = "ffmpeg_muxer";
@@ -910,4 +912,25 @@ void OutputWidget::UpdateCanvas()
 		obs_data_release(item);
 	}
 	obs_data_array_release(canvas);
+}
+
+void OutputWidget::ensure_directory(char *path)
+{
+#ifdef _WIN32
+	char *backslash = strrchr(path, '\\');
+	if (backslash)
+		*backslash = '/';
+#endif
+
+	char *slash = strrchr(path, '/');
+	if (slash) {
+		*slash = 0;
+		os_mkdirs(path);
+		*slash = '/';
+	}
+
+#ifdef _WIN32
+	if (backslash)
+		*backslash = '\\';
+#endif
 }
