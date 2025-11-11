@@ -773,7 +773,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		finished_loading = true;
 		if (restart) {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-			QMetaObject::invokeMethod(main_window, [main_window] { main_window->close(); }, Qt::QueuedConnection);
+			QTimer::singleShot(200, main_window, [main_window] { main_window->close(); });
 			return;
 		}
 		size_t scene_count = 0;
