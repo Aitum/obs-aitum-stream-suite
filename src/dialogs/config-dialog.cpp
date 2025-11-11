@@ -1555,55 +1555,57 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasCombo);
 
 	OBSHotkeyWidget *startHotkeyWidget = nullptr;
-	std::string startName = "AitumStreamSuiteStartOutput";
-	startName += obs_data_get_string(settings, "name");
-	auto hotkey = GetHotkeyByName(startName.c_str());
-	if (hotkey) {
-		auto id = obs_hotkey_get_id(hotkey);
-		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
-		auto hn = obs_hotkey_get_name(hotkey);
-		startHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
-		auto label = new OBSHotkeyLabel;
-		label->setText(QString::fromUtf8(obs_module_text("StartHotkey")));
-		startHotkeyWidget->label = label;
-		outputLayout->addRow(label, startHotkeyWidget);
-		hotkeys.push_back(startHotkeyWidget);
-	}
-
 	OBSHotkeyWidget *stopHotkeyWidget = nullptr;
-	std::string stopName = "AitumStreamSuiteStopOutput";
-	stopName += obs_data_get_string(settings, "name");
-	hotkey = GetHotkeyByName(stopName.c_str());
-	if (hotkey) {
-		auto id = obs_hotkey_get_id(hotkey);
-		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
-		auto hn = obs_hotkey_get_name(hotkey);
-		stopHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
-		auto label = new OBSHotkeyLabel;
-		label->setText(QString::fromUtf8(obs_module_text("StopHotkey")));
-		stopHotkeyWidget->label = label;
-		outputLayout->addRow(label, stopHotkeyWidget);
-		hotkeys.push_back(stopHotkeyWidget);
-		if (startHotkeyWidget) {
-			stopHotkeyWidget->label->pairPartner = startHotkeyWidget->label;
-			startHotkeyWidget->label->pairPartner = stopHotkeyWidget->label;
-		}
-	}
-
 	OBSHotkeyWidget *extraHotkeyWidget = nullptr;
-	std::string ebName = "AitumStreamSuiteSaveBacktrack";
-	ebName += obs_data_get_string(settings, "name");
-	hotkey = GetHotkeyByName(ebName.c_str());
-	if (hotkey) {
-		auto id = obs_hotkey_get_id(hotkey);
-		std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
-		auto hn = obs_hotkey_get_name(hotkey);
-		extraHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
-		auto label = new OBSHotkeyLabel;
-		label->setText(QString::fromUtf8(obs_module_text("SaveBacktrack")));
-		extraHotkeyWidget->label = label;
-		outputLayout->addRow(label, extraHotkeyWidget);
-		hotkeys.push_back(extraHotkeyWidget);
+	if (!isNew) {
+		std::string startName = "AitumStreamSuiteStartOutput";
+		startName += obs_data_get_string(settings, "name");
+		auto hotkey = GetHotkeyByName(startName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			startHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_module_text("StartHotkey")));
+			startHotkeyWidget->label = label;
+			outputLayout->addRow(label, startHotkeyWidget);
+			hotkeys.push_back(startHotkeyWidget);
+		}
+
+		std::string stopName = "AitumStreamSuiteStopOutput";
+		stopName += obs_data_get_string(settings, "name");
+		hotkey = GetHotkeyByName(stopName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			stopHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_module_text("StopHotkey")));
+			stopHotkeyWidget->label = label;
+			outputLayout->addRow(label, stopHotkeyWidget);
+			hotkeys.push_back(stopHotkeyWidget);
+			if (startHotkeyWidget) {
+				stopHotkeyWidget->label->pairPartner = startHotkeyWidget->label;
+				startHotkeyWidget->label->pairPartner = stopHotkeyWidget->label;
+			}
+		}
+
+		std::string ebName = "AitumStreamSuiteSaveBacktrack";
+		ebName += obs_data_get_string(settings, "name");
+		hotkey = GetHotkeyByName(ebName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			extraHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_module_text("SaveBacktrack")));
+			extraHotkeyWidget->label = label;
+			outputLayout->addRow(label, extraHotkeyWidget);
+			hotkeys.push_back(extraHotkeyWidget);
+		}
 	}
 
 	if (!expanded) {
