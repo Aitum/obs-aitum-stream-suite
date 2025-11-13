@@ -162,6 +162,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		obs_source_release(dst);
 		obs_data_release(t);
 	}
+	obs_data_array_release(arr);
 
 	obs_add_tick_callback(Tick, this);
 }
@@ -557,7 +558,6 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s)
 	if (s) {
 		obs_data_release(settings);
 		settings = s;
-		obs_data_addref(s);
 	}
 
 	auto c = color_from_int(obs_data_get_int(settings, "color"));
