@@ -59,13 +59,14 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 			obs_canvas_release(canvas);
 			return;
 		}
-		if (obs_weak_object_references_object((obs_weak_object_t *)current_canvas, (obs_object_t *)canvas)) {
-			obs_canvas_release(canvas);
-			return;
-		}
 
 		if (current_canvas) {
 			auto prev_canvas = obs_weak_canvas_get_canvas(current_canvas);
+			if (prev_canvas == canvas) {
+				obs_canvas_release(prev_canvas);
+				obs_canvas_release(canvas);
+				return;
+			}
 			if (prev_canvas) {
 				signal_handler_disconnect(obs_canvas_get_signal_handler(prev_canvas), "channel_change",
 							  canvas_channel_change, this);

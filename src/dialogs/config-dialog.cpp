@@ -752,8 +752,10 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	});
 
 	auto replaceLayout = new QGridLayout;
-	replaceLayout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplace"))), 0, 0);
-	replaceLayout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplacement"))), 0, 1);
+	auto replaceLabel = new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplace")));
+	replaceLayout->addWidget(replaceLabel, 0, 0);
+	auto replacementLabel = new QLabel(QString::fromUtf8(obs_module_text("CanvasCloneReplacement")));
+	replaceLayout->addWidget(replacementLabel, 0, 1);
 	auto replace_sources = obs_data_get_array(settings, "replace_sources");
 	if (!replace_sources) {
 		replace_sources = obs_data_array_create();
@@ -770,15 +772,16 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		sourceCombo->setEditable(true);
 		obs_enum_all_sources(
 			[](void *param, obs_source_t *source) {
+				if (obs_obj_is_private(source))
+					return true;
 				auto combo = (QComboBox *)param;
-				if (!obs_obj_is_private(source)) {
-					auto name = QString::fromUtf8(obs_source_get_name(source));
-					int index = 0;
-					while (index < combo->count() &&
-					       combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
-						index++;
-					combo->insertItem(index, name);
-				}
+
+				auto name = QString::fromUtf8(obs_source_get_name(source));
+				int index = 0;
+				while (index < combo->count() && combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
+					index++;
+				combo->insertItem(index, name);
+
 				return true;
 			},
 			sourceCombo);
@@ -793,15 +796,16 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		replaceCombo->setEditable(true);
 		obs_enum_all_sources(
 			[](void *param, obs_source_t *source) {
+				if (obs_obj_is_private(source))
+					return true;
 				auto combo = (QComboBox *)param;
-				if (!obs_obj_is_private(source)) {
-					auto name = QString::fromUtf8(obs_source_get_name(source));
-					int index = 0;
-					while (index < combo->count() &&
-					       combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
-						index++;
-					combo->insertItem(index, name);
-				}
+
+				auto name = QString::fromUtf8(obs_source_get_name(source));
+				int index = 0;
+				while (index < combo->count() && combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
+					index++;
+				combo->insertItem(index, name);
+
 				return true;
 			},
 			replaceCombo);
@@ -1863,7 +1867,16 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged", Q_ARG(int, videoEncoder->currentIndex()));
 		} else if (strcmp(ove, "MainEncoder") == 0) {
 			videoEncoder->setCurrentIndex(0);
-			QMetaObject::invokeMethod(videoEncoder, "currentIndexChanged", Q_ARG(int, 0));
+			videoPageLayout->setRowVisible(videoEncoder, false);
+			if (!videoEncoderIndex) {
+			} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+				videoPageLayout->setRowVisible(videoEncoderIndex, true);
+			} else {
+				videoPageLayout->setRowVisible(videoEncoderIndex, false);
+				if (videoEncoderIndex->currentIndex() != 0)
+					videoEncoderIndex->setCurrentIndex(0);
+			}
+			videoEncoderGroup->setVisible(false);
 		} else {
 			videoPageLayout->setRowVisible(videoEncoder, false);
 			videoPageLayout->setRowVisible(videoEncoderIndex, false);
@@ -1883,8 +1896,16 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			if (encoder_changed)
 				obs_data_set_string(settings, "video_encoder", encoder);
 			if (!encoder || encoder[0] == '\0') {
+				auto canvas = obs_data_get_string(settings, "canvas");
+				bool main = !canvas || canvas[0] == '\0';
+				if (!main) {
+					auto mc = obs_get_main_canvas();
+					if (strcmp(obs_canvas_get_name(mc), canvas) == 0)
+						main = true;
+					obs_canvas_release(mc);
+				}
 				if (!videoEncoderIndex) {
-				} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+				} else if (main && config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
 					videoPageLayout->setRowVisible(videoEncoderIndex, true);
 				} else {
 					videoPageLayout->setRowVisible(videoEncoderIndex, false);
