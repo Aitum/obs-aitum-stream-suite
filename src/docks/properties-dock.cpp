@@ -38,6 +38,7 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 
 	auto vl = new QVBoxLayout;
 	auto scrollWidget = new QWidget;
+	scrollWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	scrollWidget->setLayout(vl);
 	scrollArea->setWidget(scrollWidget);
 	auto hl = new QHBoxLayout;

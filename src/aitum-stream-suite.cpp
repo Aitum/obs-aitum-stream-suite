@@ -193,6 +193,9 @@ void save_dock_state(int index)
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "SaveSettings");
 	}
+	for (const auto &it : canvas_clone_docks) {
+		QMetaObject::invokeMethod(it, "SaveSettings");
+	}
 }
 
 void reset_live_dock_state()
@@ -306,6 +309,7 @@ void reset_live_dock_state()
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
 	{
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
+		canvas_clone_dock->reset_live_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
@@ -431,6 +435,7 @@ void reset_build_dock_state()
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
 	{
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
+		canvas_clone_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::RightDockWidgetArea, d);

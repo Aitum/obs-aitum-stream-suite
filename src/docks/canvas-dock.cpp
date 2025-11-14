@@ -4927,7 +4927,7 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 void CanvasDock::reset_live_state()
 {
 	panel_split->setSizes({1, 0, 0});
-	canvas_split->setSizes({3, 1});
+	canvas_split->setSizes({1, 1});
 }
 
 void CanvasDock::reset_build_state()
