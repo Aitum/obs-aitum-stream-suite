@@ -489,8 +489,9 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			&p);
 		if (!change_source) {
 			duplicate = obs_source_get_ref(source);
-		} else if (!change_source && current && source &&
-			   (current == source || strcmp(obs_source_get_name(current), obs_source_get_name(source)) == 0)) {
+		} else if (current && source &&
+			   ((!change_source && current == source) ||
+			    (current != source && strcmp(obs_source_get_name(current), obs_source_get_name(source)) == 0))) {
 			duplicate = obs_source_get_ref(current);
 		} else {
 			//duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
@@ -834,7 +835,6 @@ void CanvasCloneDock::SaveSettings(bool closing)
 		obs_data_set_string(settings, "canvas_split", state_chars);
 	}
 }
-
 
 void CanvasCloneDock::LoadMode(int index)
 {
