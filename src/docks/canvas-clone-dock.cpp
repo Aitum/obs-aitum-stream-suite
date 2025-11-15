@@ -574,6 +574,8 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 
 void CanvasCloneDock::DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2)
 {
+	if (!item || !item2)
+		return;
 	struct obs_transform_info transform;
 	struct obs_transform_info transform2;
 	obs_sceneitem_get_info2(item, &transform);

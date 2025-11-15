@@ -190,7 +190,7 @@ void OutputDock::LoadSettings()
 			obs_data_t *data2 = obs_data_array_item(outputs2, i);
 			auto name = QString::fromUtf8(obs_data_get_string(data2, "name"));
 			obs_data_release(data2);
-			if (name == objectName()) {
+			if (name == (*it)->objectName()) {
 				(*it)->UpdateSettings(data2);
 				found = true;
 				break;
