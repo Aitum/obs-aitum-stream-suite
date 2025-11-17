@@ -40,22 +40,37 @@ CaptureWidget::CaptureWidget(obs_source_t *s, QWidget *parent) : QFrame(parent),
 		QMenu menu;
 
 		auto window = obs_properties_get(props, "window");
+		auto format = obs_property_list_format(window);
 		auto count = obs_property_list_item_count(window);
 		for (size_t i = 0; i < count; i++) {
 			auto desc = obs_property_list_item_name(window, i);
 			if (!desc || desc[0] == '\0')
 				continue;
-			auto val = obs_property_list_item_string(window, i);
-			menu.addAction(QString::fromUtf8(desc), [this, val] {
-				auto s2 = obs_weak_source_get_source(source);
-				if (!s2)
-					return;
-				auto d = obs_data_create();
-				obs_data_set_string(d, "window", val);
-				obs_source_update(s2, d);
-				obs_data_release(d);
-				obs_source_release(s2);
-			});
+			if (format == OBS_COMBO_FORMAT_STRING) {
+				auto val = obs_property_list_item_string(window, i);
+				menu.addAction(QString::fromUtf8(desc), [this, val] {
+					auto s2 = obs_weak_source_get_source(source);
+					if (!s2)
+						return;
+					auto d = obs_data_create();
+					obs_data_set_string(d, "window", val);
+					obs_source_update(s2, d);
+					obs_data_release(d);
+					obs_source_release(s2);
+				});
+			} else if (format == OBS_COMBO_FORMAT_INT) {
+				auto val = obs_property_list_item_int(window, i);
+				menu.addAction(QString::fromUtf8(desc), [this, val] {
+					auto s2 = obs_weak_source_get_source(source);
+					if (!s2)
+						return;
+					auto d = obs_data_create();
+					obs_data_set_int(d, "window", val);
+					obs_source_update(s2, d);
+					obs_data_release(d);
+					obs_source_release(s2);
+				});
+			}
 		}
 
 		menu.exec(QCursor::pos());
