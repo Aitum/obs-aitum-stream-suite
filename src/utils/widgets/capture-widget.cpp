@@ -82,6 +82,8 @@ CaptureWidget::~CaptureWidget()
 		signal_handler_disconnect(sh, "hooked", hooked, this);
 		signal_handler_disconnect(sh, "unhooked", unhooked, this);
 	}
+	obs_source_release(s);
+	obs_weak_source_release(source);
 }
 
 void CaptureWidget::hooked(void *param, calldata_t *cd)
