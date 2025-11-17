@@ -70,6 +70,8 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/docks/canvas-dock.hpp
   src/docks/canvas-clone-dock.cpp
   src/docks/canvas-clone-dock.hpp
+  src/docks/capture-dock.cpp
+  src/docks/capture-dock.hpp
   src/docks/filters-dock.cpp
   src/docks/filters-dock.hpp
   src/docks/live-scenes-dock.cpp
@@ -96,6 +98,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/event-filter.cpp
   src/utils/file-download.c
   src/utils/icon.cpp
+  src/utils/widgets/capture-widget.cpp
   src/utils/widgets/double-slider.cpp
   src/utils/widgets/hotkey-edit.cpp
   src/utils/widgets/locked-checkbox.cpp
@@ -111,6 +114,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/event-filter.hpp
   src/utils/file-download.h
   src/utils/icon.hpp
+  src/utils/widgets/capture-widget.hpp
   src/utils/widgets/double-slider.hpp
   src/utils/widgets/hotkey-edit.hpp
   src/utils/widgets/locked-checkbox.hpp

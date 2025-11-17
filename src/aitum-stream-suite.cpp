@@ -3,6 +3,7 @@
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
+#include "docks/capture-dock.hpp"
 #include "docks/filters-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
@@ -1177,6 +1178,8 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteFilters", obs_module_text("AitumStreamSuiteFilters"), filters_dock);
 	live_scenes_dock = new LiveScenesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteLiveScenes", obs_module_text("AitumStreamSuiteLiveScenes"), live_scenes_dock);
+	auto capture_dock = new CaptureDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteCapture", obs_module_text("AitumStreamSuiteCapture"), capture_dock);
 
 	std::string url = "https://api.aitum.tv/plugin/streamsuite";
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
