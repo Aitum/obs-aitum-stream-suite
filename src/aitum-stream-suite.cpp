@@ -1,13 +1,17 @@
 #include "dialogs/config-dialog.hpp"
+#include "dialogs/name-dialog.hpp"
 #include "dialogs/scene-collection-wizard.hpp"
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
 #include "docks/capture-dock.hpp"
 #include "docks/filters-dock.hpp"
+#include "docks/live-scenes-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
 #include "utils/file-download.h"
+#include "utils/icon.hpp"
+#include "utils/obs-websocket-api.h"
 #include "utils/widgets/pixmap-label.hpp"
 #include "version.h"
 #include <obs-frontend-api.h>
@@ -22,9 +26,6 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <util/dstr.h>
-#include "docks/live-scenes-dock.hpp"
-#include "utils/icon.hpp"
-#include "utils/obs-websocket-api.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
@@ -52,6 +53,8 @@ QString newer_version_available;
 
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
+
+std::list<QFrame *> empty_docks;
 
 extern QWidget *aitumSettingsWidget;
 
@@ -691,6 +694,27 @@ void load_current_profile_config()
 	} else {
 		blog(LOG_INFO, "[Aitum Stream Suite] Loaded configuration file");
 	}
+	for (const auto &it : empty_docks) {
+		obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+	}
+	empty_docks.clear();
+	auto ed = obs_data_get_array(current_profile_config, "empty_docks");
+	if (ed) {
+		obs_data_array_enum(
+			ed,
+			[](obs_data_t *data, void *param) {
+				UNUSED_PARAMETER(param);
+				auto empty_dock = new QFrame;
+				if (obs_frontend_add_dock_by_id(obs_data_get_string(data, "name"),
+								obs_data_get_string(data, "name"), empty_dock)) {
+					empty_docks.push_back(empty_dock);
+				} else {
+					delete empty_dock;
+				}
+			},
+			nullptr);
+		obs_data_array_release(ed);
+	}
 
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	if (!canvas) {
@@ -743,7 +767,6 @@ void load_current_profile_config()
 		modesTab = -1;
 		modesTabBar->setCurrentIndex(index);
 	}
-
 	load_outputs();
 }
 
@@ -839,6 +862,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 		if (output_dock)
 			output_dock->Exiting();
+		for (auto &it : empty_docks) {
+			obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+		}
+		empty_docks.clear();
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
@@ -1086,7 +1113,51 @@ bool obs_module_load(void)
 				reset_design_dock_state();
 			}
 		});
-
+		menu.addSeparator();
+		menu.addAction(QString::fromUtf8(obs_module_text("AddEmptyDock")), [] {
+			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			std::string name = obs_module_text("EmptyDock");
+			if (NameDialog::AskForName(main_window, QString::fromUtf8(obs_module_text("EmptyDockName")), name)) {
+				//break;
+				auto empty_dock = new QFrame;
+				if (obs_frontend_add_dock_by_id(name.c_str(), name.c_str(), empty_dock)) {
+					empty_dock->parentWidget()->show();
+					auto ed = obs_data_get_array(current_profile_config, "empty_docks");
+					if (!ed) {
+						ed = obs_data_array_create();
+						obs_data_set_array(current_profile_config, "empty_docks", ed);
+					}
+					auto edd = obs_data_create();
+					obs_data_set_string(edd, "name", name.c_str());
+					obs_data_array_push_back(ed, edd);
+					obs_data_release(edd);
+					empty_docks.push_back(empty_dock);
+				} else {
+					delete empty_dock;
+				}
+			}
+		});
+		if (!empty_docks.empty()) {
+			auto removeMenu = menu.addMenu(QString::fromUtf8(obs_module_text("RemoveEmptyDock")));
+			for (const auto &it : empty_docks) {
+				QFrame *w = it;
+				removeMenu->addAction(it->parentWidget()->objectName(), [w] {
+					std::string name = w->parentWidget()->objectName().toUtf8().constData();
+					obs_frontend_remove_dock(name.c_str());
+					empty_docks.remove(w);
+					auto ed = obs_data_get_array(current_profile_config, "empty_docks");
+					auto count = obs_data_array_count(ed);
+					for (size_t i = count; i > 0; i--) {
+						auto item = obs_data_array_item(ed, i - 1);
+						if (!item)
+							continue;
+						if (strcmp(name.c_str(), obs_data_get_string(item, "name")) == 0) {
+							obs_data_array_erase(ed, i - 1);
+						}
+					}
+				});
+			}
+		}
 		menu.exec(QCursor::pos());
 	});
 
@@ -1514,6 +1585,10 @@ void obs_module_unload()
 	if (output_dock) {
 		delete output_dock;
 	}
+	for (auto &it : empty_docks) {
+		obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+	}
+	empty_docks.clear();
 }
 
 const char *obs_module_name(void)
