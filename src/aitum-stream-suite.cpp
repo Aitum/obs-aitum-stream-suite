@@ -717,7 +717,16 @@ void load_current_profile_config()
 		if (obs_data_array_count(outputs2) < 1) {
 			auto new_output = obs_data_create();
 			obs_data_set_bool(new_output, "enabled", true);
+			obs_data_set_string(new_output, "type", "stream");
 			obs_data_set_string(new_output, "name", "Vertical Stream");
+			obs_data_set_string(new_output, "canvas", canvas_name);
+			obs_data_array_push_back(outputs2, new_output);
+			obs_data_release(new_output);
+
+			new_output = obs_data_create();
+			obs_data_set_bool(new_output, "enabled", true);
+			obs_data_set_string(new_output, "type", "backtrack");
+			obs_data_set_string(new_output, "name", "Vertical Backtrack");
 			obs_data_set_string(new_output, "canvas", canvas_name);
 			obs_data_array_push_back(outputs2, new_output);
 			obs_data_release(new_output);
