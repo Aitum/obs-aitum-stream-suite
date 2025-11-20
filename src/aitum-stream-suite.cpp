@@ -1381,7 +1381,8 @@ void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_
 	}
 	const char *canvas_name = obs_data_get_string(request_data, "canvas");
 	for (const auto &it : canvas_docks) {
-		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0)
+		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0 ||
+		    strcmp(obs_canvas_get_uuid(it->GetCanvas()), canvas_name) == 0)
 			QMetaObject::invokeMethod(it, "SwitchScene", Q_ARG(QString, QString::fromUtf8(scene_name)));
 	}
 
@@ -1398,7 +1399,7 @@ void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response
 	}
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
 			continue;
 
 		auto source = obs_canvas_get_channel(canvas, 0);
@@ -1408,9 +1409,11 @@ void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response
 		}
 		if (source) {
 			obs_data_set_string(response_data, "scene", obs_source_get_name(source));
+			obs_data_set_string(response_data, "scene_uuid", obs_source_get_uuid(source));
 			obs_source_release(source);
 		} else {
 			obs_data_set_string(response_data, "scene", "");
+			obs_data_set_string(response_data, "scene_uuid", "");
 		}
 		obs_data_set_bool(response_data, "success", true);
 		return;
@@ -1429,7 +1432,7 @@ void vendor_request_get_scenes(obs_data_t *request_data, obs_data_t *response_da
 
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
 			continue;
 
 		auto sa = obs_data_array_create();
