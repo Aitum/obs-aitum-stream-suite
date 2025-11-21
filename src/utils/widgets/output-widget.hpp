@@ -10,7 +10,6 @@ class OutputWidget : public QFrame {
 private:
 	obs_data_t *settings = nullptr;
 	int outputPlatformIconSize = 36;
-	std::string name;
 
 	QPushButton *outputButton = nullptr;
 	QPushButton *extraButton = nullptr;
@@ -22,6 +21,7 @@ private:
 
 	bool StartOutput();
 	void UpdateCanvas();
+	obs_encoder_t *GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char* output_name);
 
 	static void output_stop(void *data, calldata_t *calldata);
 	static void output_start(void *data, calldata_t *calldata);

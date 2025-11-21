@@ -49,6 +49,8 @@ private:
 
 	void AddCanvas(QFormLayout *canvasLayout, obs_data_t *settings, obs_data_array_t *canvas);
 	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew = false);
+	void AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *output_settings, obs_data_array_t *outputs,
+				 QComboBox *canvasCombo, int idx);
 	void AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings, QFormLayout *layout);
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
 	void AddCanvas();
@@ -75,7 +77,7 @@ private:
 
 	void AddRecord(bool backtrack);
 
-	obs_hotkey_t *GetHotkeyByName(const char* name);
+	obs_hotkey_t *GetHotkeyByName(const char *name);
 	std::vector<obs_key_combination_t> GetCombosForHotkey(obs_hotkey_id hotkey);
 
 private slots:

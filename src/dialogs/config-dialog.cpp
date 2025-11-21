@@ -1556,14 +1556,37 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	output_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
 
 	outputLayout->addRow(output_title_layout);
-	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasCombo);
 
-	OBSHotkeyWidget *startHotkeyWidget = nullptr;
-	OBSHotkeyWidget *stopHotkeyWidget = nullptr;
-	OBSHotkeyWidget *extraHotkeyWidget = nullptr;
+	auto canvasLayout = new QVBoxLayout;
+	canvasLayout->setContentsMargins(0, 0, 0, 0);
+	auto canvasSubLayout = new QHBoxLayout;
+	canvasSubLayout->setContentsMargins(0, 0, 0, 0);
+	canvasSubLayout->addWidget(canvasCombo);
+	QToolButton *add = nullptr;
+	if (strcmp(output_type, "record") == 0) {
+		add = new QToolButton;
+		add->setProperty("themeID", "addIconSmall");
+		add->setProperty("class", "icon-plus");
+		add->setToolTip(QString::fromUtf8(obs_frontend_get_locale_string("Add")));
+		canvasSubLayout->addWidget(add);
+	}
+	canvasLayout->addLayout(canvasSubLayout);
+	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasLayout);
+	//QList<QWidget *> canvasWidgets;
+
+	//outputLayout->insertRow
+
+	QWidget *hotkeyGroup = nullptr;
+
 	if (!isNew) {
+		hotkeyGroup = new QWidget;
+		outputLayout->addRow(QString::fromUtf8(obs_module_text("Hotkeys")), hotkeyGroup);
+		auto hotkeyLayout = new QFormLayout;
+		hotkeyLayout->setContentsMargins(0, 0, 0, 0);
+		hotkeyGroup->setLayout(hotkeyLayout);
 		std::string startName = "AitumStreamSuiteStartOutput";
 		startName += obs_data_get_string(settings, "name");
+		OBSHotkeyWidget *startHotkeyWidget = nullptr;
 		auto hotkey = GetHotkeyByName(startName.c_str());
 		if (hotkey) {
 			auto id = obs_hotkey_get_id(hotkey);
@@ -1573,7 +1596,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			auto label = new OBSHotkeyLabel;
 			label->setText(QString::fromUtf8(obs_module_text("StartHotkey")));
 			startHotkeyWidget->label = label;
-			outputLayout->addRow(label, startHotkeyWidget);
+			hotkeyLayout->addRow(label, startHotkeyWidget);
 			hotkeys.push_back(startHotkeyWidget);
 		}
 
@@ -1584,11 +1607,11 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			auto id = obs_hotkey_get_id(hotkey);
 			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
 			auto hn = obs_hotkey_get_name(hotkey);
-			stopHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto stopHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
 			auto label = new OBSHotkeyLabel;
 			label->setText(QString::fromUtf8(obs_module_text("StopHotkey")));
 			stopHotkeyWidget->label = label;
-			outputLayout->addRow(label, stopHotkeyWidget);
+			hotkeyLayout->addRow(label, stopHotkeyWidget);
 			hotkeys.push_back(stopHotkeyWidget);
 			if (startHotkeyWidget) {
 				stopHotkeyWidget->label->pairPartner = startHotkeyWidget->label;
@@ -1603,24 +1626,19 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			auto id = obs_hotkey_get_id(hotkey);
 			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
 			auto hn = obs_hotkey_get_name(hotkey);
-			extraHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto extraHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
 			auto label = new OBSHotkeyLabel;
 			label->setText(QString::fromUtf8(obs_module_text("SaveBacktrack")));
 			extraHotkeyWidget->label = label;
-			outputLayout->addRow(label, extraHotkeyWidget);
+			hotkeyLayout->addRow(label, extraHotkeyWidget);
 			hotkeys.push_back(extraHotkeyWidget);
 		}
 	}
 
 	if (!expanded) {
-		outputLayout->setRowVisible(canvasCombo, false);
-		if (startHotkeyWidget)
-			outputLayout->setRowVisible(startHotkeyWidget, false);
-		if (stopHotkeyWidget)
-			outputLayout->setRowVisible(stopHotkeyWidget, false);
-		if (extraHotkeyWidget)
-			outputLayout->setRowVisible(extraHotkeyWidget, false);
-
+		outputLayout->setRowVisible(canvasLayout, false);
+		if (hotkeyGroup)
+			outputLayout->setRowVisible(hotkeyGroup, false);
 		streaming_title->setArrowType(Qt::ArrowType::RightArrow);
 	}
 
@@ -1630,19 +1648,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	if (strcmp(output_type, "virtual_cam") == 0) {
 		connect(streaming_title, &QToolButton::toggled,
-			[streaming_title, settings, canvasCombo, outputLayout, startHotkeyWidget, stopHotkeyWidget,
-			 extraHotkeyWidget](bool checked) {
+			[streaming_title, settings, canvasCombo, outputLayout, hotkeyGroup](bool checked) {
 				outputLayout->setRowVisible(canvasCombo, checked);
-				if (startHotkeyWidget)
-					outputLayout->setRowVisible(startHotkeyWidget, checked);
-				if (stopHotkeyWidget)
-					outputLayout->setRowVisible(stopHotkeyWidget, checked);
-				if (extraHotkeyWidget)
-					outputLayout->setRowVisible(extraHotkeyWidget, checked);
+				if (hotkeyGroup)
+					outputLayout->setRowVisible(hotkeyGroup, checked);
 				obs_data_set_bool(settings, "expanded", checked);
 				streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
 			});
-		connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, settings, outputs] {
+		connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, settings] {
 			obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		});
 		return;
@@ -1680,12 +1693,109 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	//	auto pageStyle = QString("QWidget[page=\"true\"] { border: 1px solid %1; padding-top: 0; margin-top: 0; }")
 	//					.arg(QPalette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb));
 	//
-	auto videoPage = new QWidget;
-	videoPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-	//	videoPage->setStyleSheet(pageStyle);
-	//	videoPage->setProperty("page", true);
-	auto videoPageLayout = new QFormLayout;
-	videoPage->setLayout(videoPageLayout);
+	if (add) {
+		connect(add, &QToolButton::clicked, [this, advancedTabWidget, settings, outputs, canvasLayout, canvasCombo] {
+			auto index = advancedTabWidget->count() - 1;
+			if (index >= MAX_OUTPUT_VIDEO_ENCODERS)
+				return;
+			auto canvasSubLayout = new QHBoxLayout;
+			canvasSubLayout->setContentsMargins(0, 0, 0, 0);
+			auto cc = new QComboBox;
+			auto video_encoders = obs_data_get_array(settings, "video_encoders");
+			if (!video_encoders) {
+				video_encoders = obs_data_array_create();
+				obs_data_set_array(settings, "video_encoders", video_encoders);
+			}
+			auto venc_settings = obs_data_array_item(video_encoders, index);
+			if (!venc_settings) {
+				venc_settings = obs_data_create();
+				obs_data_array_insert(video_encoders, index, venc_settings);
+			}
+			obs_data_array_release(video_encoders);
+			AddVideoEncoderPage(advancedTabWidget, venc_settings, outputs, cc, index);
+			obs_data_release(venc_settings);
+
+			for (int i = 0; i < canvasCombo->count(); i++) {
+				cc->addItem(canvasCombo->itemText(i));
+			}
+			canvasSubLayout->addWidget(cc);
+			auto remove = new QToolButton;
+			remove->setProperty("themeID", "removeIconSmall");
+			remove->setProperty("class", "icon-minus");
+			remove->setToolTip(QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
+			canvasSubLayout->addWidget(remove);
+			canvasLayout->addLayout(canvasSubLayout);
+			connect(remove, &QToolButton::clicked, [this, advancedTabWidget, settings, canvasLayout, canvasSubLayout] {
+				auto video_encoders = obs_data_get_array(settings, "video_encoders");
+				auto c = canvasLayout->count();
+				for (int i = c - 1; i >= 0; i--) {
+					auto item = canvasLayout->itemAt(i);
+					if (item->layout() == canvasSubLayout) {
+						canvasLayout->removeItem(item);
+						RemoveLayoutItem(item);
+						obs_data_array_erase(video_encoders, i);
+						advancedTabWidget->removeTab(i);
+					}
+				}
+				obs_data_array_release(video_encoders);
+			});
+		});
+	}
+
+	auto video_encoders = obs_data_get_array(settings, "video_encoders");
+	if (!video_encoders) {
+		video_encoders = obs_data_array_create();
+		auto venc_settings = obs_data_create();
+		obs_data_apply(venc_settings, settings);
+		obs_data_array_push_back(video_encoders, venc_settings);
+		obs_data_release(venc_settings);
+		obs_data_set_array(settings, "video_encoders", video_encoders);
+	}
+	auto count = obs_data_array_count(video_encoders);
+	for (size_t i = 0; i < count; i++) {
+		auto venc_settings = obs_data_array_item(video_encoders, i);
+		if (i == 0) {
+			AddVideoEncoderPage(advancedTabWidget, venc_settings, outputs, canvasCombo, (int)i);
+		} else {
+			auto canvasSubLayout = new QHBoxLayout;
+			canvasSubLayout->setContentsMargins(0, 0, 0, 0);
+			auto cc = new QComboBox;
+			for (int j = 0; j < canvasCombo->count(); j++) {
+				cc->addItem(canvasCombo->itemText(j));
+			}
+			auto cn = QString::fromUtf8(obs_data_get_string(venc_settings, "canvas"));
+			cc->setCurrentText(cn);
+			AddVideoEncoderPage(advancedTabWidget, venc_settings, outputs, cc, (int)i);
+			canvasSubLayout->addWidget(cc);
+			auto remove = new QToolButton;
+			remove->setProperty("themeID", "removeIconSmall");
+			remove->setProperty("class", "icon-minus");
+			remove->setToolTip(QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
+			canvasSubLayout->addWidget(remove);
+			canvasLayout->addLayout(canvasSubLayout);
+			connect(remove, &QToolButton::clicked,
+				[this, advancedTabWidget, settings, canvasLayout, canvasSubLayout, i] {
+					auto video_encoders = obs_data_get_array(settings, "video_encoders");
+					auto c = canvasLayout->count();
+					for (int j = c - 1; j >= 0; j--) {
+						auto item = canvasLayout->itemAt(j);
+						if (item->layout() == canvasSubLayout) {
+							canvasLayout->removeItem(item);
+							RemoveLayoutItem(item);
+							obs_data_array_erase(video_encoders, j);
+							advancedTabWidget->removeTab(j);
+						}
+					}
+					obs_data_array_release(video_encoders);
+				});
+		}
+		obs_data_release(venc_settings);
+	}
+	connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, settings] {
+		obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
+	});
+
+	obs_data_array_release(video_encoders);
 
 	auto audioPage = new QWidget;
 	audioPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -1693,6 +1803,201 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	//	audioPage->setProperty("page", true);
 	auto audioPageLayout = new QFormLayout;
 	audioPage->setLayout(audioPageLayout);
+
+	auto audioEncoder = new QComboBox;
+	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
+	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+		auto audioTrack = new QComboBox;
+		for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
+			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
+									     trackConfigName.toUtf8().constData()));
+			if (trackName.isEmpty()) {
+				auto trackTranslationName =
+					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
+				trackName = QString::fromUtf8(
+					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+			}
+			if (trackName.isEmpty())
+				trackName = QString::number(i + 1);
+			audioTrack->addItem(trackName);
+		}
+		audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
+		connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
+			if (audioTrack->currentIndex() >= 0)
+				obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
+		});
+		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
+	} else {
+		auto at = obs_data_get_int(settings, "audio_tracks");
+		std::vector<QCheckBox *> audioTracks;
+		auto al = new QHBoxLayout;
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
+			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
+									     trackConfigName.toUtf8().constData()));
+			if (trackName.isEmpty()) {
+				auto trackTranslationName =
+					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
+				trackName = QString::fromUtf8(
+					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
+			}
+			if (trackName.isEmpty())
+				trackName = QString::number(i + 1);
+			auto check = new QCheckBox(trackName);
+			check->setChecked((at & (1ll << i)) != 0);
+			audioTracks.push_back(check);
+			al->addWidget(check);
+		}
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+			connect(audioTracks[i], &QCheckBox::checkStateChanged, [this, settings, audioTracks] {
+#else
+			connect(audioTracks[i], &QCheckBox::stateChanged, [this, settings, audioTracks] {
+#endif
+				long long tracks = 0;
+				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+					if (audioTracks[i]->isChecked())
+						tracks += (1ll << i);
+				}
+				if (!tracks)
+					tracks = 1;
+				obs_data_set_int(settings, "audio_tracks", tracks);
+			});
+		}
+		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTracks")), al);
+	}
+
+	auto audioEncoderGroup = new QWidget();
+	audioEncoderGroup->setProperty("altColor", QVariant(true));
+	auto audioEncoderGroupLayout = new QFormLayout();
+	audioEncoderGroup->setLayout(audioEncoderGroupLayout);
+	audioPageLayout->addRow(audioEncoderGroup);
+
+	int audio_encoder_index = 0;
+	const char *current_type = obs_data_get_string(settings, "audio_encoder");
+	const char *type;
+	size_t idx = 0;
+	while (obs_enum_encoder_types(idx++, &type)) {
+		if (obs_get_encoder_type(type) != OBS_ENCODER_AUDIO)
+			continue;
+		uint32_t caps = obs_get_encoder_caps(type);
+		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
+			continue;
+		if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+			const char *codec = obs_get_encoder_codec(type);
+			if (astrcmpi(codec, "aac") != 0 && astrcmpi(codec, "opus") != 0)
+				continue;
+		}
+		audioEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
+		if (strcmp(type, current_type) == 0)
+			audio_encoder_index = audioEncoder->count() - 1;
+	}
+
+	connect(audioEncoder, &QComboBox::currentIndexChanged,
+		[this, outputGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup, audioEncoderGroupLayout,
+		 settings, audioPage] {
+			auto encoder_string = audioEncoder->currentData().toString().toUtf8();
+			auto encoder = encoder_string.constData();
+			const bool encoder_changed = !encoder_string.isEmpty() &&
+						     strcmp(obs_data_get_string(settings, "audio_encoder"), encoder) != 0;
+			if (encoder_changed)
+				obs_data_set_string(settings, "audio_encoder", encoder);
+
+			auto t = audio_encoder_properties.find(outputGroup);
+			if (t != audio_encoder_properties.end()) {
+				obs_properties_destroy(t->second);
+				audio_encoder_properties.erase(t);
+			}
+			for (int i = audioEncoderGroupLayout->rowCount() - 1; i >= 0; i--) {
+				audioEncoderGroupLayout->removeRow(i);
+			}
+			auto aes = encoder_changed ? nullptr : obs_data_get_obj(settings, "audio_encoder_settings");
+			if (!aes) {
+				auto defaults = obs_encoder_defaults(encoder);
+				if (defaults) {
+					aes = obs_data_get_defaults(defaults);
+					obs_data_release(defaults);
+				} else {
+					aes = obs_data_create();
+				}
+				obs_data_set_obj(settings, "audio_encoder_settings", aes);
+			}
+			auto stream_encoder_properties = obs_get_encoder_properties(encoder);
+			audio_encoder_properties[outputGroup] = stream_encoder_properties;
+
+			obs_property_t *property = obs_properties_first(stream_encoder_properties);
+			while (property) {
+				AddProperty(stream_encoder_properties, property, aes, audioEncoderGroupLayout);
+				obs_property_next(&property);
+			}
+			obs_data_release(aes);
+		});
+
+	if (audio_encoder_index == audioEncoder->currentIndex())
+		audioEncoder->setCurrentIndex(-1);
+	audioEncoder->setCurrentIndex(audio_encoder_index);
+
+	const bool advanced = obs_data_get_bool(settings, "advanced");
+
+	auto advancedButton = new QCheckBox(QString::fromUtf8(obs_module_text("CustomEncoderSettings")));
+	advancedButton->setCheckable(true);
+	advancedButton->setChecked(advanced);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(advancedButton, &QCheckBox::checkStateChanged, [advancedButton, advancedGroup, settings] {
+#else
+	connect(advancedButton, &QCheckBox::stateChanged, [advancedButton, advancedGroup, settings] {
+#endif
+		const bool is_advanced = advancedButton->isChecked();
+		const bool expanded = obs_data_get_bool(settings, "expanded");
+		advancedGroup->setVisible(is_advanced && expanded);
+		obs_data_set_bool(settings, "advanced", is_advanced);
+	});
+
+	connect(streaming_title, &QToolButton::toggled,
+		[advancedGroup, advancedButton, streaming_title, settings, canvasLayout, outputLayout, hotkeyGroup](bool checked) {
+			const bool advanced = obs_data_get_bool(settings, "advanced");
+			advancedButton->setVisible(checked);
+			outputLayout->setRowVisible(canvasLayout, checked);
+			if (hotkeyGroup)
+				outputLayout->setRowVisible(hotkeyGroup, checked);
+			advancedGroup->setVisible(checked && advanced);
+			obs_data_set_bool(settings, "expanded", checked);
+			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
+		});
+
+	if (expanded) {
+		streaming_title->setArrowType(Qt::ArrowType::DownArrow);
+		if (!advanced)
+			advancedGroup->setVisible(false);
+	} else {
+		advancedButton->setVisible(false);
+		advancedGroup->setVisible(false);
+	}
+
+	advancedTabWidget->addTab(audioPage, QString::fromUtf8(obs_module_text("AudioEncoderSettings")));
+	advancedGroupLayout->addWidget(advancedTabWidget, 1);
+
+	outputLayout->addWidget(advancedButton);
+
+	outputLayout->addRow(advancedGroup);
+
+	if (isNew) {
+		canvasCombo->show();
+		canvasCombo->setFocus();
+		//canvasCombo->setFocus(Qt::OtherFocusReason);
+	}
+}
+
+void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *settings, obs_data_array_t *outputs,
+					   QComboBox *canvasCombo, int index)
+{
+	auto videoPage = new QWidget;
+	videoPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	//	videoPage->setStyleSheet(pageStyle);
+	//	videoPage->setProperty("page", true);
+	auto videoPageLayout = new QFormLayout;
+	videoPage->setLayout(videoPageLayout);
 
 	auto outputVideoEncoder = new QComboBox;
 	outputVideoEncoder->addItem(QString::fromUtf8(obs_module_text("None")), QVariant(QString::fromUtf8("")));
@@ -1731,7 +2036,15 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	    !config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo"))
 		videoPageLayout->setRowVisible(videoEncoderIndex, false);
 
-	auto canvasComboChanged = [canvasCombo, outputVideoEncoder, settings, outputs] {
+	tabWidget->insertTab(index, videoPage, QString::fromUtf8(obs_module_text("VideoEncoderSettings")));
+
+	auto canvasComboChanged = [canvasCombo, outputVideoEncoder, settings, outputs, tabWidget, index] {
+		if (canvasCombo->currentText().isEmpty()) {
+			tabWidget->setTabText(index, QString::fromUtf8(obs_module_text("VideoEncoderSettings")));
+		} else {
+			tabWidget->setTabText(index, canvasCombo->currentText() + " " +
+							     QString::fromUtf8(obs_module_text("VideoEncoderSettings")));
+		}
 		obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		auto canvas_name = obs_data_get_string(settings, "canvas");
 		auto canvas = canvas_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(canvas_name);
@@ -1747,10 +2060,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			auto output = obs_data_array_item(outputs, i);
 			auto name = obs_data_get_string(output, "name");
 			if (name && name[0] != '\0' && strcmp(obs_data_get_string(settings, "name"), name) != 0) {
-				auto cn = obs_data_get_string(output, "canvas");
-				if (cn[0] == '\0' || strcmp(cn, canvas_name) == 0) {
-					outputVideoEncoder->addItem(QString::fromUtf8(name), QVariant(QString::fromUtf8(name)));
-				}
+				outputVideoEncoder->addItem(QString::fromUtf8(name), QVariant(QString::fromUtf8(name)));
 			}
 			obs_data_release(output);
 		}
@@ -1885,11 +2195,9 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	};
 	connect(outputVideoEncoder, &QComboBox::currentTextChanged, ouputVideoEncoderChanged);
 
-	ouputVideoEncoderChanged();
-
 	connect(videoEncoder, &QComboBox::currentIndexChanged,
-		[this, outputGroup, advancedGroupLayout, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup,
-		 videoEncoderGroupLayout, settings, videoPage] {
+		[this, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoEncoderGroupLayout, settings,
+		 videoPage] {
 			auto encoder_string = videoEncoder->currentData().toString().toUtf8();
 			auto encoder = encoder_string.constData();
 			const bool encoder_changed = strcmp(obs_data_get_string(settings, "video_encoder"), encoder) != 0;
@@ -1905,7 +2213,8 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 					obs_canvas_release(mc);
 				}
 				if (!videoEncoderIndex) {
-				} else if (main && config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+				} else if (main &&
+					   config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
 					videoPageLayout->setRowVisible(videoEncoderIndex, true);
 				} else {
 					videoPageLayout->setRowVisible(videoEncoderIndex, false);
@@ -1918,7 +2227,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 					videoPageLayout->setRowVisible(videoEncoderIndex, false);
 				if (!videoEncoderGroup->isVisibleTo(videoPage))
 					videoEncoderGroup->setVisible(true);
-				auto t = video_encoder_properties.find(outputGroup);
+				auto t = video_encoder_properties.find(videoPage);
 				if (t != video_encoder_properties.end()) {
 					obs_properties_destroy(t->second);
 					video_encoder_properties.erase(t);
@@ -1938,7 +2247,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 					obs_data_set_obj(settings, "video_encoder_settings", ves);
 				}
 				auto stream_encoder_properties = obs_get_encoder_properties(encoder);
-				video_encoder_properties[outputGroup] = stream_encoder_properties;
+				video_encoder_properties[videoPage] = stream_encoder_properties;
 
 				obs_property_t *property = obs_properties_first(stream_encoder_properties);
 				while (property) {
@@ -1949,6 +2258,12 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			}
 		});
 
+	ouputVideoEncoderChanged();
+
+	auto output_type = obs_data_get_string(settings, "type");
+
+	bool is_stream = (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
+
 	const char *current_type = obs_data_get_string(settings, "video_encoder");
 	const char *type;
 	size_t idx = 0;
@@ -1958,7 +2273,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		uint32_t caps = obs_get_encoder_caps(type);
 		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
 			continue;
-		if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+		if (is_stream) {
 			const char *codec = obs_get_encoder_codec(type);
 			if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
 				continue;
@@ -1969,196 +2284,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	}
 	if (videoEncoder->currentIndex() <= 0)
 		videoEncoderGroup->setVisible(false);
-
-	auto audioEncoder = new QComboBox;
-	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
-	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
-		auto audioTrack = new QComboBox;
-		for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
-			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
-			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
-									     trackConfigName.toUtf8().constData()));
-			if (trackName.isEmpty()) {
-				auto trackTranslationName =
-					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
-				trackName = QString::fromUtf8(
-					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
-			}
-			if (trackName.isEmpty())
-				trackName = QString::number(i + 1);
-			audioTrack->addItem(trackName);
-		}
-		audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
-		connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
-			if (audioTrack->currentIndex() >= 0)
-				obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
-		});
-		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
-	} else {
-		auto at = obs_data_get_int(settings, "audio_tracks");
-		std::vector<QCheckBox *> audioTracks;
-		auto al = new QHBoxLayout;
-		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
-			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
-			auto trackName = QString::fromUtf8(config_get_string(obs_frontend_get_profile_config(), "AdvOut",
-									     trackConfigName.toUtf8().constData()));
-			if (trackName.isEmpty()) {
-				auto trackTranslationName =
-					QString::fromUtf8("Basic.Settings.Output.Adv.Audio.Track") + QString::number(i + 1);
-				trackName = QString::fromUtf8(
-					obs_frontend_get_locale_string(trackTranslationName.toUtf8().constData()));
-			}
-			if (trackName.isEmpty())
-				trackName = QString::number(i + 1);
-			auto check = new QCheckBox(trackName);
-			check->setChecked((at & (1ll << i)) != 0);
-			audioTracks.push_back(check);
-			al->addWidget(check);
-		}
-		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-			connect(audioTracks[i], &QCheckBox::checkStateChanged, [this, settings, audioTracks] {
-#else
-			connect(audioTracks[i], &QCheckBox::stateChanged, [this, settings, audioTracks] {
-#endif
-				long long tracks = 0;
-				for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
-					if (audioTracks[i]->isChecked())
-						tracks += (1ll << i);
-				}
-				if (!tracks)
-					tracks = 1;
-				obs_data_set_int(settings, "audio_tracks", tracks);
-			});
-		}
-		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTracks")), al);
-	}
-
-	auto audioEncoderGroup = new QWidget();
-	audioEncoderGroup->setProperty("altColor", QVariant(true));
-	auto audioEncoderGroupLayout = new QFormLayout();
-	audioEncoderGroup->setLayout(audioEncoderGroupLayout);
-	audioPageLayout->addRow(audioEncoderGroup);
-
-	int audio_encoder_index = 0;
-	current_type = obs_data_get_string(settings, "audio_encoder");
-	idx = 0;
-	while (obs_enum_encoder_types(idx++, &type)) {
-		if (obs_get_encoder_type(type) != OBS_ENCODER_AUDIO)
-			continue;
-		uint32_t caps = obs_get_encoder_caps(type);
-		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
-			continue;
-		if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
-			const char *codec = obs_get_encoder_codec(type);
-			if (astrcmpi(codec, "aac") != 0 && astrcmpi(codec, "opus") != 0)
-				continue;
-		}
-		audioEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
-		if (strcmp(type, current_type) == 0)
-			audio_encoder_index = audioEncoder->count() - 1;
-	}
-
-	connect(audioEncoder, &QComboBox::currentIndexChanged,
-		[this, outputGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup, audioEncoderGroupLayout,
-		 settings, audioPage] {
-			auto encoder_string = audioEncoder->currentData().toString().toUtf8();
-			auto encoder = encoder_string.constData();
-			const bool encoder_changed = !encoder_string.isEmpty() &&
-						     strcmp(obs_data_get_string(settings, "audio_encoder"), encoder) != 0;
-			if (encoder_changed)
-				obs_data_set_string(settings, "audio_encoder", encoder);
-
-			auto t = audio_encoder_properties.find(outputGroup);
-			if (t != audio_encoder_properties.end()) {
-				obs_properties_destroy(t->second);
-				audio_encoder_properties.erase(t);
-			}
-			for (int i = audioEncoderGroupLayout->rowCount() - 1; i >= 0; i--) {
-				audioEncoderGroupLayout->removeRow(i);
-			}
-			auto aes = encoder_changed ? nullptr : obs_data_get_obj(settings, "audio_encoder_settings");
-			if (!aes) {
-				auto defaults = obs_encoder_defaults(encoder);
-				if (defaults) {
-					aes = obs_data_get_defaults(defaults);
-					obs_data_release(defaults);
-				} else {
-					aes = obs_data_create();
-				}
-				obs_data_set_obj(settings, "audio_encoder_settings", aes);
-			}
-			auto stream_encoder_properties = obs_get_encoder_properties(encoder);
-			audio_encoder_properties[outputGroup] = stream_encoder_properties;
-
-			obs_property_t *property = obs_properties_first(stream_encoder_properties);
-			while (property) {
-				AddProperty(stream_encoder_properties, property, aes, audioEncoderGroupLayout);
-				obs_property_next(&property);
-			}
-			obs_data_release(aes);
-		});
-
-	if (audio_encoder_index == audioEncoder->currentIndex())
-		audioEncoder->setCurrentIndex(-1);
-	audioEncoder->setCurrentIndex(audio_encoder_index);
-
-	const bool advanced = obs_data_get_bool(settings, "advanced");
-
-	auto advancedButton = new QCheckBox(QString::fromUtf8(obs_module_text("CustomEncoderSettings")));
-	advancedButton->setCheckable(true);
-	advancedButton->setChecked(advanced);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-	connect(advancedButton, &QCheckBox::checkStateChanged, [advancedButton, advancedGroup, settings] {
-#else
-	connect(advancedButton, &QCheckBox::stateChanged, [advancedButton, advancedGroup, settings] {
-#endif
-		const bool is_advanced = advancedButton->isChecked();
-		const bool expanded = obs_data_get_bool(settings, "expanded");
-		advancedGroup->setVisible(is_advanced && expanded);
-		obs_data_set_bool(settings, "advanced", is_advanced);
-	});
-
-	connect(streaming_title, &QToolButton::toggled,
-		[advancedGroup, advancedButton, streaming_title, settings, canvasCombo, outputLayout, startHotkeyWidget,
-		 stopHotkeyWidget, extraHotkeyWidget](bool checked) {
-			const bool advanced = obs_data_get_bool(settings, "advanced");
-			advancedButton->setVisible(checked);
-			outputLayout->setRowVisible(canvasCombo, checked);
-			if (startHotkeyWidget)
-				outputLayout->setRowVisible(startHotkeyWidget, checked);
-			if (stopHotkeyWidget)
-				outputLayout->setRowVisible(stopHotkeyWidget, checked);
-			if (extraHotkeyWidget)
-				outputLayout->setRowVisible(extraHotkeyWidget, checked);
-			advancedGroup->setVisible(checked && advanced);
-			obs_data_set_bool(settings, "expanded", checked);
-			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
-		});
-
-	if (expanded) {
-		streaming_title->setArrowType(Qt::ArrowType::DownArrow);
-		if (!advanced)
-			advancedGroup->setVisible(false);
-	} else {
-		advancedButton->setVisible(false);
-		advancedGroup->setVisible(false);
-	}
-
-	// Hook up
-	advancedTabWidget->addTab(videoPage, QString::fromUtf8(obs_module_text("VideoEncoderSettings")));
-	advancedTabWidget->addTab(audioPage, QString::fromUtf8(obs_module_text("AudioEncoderSettings")));
-	advancedGroupLayout->addWidget(advancedTabWidget, 1);
-
-	outputLayout->addWidget(advancedButton);
-
-	outputLayout->addRow(advancedGroup);
-
-	if (isNew) {
-		canvasCombo->show();
-		canvasCombo->setFocus();
-		//canvasCombo->setFocus(Qt::OtherFocusReason);
-	}
 }
 
 void OBSBasicSettings::AddRecord(bool backtrack)
