@@ -110,6 +110,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/switching-splitter.cpp
   src/utils/widgets/qt-display.cpp
   src/utils/widgets/visibility-checkbox.cpp
+  src/utils/widgets/visibility-item-widget.cpp
   src/utils/color.hpp
   src/utils/event-filter.hpp
   src/utils/file-download.h
@@ -125,7 +126,8 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/stream-key-input.hpp
   src/utils/widgets/switching-splitter.hpp
   src/utils/widgets/qt-display.hpp
-  src/utils/widgets/visibility-checkbox.hpp)
+  src/utils/widgets/visibility-checkbox.hpp
+  src/utils/widgets/visibility-item-widget.hpp)
 
 if(BUILD_OUT_OF_TREE)
 	set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
