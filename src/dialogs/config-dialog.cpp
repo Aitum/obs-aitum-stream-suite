@@ -2258,8 +2258,6 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 			}
 		});
 
-	ouputVideoEncoderChanged();
-
 	auto output_type = obs_data_get_string(settings, "type");
 
 	bool is_stream = (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
@@ -2284,6 +2282,8 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	}
 	if (videoEncoder->currentIndex() <= 0)
 		videoEncoderGroup->setVisible(false);
+
+	ouputVideoEncoderChanged();
 }
 
 void OBSBasicSettings::AddRecord(bool backtrack)
