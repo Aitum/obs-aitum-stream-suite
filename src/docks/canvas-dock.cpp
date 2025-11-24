@@ -731,8 +731,8 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 	float scale;
 
 	GetScaleAndCenterPos(sourceCX, sourceCY, cx, cy, x, y, scale);
-	//if (window->previewScale != scale)
-	//	window->previewScale = scale;
+	if (window->previewScale != scale)
+		window->previewScale = scale;
 	auto newCX = scale * float(sourceCX);
 	auto newCY = scale * float(sourceCY);
 
