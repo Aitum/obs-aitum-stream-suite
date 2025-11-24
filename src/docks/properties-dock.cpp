@@ -951,9 +951,10 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 				}
 			} else {
 				auto source = obs_weak_source_get_source(current_properties);
-				if (obs_property_button_clicked(property, obs_obj_get_data(source))) {
+				if (obs_property_button_clicked(property, source)) {
 					RefreshProperties(properties, layout);
 				}
+				obs_source_release(source);
 			}
 		});
 	} else if (type == OBS_PROPERTY_PATH) {
