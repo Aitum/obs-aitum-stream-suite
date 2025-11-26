@@ -73,9 +73,16 @@ private:
 	QToolButton *generalHelpButton;
 	QToolButton *generalSupportAitumButton;
 
+	QCheckBox *mainStream;
+	QCheckBox *mainRecord;
+	QCheckBox *mainBacktrack;
+	QCheckBox *mainVirtualCam;
+
 	std::vector<OBSHotkeyWidget *> hotkeys;
 
+	void AddStream();
 	void AddRecord(bool backtrack);
+	void AddVirtualCam();
 
 	obs_hotkey_t *GetHotkeyByName(const char *name);
 	std::vector<obs_key_combination_t> GetCombosForHotkey(obs_hotkey_id hotkey);
@@ -102,6 +109,7 @@ public:
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
 	void SetNewerVersion(QString newer_version_available);
 	void ShowTab(int i);
+	void SetCreateType(const char *create_type);
 	void SaveHotkeys();
 public slots:
 };

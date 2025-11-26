@@ -320,38 +320,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 
 		auto a =
 			addMenu.addAction(QIcon(":/aitum/media/stream.svg"), QString::fromUtf8(obs_module_text("AddStreamOutput")));
-		connect(a, &QAction::triggered, [this] {
-			QStringList otherNames;
-			obs_data_array_enum(
-				extra_outputs,
-				[](obs_data_t *data2, void *param) {
-					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-				},
-				&otherNames);
-			otherNames.removeDuplicates();
-			auto outputDialog = new StreamOutputDialog(this, otherNames);
-
-			outputDialog->setWindowModality(Qt::WindowModal);
-			outputDialog->setModal(true);
-
-			if (outputDialog->exec() == QDialog::Accepted) {
-				// create a new output
-				if (!extra_outputs)
-					return;
-				auto s = obs_data_create();
-				obs_data_set_bool(s, "enabled", true);
-				obs_data_set_bool(s, "expanded", true);
-				obs_data_set_string(s, "type", "stream");
-				obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
-				obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
-				obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
-				obs_data_array_push_back(extra_outputs, s);
-				AddOutput(outputsLayout, s, extra_outputs, true);
-				obs_data_release(s);
-			}
-
-			delete outputDialog;
-		});
+		connect(a, &QAction::triggered, [this] { AddStream(); });
 
 		a = addMenu.addAction(QIcon(":/aitum/media/record.svg"), QString::fromUtf8(obs_module_text("AddRecordOutput")));
 		connect(a, &QAction::triggered, [this] { AddRecord(false); });
@@ -361,35 +330,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		connect(a, &QAction::triggered, [this] { AddRecord(true); });
 		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
-		connect(a, &QAction::triggered, [this] {
-			QStringList otherNames;
-			obs_data_array_enum(
-				extra_outputs,
-				[](obs_data_t *data2, void *param) {
-					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-				},
-				&otherNames);
-			otherNames.removeDuplicates();
-
-			std::string name = obs_module_text("VirtualCam");
-			while (true) {
-				if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("OutputName")), name))
-					break;
-
-				if (otherNames.contains(QString::fromUtf8(name)))
-					continue;
-
-				auto s = obs_data_create();
-				obs_data_set_bool(s, "enabled", true);
-				obs_data_set_bool(s, "expanded", true);
-				obs_data_set_string(s, "type", "virtual_cam");
-				obs_data_set_string(s, "name", name.c_str());
-				obs_data_array_push_back(extra_outputs, s);
-				AddOutput(outputsLayout, s, extra_outputs, true);
-				obs_data_release(s);
-				break;
-			}
-		});
+		connect(a, &QAction::triggered, [this] { AddVirtualCam(); });
 		addMenu.exec(QCursor::pos());
 	});
 
@@ -412,8 +353,52 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 	outputLayout->addRow(mainTitle2);
 
 	auto mainDescription2 = new QLabel(QString::fromUtf8(obs_module_text("SettingsMainOutputDescription")));
+
 	//	mainTitle->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
 	outputLayout->addRow(mainDescription2);
+
+	auto mainOutputLayout = new QHBoxLayout;
+	mainStream = new QCheckBox(QString::fromUtf8(obs_module_text("Stream")));
+	mainStream->setIcon(QIcon(":/aitum/media/stream.svg"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(mainStream, &QCheckBox::checkStateChanged, [this] {
+#else
+	connect(mainStream, &QCheckBox::stateChanged, [this] {
+#endif
+		obs_data_set_bool(main_settings, "main_stream_output_show", mainStream->isChecked());
+	});
+	mainOutputLayout->addWidget(mainStream);
+	mainRecord = new QCheckBox(QString::fromUtf8(obs_module_text("Record")));
+	mainRecord->setIcon(QIcon(":/aitum/media/record.svg"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(mainRecord, &QCheckBox::checkStateChanged, [this] {
+#else
+	connect(mainRecord, &QCheckBox::stateChanged, [this] {
+#endif
+		obs_data_set_bool(main_settings, "main_record_output_show", mainRecord->isChecked());
+	});
+	mainOutputLayout->addWidget(mainRecord);
+	mainBacktrack = new QCheckBox(QString::fromUtf8(obs_module_text("Backtrack")));
+	mainBacktrack->setIcon(QIcon(":/aitum/media/backtrack_off.svg"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(mainBacktrack, &QCheckBox::checkStateChanged, [this] {
+#else
+	connect(mainBacktrack, &QCheckBox::stateChanged, [this] {
+#endif
+		obs_data_set_bool(main_settings, "main_backtrack_output_show", mainBacktrack->isChecked());
+	});
+	mainOutputLayout->addWidget(mainBacktrack);
+	mainVirtualCam = new QCheckBox(QString::fromUtf8(obs_module_text("VirtualCamera")));
+	mainVirtualCam->setIcon(QIcon(":/aitum/media/virtual_cam_off.svg"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(mainVirtualCam, &QCheckBox::checkStateChanged, [this] {
+#else
+	connect(mainVirtualCam, &QCheckBox::stateChanged, [this] {
+#endif
+		obs_data_set_bool(main_settings, "main_virtual_cam_output_show", mainVirtualCam->isChecked());
+	});
+	mainOutputLayout->addWidget(mainVirtualCam);
+	outputLayout->addRow(QString::fromUtf8(obs_module_text("SettingsMainOutputShow")), mainOutputLayout);
 
 	outputGroup->setLayout(outputLayout);
 
@@ -900,6 +885,11 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		RemoveLayoutItem(i);
 		outputsLayout->removeRow(2);
 	}
+	mainStream->setChecked(obs_data_get_bool(settings, "main_stream_output_show"));
+	mainRecord->setChecked(obs_data_get_bool(settings, "main_record_output_show"));
+	mainBacktrack->setChecked(obs_data_get_bool(settings, "main_backtrack_output_show"));
+	mainVirtualCam->setChecked(obs_data_get_bool(settings, "main_virtual_cam_output_show"));
+
 	obs_data_array_release(extra_outputs);
 	extra_outputs = obs_data_get_array(settings, "outputs");
 	if (!extra_outputs) {
@@ -1378,6 +1368,21 @@ void OBSBasicSettings::ShowTab(int i)
 	listWidget->setCurrentRow(i);
 }
 
+void OBSBasicSettings::SetCreateType(const char *create_type)
+{
+	if (!create_type)
+		return;
+	if (strcmp(create_type, "stream") == 0) {
+		AddStream();
+	} else if (strcmp(create_type, "record") == 0) {
+		AddRecord(false);
+	} else if (strcmp(create_type, "backtrack") == 0) {
+		AddRecord(false);
+	} else if (strcmp(create_type, "virtual_cam") == 0) {
+		AddVirtualCam();
+	}
+}
+
 QIcon getPlatformIconFromEndpoint(QString endpoint);
 
 void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew)
@@ -1513,7 +1518,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			otherNames.removeDuplicates();
 			otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
 
-			std::string name = obs_module_text("VirtualCam");
+			std::string name = obs_module_text("VirtualCamera");
 			while (true) {
 				if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("OutputName")), name))
 					break;
@@ -2286,6 +2291,40 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	ouputVideoEncoderChanged();
 }
 
+void OBSBasicSettings::AddStream()
+{
+	QStringList otherNames;
+	obs_data_array_enum(
+		extra_outputs,
+		[](obs_data_t *data2, void *param) {
+			((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+		},
+		&otherNames);
+	otherNames.removeDuplicates();
+	auto outputDialog = new StreamOutputDialog(this, otherNames);
+
+	outputDialog->setWindowModality(Qt::WindowModal);
+	outputDialog->setModal(true);
+
+	if (outputDialog->exec() == QDialog::Accepted) {
+		// create a new output
+		if (!extra_outputs)
+			return;
+		auto s = obs_data_create();
+		obs_data_set_bool(s, "enabled", true);
+		obs_data_set_bool(s, "expanded", true);
+		obs_data_set_string(s, "type", "stream");
+		obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
+		obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
+		obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
+		obs_data_array_push_back(extra_outputs, s);
+		AddOutput(outputsLayout, s, extra_outputs, true);
+		obs_data_release(s);
+	}
+
+	delete outputDialog;
+}
+
 void OBSBasicSettings::AddRecord(bool backtrack)
 {
 	QStringList otherNames;
@@ -2321,6 +2360,36 @@ void OBSBasicSettings::AddRecord(bool backtrack)
 	}
 
 	delete outputDialog;
+}
+
+void OBSBasicSettings::AddVirtualCam() {
+	QStringList otherNames;
+	obs_data_array_enum(
+		extra_outputs,
+		[](obs_data_t *data2, void *param) {
+			((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+		},
+		&otherNames);
+	otherNames.removeDuplicates();
+
+	std::string name = obs_module_text("VirtualCamera");
+	while (true) {
+		if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("OutputName")), name))
+			break;
+
+		if (otherNames.contains(QString::fromUtf8(name)))
+			continue;
+
+		auto s = obs_data_create();
+		obs_data_set_bool(s, "enabled", true);
+		obs_data_set_bool(s, "expanded", true);
+		obs_data_set_string(s, "type", "virtual_cam");
+		obs_data_set_string(s, "name", name.c_str());
+		obs_data_array_push_back(extra_outputs, s);
+		AddOutput(outputsLayout, s, extra_outputs, true);
+		obs_data_release(s);
+		break;
+	}
 }
 
 obs_hotkey_t *OBSBasicSettings::GetHotkeyByName(const char *name)

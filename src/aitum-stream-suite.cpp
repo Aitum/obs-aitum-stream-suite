@@ -38,10 +38,7 @@ QToolBar *toolbar = nullptr;
 int modesTab = -1;
 
 QList<QAction *> partnerBlockActions;
-QAction *streamAction = nullptr;
-QAction *recordAction = nullptr;
 QAction *studioModeAction = nullptr;
-QAction *virtualCameraAction = nullptr;
 
 OBSBasicSettings *configDialog = nullptr;
 OutputDock *output_dock = nullptr;
@@ -92,7 +89,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 					(time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
 				if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
 					QMetaObject::invokeMethod(toolbar, [blocks] {
-						auto before = streamAction;
+						auto before = studioModeAction;
 						size_t count = obs_data_array_count(blocks);
 						for (size_t i = 0; i < count; i++) {
 							obs_data_t *block = obs_data_array_item(blocks, i);
@@ -690,6 +687,10 @@ void load_current_profile_config()
 	dstr_free(&path);
 	if (!current_profile_config) {
 		current_profile_config = obs_data_create();
+		obs_data_set_bool(current_profile_config, "main_stream_output_show", true);
+		obs_data_set_bool(current_profile_config, "main_record_output_show", true);
+		obs_data_set_bool(current_profile_config, "main_backtrack_output_show", true);
+		obs_data_set_bool(current_profile_config, "main_virtual_cam_output_show", true);
 		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
 	} else {
 		blog(LOG_INFO, "[Aitum Stream Suite] Loaded configuration file");
@@ -875,31 +876,21 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			studioModeAction->setChecked(false);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED) {
-		if (!virtualCameraAction->isChecked()) {
-			virtualCameraAction->setChecked(true);
-		}
+		output_dock->UpdateMainVirtualCameraStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED) {
-		if (virtualCameraAction->isChecked()) {
-			virtualCameraAction->setChecked(false);
-		}
+		output_dock->UpdateMainVirtualCameraStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING || event == OBS_FRONTEND_EVENT_STREAMING_STARTED) {
-		if (!streamAction->isChecked()) {
-			streamAction->setChecked(true);
-		}
 		output_dock->UpdateMainStreamStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING || event == OBS_FRONTEND_EVENT_STREAMING_STOPPED) {
-		if (streamAction->isChecked()) {
-			streamAction->setChecked(false);
-		}
 		output_dock->UpdateMainStreamStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STARTING || event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
-		if (!recordAction->isChecked()) {
-			recordAction->setChecked(true);
-		}
+		output_dock->UpdateMainRecordingStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
-		if (recordAction->isChecked()) {
-			recordAction->setChecked(false);
-		}
+		output_dock->UpdateMainRecordingStatus(false);
+	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED){
+		output_dock->UpdateMainBacktrackStatus(true);
+	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING|| event ==  OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED){
+		output_dock->UpdateMainBacktrackStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
 		QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
 		for (const auto &it : canvas_docks) {
@@ -987,10 +978,14 @@ bool obs_data_array_equal(obs_data_array_t *a, obs_data_array_t *b)
 	return true;
 }
 
-void open_config_dialog(int tab)
+void open_config_dialog(int tab, const char* create_type)
 {
-	if (!configDialog)
+	if (!configDialog) {
 		configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
+		QObject::connect(configDialog, &OBSBasicSettings::accepted, [] {
+
+		});
+	}
 	auto settings = obs_data_create();
 	if (current_profile_config) {
 		const char *geom = obs_data_get_string(current_profile_config, "config_geometry");
@@ -1005,27 +1000,53 @@ void open_config_dialog(int tab)
 	configDialog->SetNewerVersion(newer_version_available);
 	if (tab > 0)
 		configDialog->ShowTab(tab);
+	configDialog->show();
+	configDialog->SetCreateType(create_type);
 
 	if (configDialog->exec() == QDialog::Accepted) {
-		bool canvas_changed = true;
-		bool outputs_changed = true;
+		bool canvas_changed = false;
+		bool outputs_changed = false;
 		if (current_profile_config) {
+			auto show = obs_data_get_bool(settings, "main_stream_output_show");
+			if (show != obs_data_get_bool(current_profile_config, "main_stream_output_show")) {
+				obs_data_set_bool(current_profile_config, "main_stream_output_show", show);
+				outputs_changed = true;
+			}
+			show = obs_data_get_bool(settings, "main_record_output_show");
+			if (show != obs_data_get_bool(current_profile_config, "main_record_output_show")) {
+				obs_data_set_bool(current_profile_config, "main_record_output_show", show);
+				outputs_changed = true;
+			}
+			show = obs_data_get_bool(settings, "main_backtrack_output_show");
+			if (show != obs_data_get_bool(current_profile_config, "main_backtrack_output_show")) {
+				obs_data_set_bool(current_profile_config, "main_backtrack_output_show", show);
+				outputs_changed = true;
+			}
+			show = obs_data_get_bool(settings, "main_virtual_cam_output_show");
+			if (show != obs_data_get_bool(current_profile_config, "main_virtual_cam_output_show")) {
+				obs_data_set_bool(current_profile_config, "main_virtual_cam_output_show", show);
+				outputs_changed = true;
+			}
 			obs_data_array_t *a = obs_data_get_array(current_profile_config, "canvas");
 			obs_data_array_t *b = obs_data_get_array(settings, "canvas");
-			canvas_changed = !obs_data_array_equal(a, b);
-			if (canvas_changed)
+			if (!obs_data_array_equal(a, b)) {
+				canvas_changed = true;
 				obs_data_set_array(current_profile_config, "canvas", b);
+			}
 			obs_data_array_release(a);
 			obs_data_array_release(b);
 			a = obs_data_get_array(current_profile_config, "outputs");
 			b = obs_data_get_array(settings, "outputs");
-			outputs_changed = !obs_data_array_equal(a, b);
-			if (outputs_changed)
+			if (!obs_data_array_equal(a, b)) {
+				outputs_changed = true;
 				obs_data_set_array(current_profile_config, "outputs", b);
+			}
 			obs_data_array_release(a);
 			obs_data_array_release(b);
 			obs_data_release(settings);
 		} else {
+			canvas_changed = true;
+			outputs_changed = true;
 			current_profile_config = settings;
 		}
 		obs_data_set_string(current_profile_config, "config_geometry", configDialog->saveGeometry().toBase64().constData());
@@ -1168,7 +1189,7 @@ bool obs_module_load(void)
 	aitumSettingsWidget->setProperty("themeID", "configIconSmall");
 	aitumSettingsWidget->setProperty("class", "icon-gear");
 	aitumSettingsWidget->setObjectName("AitumStreamSuiteSettingsButton");
-	QObject::connect(aitumSettingsAction, &QAction::triggered, [] { open_config_dialog(0); });
+	QObject::connect(aitumSettingsAction, &QAction::triggered, [] { open_config_dialog(0, nullptr); });
 
 	// Contribute Button
 	auto contributeButton = toolbar->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
@@ -1190,7 +1211,7 @@ bool obs_module_load(void)
 	QAction::connect(aitumButton, &QAction::triggered, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
 
 	auto addCanvas = toolbar->addAction(QString::fromUtf8(obs_module_text("AddCanvas")));
-	QAction::connect(addCanvas, &QAction::triggered, [] { open_config_dialog(1); });
+	QAction::connect(addCanvas, &QAction::triggered, [] { open_config_dialog(1, nullptr); });
 
 	//tb->addAction(QString::fromUtf8(obs_module_text("Reset")));
 	//tb->layout()->addItem(new QSpacerItem(0, 0));
@@ -1201,38 +1222,12 @@ bool obs_module_load(void)
 	//auto controlsToolBar = main_window->addToolBar(QString::fromUtf8(obs_module_text("Controls")));
 	auto controlsToolBar = toolbar;
 
-	streamAction = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("Stream")));
-	streamAction->setCheckable(true);
-	streamAction->setIcon(create2StateIcon(":/aitum/media/streaming.svg", ":/aitum/media/stream.svg"));
-	controlsToolBar->widgetForAction(streamAction)->setStyleSheet("QAbstractButton:checked{background: rgb(0,210,153);}");
-	QObject::connect(streamAction, SIGNAL(triggered()), main_window, SLOT(StreamActionTriggered()));
-	//QMenu *m = new QMenu();
-	//m->addAction(QString::fromUtf8("test"));
-	//streamButton->setMenu(m);
-
-	recordAction = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("Record")));
-	recordAction->setCheckable(true);
-	recordAction->setIcon(create2StateIcon(":/aitum/media/recording.svg", ":/aitum/media/record.svg"));
-	controlsToolBar->widgetForAction(recordAction)->setStyleSheet("QAbstractButton:checked{background: rgb(255,0,0);}");
-	QObject::connect(recordAction, SIGNAL(triggered()), main_window, SLOT(RecordActionTriggered()));
-	//recordButton->setMenu(new QMenu());
-
-	auto replayButton = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("Backtrack")));
-	replayButton->setCheckable(true);
-	replayButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
-	controlsToolBar->widgetForAction(replayButton)->setStyleSheet("QAbstractButton:checked{background: rgb(26,87,255);}");
-	QObject::connect(replayButton, SIGNAL(triggered()), main_window, SLOT(ReplayBufferSave()));
-
-	virtualCameraAction = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("VirtualCamera")));
-	virtualCameraAction->setCheckable(true);
-	virtualCameraAction->setIcon(create2StateIcon(":/aitum/media/virtual_cam_on.svg", ":/aitum/media/virtual_cam_off.svg"));
-	controlsToolBar->widgetForAction(virtualCameraAction)->setStyleSheet("QAbstractButton:checked{background: rgb(192,128,0);}");
-	QObject::connect(virtualCameraAction, SIGNAL(triggered()), main_window, SLOT(VirtualCamActionTriggered()));
-
 	studioModeAction = controlsToolBar->addAction(QString::fromUtf8(obs_module_text("StudioMode")));
+
 	studioModeAction->setCheckable(true);
 	studioModeAction->setIcon(create2StateIcon(":/aitum/media/studio_mode_on.svg", ":/aitum/media/studio_mode_off.svg"));
 	controlsToolBar->widgetForAction(studioModeAction)->setStyleSheet("QAbstractButton:checked{background: rgb(158,0,89);}");
+	((QToolButton *)controlsToolBar->widgetForAction(studioModeAction))->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 	QObject::connect(studioModeAction, SIGNAL(triggered()), main_window, SLOT(TogglePreviewProgramMode()));
 
 	//https://coolors.co/00d299-ff0000-1a57ff-c08000-9e0059
@@ -1242,6 +1237,7 @@ bool obs_module_load(void)
 	settingsButton->setProperty("class", "icon-gear");
 	controlsToolBar->widgetForAction(settingsButton)->setProperty("themeID", "configIconSmall");
 	controlsToolBar->widgetForAction(settingsButton)->setProperty("class", "icon-gear");
+	((QToolButton *)controlsToolBar->widgetForAction(settingsButton))->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 	QObject::connect(settingsButton, SIGNAL(triggered()), main_window, SLOT(on_action_Settings_triggered()));
 
 	//auto action = controlsToolBar->addAction("");

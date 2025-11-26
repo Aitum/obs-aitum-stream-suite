@@ -1,11 +1,12 @@
 #pragma once
 
 #include <obs.h>
+#include <QCheckBox>
 #include <QFrame>
 #include <QGridLayout>
+#include <QLabel>
 #include <QPushButton>
 #include <QTimer>
-#include <QLabel>
 #include <src/utils/widgets/output-widget.hpp>
 
 class OutputDock : public QFrame {
@@ -14,8 +15,17 @@ class OutputDock : public QFrame {
 private:
 	int outputPlatformIconSize = 36;
 	QVBoxLayout *mainLayout = nullptr;
-	QPushButton *mainStreamButton = nullptr;
 	QLabel *mainPlatformIconLabel = nullptr;
+	QPushButton *mainStreamButton = nullptr;
+	QPushButton *mainRecordButton = nullptr;
+	QPushButton *mainBacktrackCheckboxButton = nullptr;
+	QCheckBox *mainBacktrackCheckbox = nullptr;
+	QPushButton *mainBacktrackButton = nullptr;
+	QPushButton *mainVirtualCamButton = nullptr;
+	QFrame *mainStreamGroup = nullptr;
+	QFrame *mainRecordGroup = nullptr;
+	QFrame *mainBacktrackGroup = nullptr;
+	QFrame *mainVirtualCamGroup = nullptr;
 	QString mainPlatformUrl;
 	bool exiting = false;
 
@@ -29,8 +39,13 @@ public:
 
 	obs_data_array_t *GetOutputsArray();
 
-	void UpdateMainStreamStatus(bool active);
 	void Exiting() { exiting = true; }
 	void LoadSettings();
 	void SaveSettings();
+
+public slots:
+	void UpdateMainStreamStatus(bool active);
+	void UpdateMainRecordingStatus(bool active);
+	void UpdateMainBacktrackStatus(bool active);
+	void UpdateMainVirtualCameraStatus(bool active);
 };
