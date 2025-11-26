@@ -454,3 +454,13 @@ obs_data_array_t *OutputDock::GetOutputsArray()
 	}
 	return outputs2;
 }
+
+bool OutputDock::AddChapterToOutput(const char* output_name, const char* chapter_name) {
+	auto on = QString::fromUtf8(output_name);
+	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
+		if ((*it)->objectName() == on) {
+			return (*it)->AddChapter(chapter_name);
+		}
+	}
+	return false;
+}

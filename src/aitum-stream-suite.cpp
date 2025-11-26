@@ -1543,6 +1543,19 @@ void vendor_request_stop_output(obs_data_t *request_data, obs_data_t *response_d
 	obs_data_set_bool(response_data, "success", false);
 }
 
+void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	const char *output_name = obs_data_get_string(request_data, "output");
+	if (output_name[0] == '\0') {
+		obs_data_set_string(response_data, "error", "'output' not set");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	bool result = output_dock->AddChapterToOutput(output_name, obs_data_get_string(request_data, "chapter_name"));
+
+	obs_data_set_bool(response_data, "success", result);
+}
+
 void obs_module_post_load()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -1567,6 +1580,7 @@ void obs_module_post_load()
 	obs_websocket_vendor_register_request(vendor, "get_outputs", vendor_request_get_outputs, nullptr);
 	obs_websocket_vendor_register_request(vendor, "start_output", vendor_request_start_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
+	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
 }
 
 void obs_module_unload()

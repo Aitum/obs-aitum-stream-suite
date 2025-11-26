@@ -1638,6 +1638,36 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			hotkeyLayout->addRow(label, extraHotkeyWidget);
 			hotkeys.push_back(extraHotkeyWidget);
 		}
+
+		std::string splitName = "AitumStreamSuiteSplit";
+		splitName += obs_data_get_string(settings, "name");
+		hotkey = GetHotkeyByName(splitName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			auto splitHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.SplitFile")));
+			splitHotkeyWidget->label = label;
+			hotkeyLayout->addRow(label, splitHotkeyWidget);
+			hotkeys.push_back(splitHotkeyWidget);
+		}
+
+		std::string chapterName = "AitumStreamSuiteChapter";
+		chapterName += obs_data_get_string(settings, "name");
+		hotkey = GetHotkeyByName(chapterName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			auto chapterHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.AddChapterMarker")));
+			chapterHotkeyWidget->label = label;
+			hotkeyLayout->addRow(label, chapterHotkeyWidget);
+			hotkeys.push_back(chapterHotkeyWidget);
+		}
 	}
 
 	if (!expanded) {

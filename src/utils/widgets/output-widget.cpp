@@ -44,6 +44,57 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		outputButton->setIcon(create2StateIcon(":/aitum/media/recording.svg", ":/aitum/media/record.svg"));
 		outputButton->setStyleSheet("QAbstractButton:checked{background: rgb(255,0,0);}");
 		outputButton->setToolTip(QString::fromUtf8(obs_module_text("Record")));
+
+		std::string splitName = "AitumStreamSuiteSplit";
+		splitName += nameChars;
+		std::string splitDescription = obs_frontend_get_locale_string("Basic.Main.SplitFile");
+		splitDescription = splitDescription + " " + nameChars;
+
+		splitHotkey = obs_hotkey_register_frontend(splitName.c_str(), splitDescription.c_str(),
+			[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
+				UNUSED_PARAMETER(id);
+				UNUSED_PARAMETER(hotkey);
+				if (!pressed)
+					return;
+				auto this_ = (OutputWidget *)data;
+				if (!this_->output)
+					return;
+				calldata_t cd = {0};
+				proc_handler_t *ph = obs_output_get_proc_handler(this_->output);
+				proc_handler_call(ph, "split", &cd);
+				calldata_free(&cd);
+			},
+			this);
+
+		auto split_hotkey = obs_data_get_array(settings, "split_hotkey");
+		obs_hotkey_load(splitHotkey, split_hotkey);
+		obs_data_array_release(split_hotkey);
+
+		std::string chapterName = "AitumStreamSuiteChapter";
+		chapterName += nameChars;
+		std::string chapterDescription = obs_frontend_get_locale_string("Basic.Main.AddChapterMarker");
+		chapterDescription = chapterDescription + " " + nameChars;
+
+		chapterHotkey = obs_hotkey_register_frontend(chapterName.c_str(), chapterDescription.c_str(),
+			[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
+				UNUSED_PARAMETER(id);
+				UNUSED_PARAMETER(hotkey);
+				if (!pressed)
+					return;
+				auto this_ = (OutputWidget *)data;
+				if (!this_->output)
+					return;
+				calldata_t cd = {0};
+				proc_handler_t *ph = obs_output_get_proc_handler(this_->output);
+				proc_handler_call(ph, "add_chapter", &cd);
+				calldata_free(&cd);
+			},
+			this);
+
+		auto chapter_hotkey = obs_data_get_array(settings, "chapter_hotkey");
+		obs_hotkey_load(chapterHotkey, chapter_hotkey);
+		obs_data_array_release(chapter_hotkey);
+
 	} else if (strcmp(output_type, "backtrack") == 0) {
 		outputButton->setStyleSheet(QString::fromUtf8(
 			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{ border-top-right-radius: 0; border-bottom-right-radius: 0; width: 32px; padding-left: 0px; padding-right: 0px;}"));
@@ -221,6 +272,10 @@ OutputWidget::~OutputWidget()
 		obs_hotkey_pair_unregister(StartStopHotkey);
 	if (extraHotkey != OBS_INVALID_HOTKEY_ID)
 		obs_hotkey_unregister(extraHotkey);
+	if (splitHotkey != OBS_INVALID_HOTKEY_ID)
+		obs_hotkey_unregister(splitHotkey);
+	if (chapterHotkey != OBS_INVALID_HOTKEY_ID)
+		obs_hotkey_unregister(chapterHotkey);
 	if (output) {
 		signal_handler_t *signal = obs_output_get_signal_handler(output);
 		signal_handler_disconnect(signal, "start", output_start, this);
@@ -340,7 +395,6 @@ bool OutputWidget::StartOutput()
 
 	std::vector<obs_encoder_t *> vencs;
 	std::vector<obs_encoder_t *> aencs;
-
 
 	//obs_encoder_t *venc = nullptr;
 	bool is_record = (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0);
@@ -630,7 +684,7 @@ bool OutputWidget::StartOutput()
 	for (size_t i = 0; i < vencs.size(); i++) {
 		obs_output_set_video_encoder2(output, vencs[i], i);
 	}
-	
+
 	for (size_t i = 0; i < aencs.size(); i++) {
 		obs_output_set_audio_encoder(output, aencs[i], i);
 	}
@@ -805,8 +859,7 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 				}
 			}
 		}
-	}else
-	{
+	} else {
 		std::pair<obs_encoder_t **, video_t *> d = {&venc, obs_canvas_get_video(canvas)};
 		obs_enum_outputs(
 			[](void *param, obs_output_t *output) {
@@ -877,7 +930,6 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 			obs_encoder_update(venc, video_settings);
 			obs_data_release(video_settings);
 		}
-
 	}
 
 	return venc;
@@ -917,6 +969,16 @@ void OutputWidget::SaveSettings()
 		obs_data_array_t *extra_hotkey = obs_hotkey_save(extraHotkey);
 		obs_data_set_array(settings, "extra_hotkey", extra_hotkey);
 		obs_data_array_release(extra_hotkey);
+	}
+	if (splitHotkey != OBS_INVALID_HOTKEY_ID) {
+		obs_data_array_t *split_hotkey = obs_hotkey_save(splitHotkey);
+		obs_data_set_array(settings, "split_hotkey", split_hotkey);
+		obs_data_array_release(split_hotkey);
+	}
+	if (chapterHotkey != OBS_INVALID_HOTKEY_ID) {
+		obs_data_array_t *chapter_hotkey = obs_hotkey_save(chapterHotkey);
+		obs_data_set_array(settings, "chapter_hotkey", chapter_hotkey);
+		obs_data_array_release(chapter_hotkey);
 	}
 }
 
@@ -984,4 +1046,17 @@ void OutputWidget::ensure_directory(char *path)
 	if (backslash)
 		*backslash = '\\';
 #endif
+}
+
+bool OutputWidget::AddChapter(const char *chapter_name)
+{
+	if (!output)
+		return false;
+	proc_handler_t *ph = obs_output_get_proc_handler(output);
+	calldata cd;
+	calldata_init(&cd);
+	calldata_set_string(&cd, "chapter_name", chapter_name);
+	bool result = proc_handler_call(ph, "add_chapter", &cd);
+	calldata_free(&cd);
+	return result;
 }

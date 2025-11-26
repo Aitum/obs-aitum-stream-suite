@@ -42,6 +42,7 @@ public:
 	void Exiting() { exiting = true; }
 	void LoadSettings();
 	void SaveSettings();
+	bool AddChapterToOutput(const char *output_name, const char *chapter_name);
 
 public slots:
 	void UpdateMainStreamStatus(bool active);

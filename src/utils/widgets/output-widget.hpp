@@ -18,6 +18,8 @@ private:
 
 	obs_hotkey_pair_id StartStopHotkey = OBS_INVALID_HOTKEY_PAIR_ID;
 	obs_hotkey_id extraHotkey = OBS_INVALID_HOTKEY_ID;
+	obs_hotkey_id splitHotkey = OBS_INVALID_HOTKEY_ID;
+	obs_hotkey_id chapterHotkey = OBS_INVALID_HOTKEY_ID;
 
 	bool StartOutput();
 	void UpdateCanvas();
@@ -37,4 +39,5 @@ public:
 	void CheckActive();
 	void SaveSettings();
 	void UpdateSettings(obs_data_t *data);
+	bool AddChapter(const char *chapter_name);
 };
