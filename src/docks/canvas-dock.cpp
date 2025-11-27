@@ -672,6 +672,7 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	LoadMode(index);
 
 	LoadScenes();
+	LogScenes();
 
 	LoadTransitions();
 
@@ -2313,7 +2314,7 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	duration->setSingleStep(50);
 	duration->setValue(curDuration);
 
-	connect(duration, (void(QSpinBox::*)(int)) & QSpinBox::valueChanged, [this, scene_name](int dur) {
+	connect(duration, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, scene_name](int dur) {
 		OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
 		OBSDataAutoRelease ps = obs_source_get_private_settings(source);
 
@@ -2920,7 +2921,7 @@ QMenu *CanvasDock::CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t 
 	auto setDuration = [visible, si](int dur) {
 		obs_sceneitem_set_transition_duration(si, visible, dur);
 	};
-	connect(duration, (void(QSpinBox::*)(int)) & QSpinBox::valueChanged, setDuration);
+	connect(duration, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, setDuration);
 
 	QAction *a = menu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("None")));
 	a->setProperty("transition_id", QString::fromUtf8(""));
@@ -4934,4 +4935,86 @@ void CanvasDock::reset_build_state()
 {
 	canvas_split->setSizes({1, 1});
 	panel_split->setSizes({1, 1, 1});
+}
+
+void CanvasDock::LogScenes()
+{
+	blog(LOG_INFO, "------------------------------------------------");
+	blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' scenes:", obs_canvas_get_name(canvas));
+	for (int j = 0; j < sceneList->count(); j++) {
+		auto item = sceneList->item(j);
+		blog(LOG_INFO, "- scene '%s':", item->text().toUtf8().constData());
+		auto scene = obs_canvas_get_scene_by_name(canvas, item->text().toUtf8().constData());
+		obs_scene_enum_items(scene, LogSceneItem, (void *)(intptr_t)1);
+		obs_source_enum_filters(obs_scene_get_source(scene), LogFilter, (void *)(intptr_t)1);
+
+		obs_scene_release(scene);
+	}
+	blog(LOG_INFO, "------------------------------------------------");
+}
+
+bool CanvasDock::LogSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *v_val)
+{
+	obs_source_t *source = obs_sceneitem_get_source(item);
+	const char *name = obs_source_get_name(source);
+	const char *id = obs_source_get_id(source);
+	int indent_count = (int)(intptr_t)v_val;
+	std::string indent;
+
+	for (int i = 0; i < indent_count; i++)
+		indent += "    ";
+
+	blog(LOG_INFO, "%s- source: '%s' (%s)", indent.c_str(), name, id);
+
+	if (obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO) {
+		const uint32_t all_mixers = (1 << MAX_AUDIO_MIXES) - 1;
+		uint32_t mixers = obs_source_get_audio_mixers(source);
+		if (mixers == 0) {
+			blog(LOG_INFO, "    %s- audio tracks: none", indent.c_str());
+		} else if ((mixers & all_mixers) != all_mixers) {
+			std::string tracks;
+			for (uint32_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+				if (mixers & (1 << i)) {
+					tracks += " ";
+					tracks += std::to_string(i + 1);
+				}
+			}
+			blog(LOG_INFO, "    %s- audio tracks:%s", indent.c_str(), tracks.c_str());
+		}
+
+		obs_monitoring_type monitoring_type = obs_source_get_monitoring_type(source);
+
+		if (monitoring_type != OBS_MONITORING_TYPE_NONE) {
+			const char *type = (monitoring_type == OBS_MONITORING_TYPE_MONITOR_ONLY) ? "monitor only"
+												 : "monitor and output";
+
+			blog(LOG_INFO, "    %s- monitoring: %s", indent.c_str(), type);
+		}
+	}
+	int child_indent = 1 + indent_count;
+	obs_source_enum_filters(source, LogFilter, (void *)(intptr_t)child_indent);
+
+	obs_source_t *show_tn = obs_sceneitem_get_transition(item, true);
+	obs_source_t *hide_tn = obs_sceneitem_get_transition(item, false);
+	if (show_tn)
+		blog(LOG_INFO, "    %s- show: '%s' (%s)", indent.c_str(), obs_source_get_name(show_tn), obs_source_get_id(show_tn));
+	if (hide_tn)
+		blog(LOG_INFO, "    %s- hide: '%s' (%s)", indent.c_str(), obs_source_get_name(hide_tn), obs_source_get_id(hide_tn));
+
+	if (obs_sceneitem_is_group(item))
+		obs_sceneitem_group_enum_items(item, LogSceneItem, (void *)(intptr_t)child_indent);
+	return true;
+}
+
+void CanvasDock::LogFilter(obs_source_t *, obs_source_t *filter, void *v_val)
+{
+	const char *name = obs_source_get_name(filter);
+	const char *id = obs_source_get_id(filter);
+	int val = (int)(intptr_t)v_val;
+	std::string indent;
+
+	for (int i = 0; i < val; i++)
+		indent += "    ";
+
+	blog(LOG_INFO, "%s- filter: '%s' (%s)", indent.c_str(), name, id);
 }

@@ -180,6 +180,8 @@ private:
 	void SetGridMode(bool checked);
 	bool IsGridMode();
 
+	void LogScenes();
+
 	enum class CenterType {
 		Scene,
 		Vertical,
@@ -234,6 +236,9 @@ private:
 	static bool GetSourceSnapOffset(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool FindHandleAtPos(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static void save_load(obs_data_t *save_data, bool saving, void *private_data);
+
+	static bool LogSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *v_val);
+	static void LogFilter(obs_source_t *, obs_source_t *filter, void *v_val);
 
 private slots:
 	void AddSourceFromAction();
