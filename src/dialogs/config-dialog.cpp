@@ -1445,6 +1445,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
 	connect(removeButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, settings, outputs] {
+		for (auto it = hotkeys.begin(); it != hotkeys.end();) {
+			auto parent = (*it)->parentWidget();
+			if (parent == outputGroup || parent->parentWidget() == outputGroup) {
+				it = hotkeys.erase(it);
+			} else {
+				++it;
+			}
+		}
 		outputsLayout->removeWidget(outputGroup);
 		RemoveWidget(outputGroup);
 		auto count = obs_data_array_count(outputs);
