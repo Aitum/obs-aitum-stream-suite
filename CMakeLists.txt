@@ -108,6 +108,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/source-tree.cpp
   src/utils/widgets/stream-key-input.cpp
   src/utils/widgets/switching-splitter.cpp
+  src/utils/widgets/projector.cpp
   src/utils/widgets/qt-display.cpp
   src/utils/widgets/visibility-checkbox.cpp
   src/utils/widgets/visibility-item-widget.cpp
@@ -125,6 +126,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/source-tree.hpp
   src/utils/widgets/stream-key-input.hpp
   src/utils/widgets/switching-splitter.hpp
+  src/utils/widgets/projector.hpp
   src/utils/widgets/qt-display.hpp
   src/utils/widgets/visibility-checkbox.hpp
   src/utils/widgets/visibility-item-widget.hpp)

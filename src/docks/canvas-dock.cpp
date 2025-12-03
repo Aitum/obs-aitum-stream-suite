@@ -806,6 +806,9 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 
 CanvasDock::~CanvasDock()
 {
+	for (auto projector : projectors) {
+		delete projector;
+	}
 	obs_frontend_remove_save_callback(save_load, this);
 	canvas_docks.remove(this);
 	obs_display_remove_draw_callback(preview->GetDisplay(), DrawPreview, this);
@@ -2729,15 +2732,11 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 
 	popup->addSeparator();
 
-	auto projectorMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("SourceProjector")));
+	auto projectorMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Open.Source")));
 	AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenSourceProjector()));
-	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("SourceWindow")), [sceneItem] {
-		obs_source_t *s = obs_source_get_ref(obs_sceneitem_get_source(sceneItem));
-		if (!s)
-			return;
-		obs_frontend_open_projector("Source", -1, nullptr, obs_source_get_name(s));
-		obs_source_release(s);
-	});
+	a = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Window")));
+	connect(a, &QAction::triggered, this, &CanvasDock::OpenSourceProjector);
+	a->setProperty("monitor", -1);
 
 	obs_source_t *s = obs_sceneitem_get_source(sceneItem);
 	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Screenshot.Source")), this,
@@ -3555,10 +3554,11 @@ bool CanvasDock::HandleMouseReleaseEvent(QMouseEvent *event)
 				preview->setVisible(!preview_disabled);
 				previewDisabledWidget->setVisible(preview_disabled);
 			});
-		auto projectorMenu = popup.addMenu(QString::fromUtf8(obs_frontend_get_locale_string("PreviewProjector")));
+		auto projectorMenu = popup.addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Open.Preview")));
 		AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenPreviewProjector()));
 
-		//a = popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("PreviewWindow")), [this] { OpenProjector(-1); });
+		a = popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Window")),
+				    [this] { OpenProjector(-1); });
 
 		a = popup.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.LockPreview")), this,
 				    [this] { locked = !locked; });
@@ -5017,4 +5017,82 @@ void CanvasDock::LogFilter(obs_source_t *, obs_source_t *filter, void *v_val)
 		indent += "    ";
 
 	blog(LOG_INFO, "%s- filter: '%s' (%s)", indent.c_str(), name, id);
+}
+
+void CanvasDock::OpenPreviewProjector()
+{
+	int monitor = sender()->property("monitor").toInt();
+	OpenProjector(monitor);
+}
+
+void CanvasDock::OpenSourceProjector()
+{
+	int monitor = sender()->property("monitor").toInt();
+	if (monitor > 9 || monitor > QGuiApplication::screens().size() - 1)
+		return;
+	OBSSceneItem item = GetSelectedItem();
+	if (!item)
+		return;
+
+	obs_source_t *open_source = obs_sceneitem_get_source(item);
+	if (!open_source)
+		return;
+	if (obs_source_get_output_flags(open_source) & OBS_SOURCE_REQUIRES_CANVAS) {
+		auto config = obs_frontend_get_user_config();
+		if (config) {
+			bool closeProjectors = config_get_bool(config, "BasicWindow", "CloseExistingProjectors");
+
+			if (closeProjectors && monitor > -1) {
+				for (size_t i = projectors.size(); i > 0; i--) {
+					size_t idx = i - 1;
+					if (projectors[idx]->GetMonitor() == monitor)
+						DeleteProjector(projectors[idx]);
+				}
+			}
+		}
+
+		OBSProjector *projector =
+			new OBSProjector(nullptr, open_source, monitor, [this](OBSProjector *p) { DeleteProjector(p); });
+
+		projectors.emplace_back(projector);
+	} else {
+		obs_frontend_open_projector("Source", monitor, nullptr, obs_source_get_name(open_source));
+	}
+}
+
+void CanvasDock::DeleteProjector(OBSProjector *projector)
+{
+	for (size_t i = 0; i < projectors.size(); i++) {
+		if (projectors[i] == projector) {
+			projectors[i]->deleteLater();
+			projectors.erase(projectors.begin() + i);
+			break;
+		}
+	}
+}
+
+OBSProjector *CanvasDock::OpenProjector(int monitor)
+{
+	/* seriously?  10 monitors? */
+	if (monitor > 9 || monitor > QGuiApplication::screens().size() - 1)
+		return nullptr;
+	auto config = obs_frontend_get_user_config();
+	if (!config)
+		return nullptr;
+
+	bool closeProjectors = config_get_bool(config, "BasicWindow", "CloseExistingProjectors");
+
+	if (closeProjectors && monitor > -1) {
+		for (size_t i = projectors.size(); i > 0; i--) {
+			size_t idx = i - 1;
+			if (projectors[idx]->GetMonitor() == monitor)
+				DeleteProjector(projectors[idx]);
+		}
+	}
+
+	OBSProjector *projector = new OBSProjector(canvas, nullptr, monitor, [this](OBSProjector *p) { DeleteProjector(p); });
+
+	projectors.emplace_back(projector);
+
+	return projector;
 }

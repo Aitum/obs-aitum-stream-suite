@@ -3,6 +3,7 @@
 #include "../utils/event-filter.hpp"
 #include "../utils/widgets/qt-display.hpp"
 #include "../utils/widgets/source-tree.hpp"
+#include "../utils/widgets/projector.hpp"
 #include <mutex>
 #include <obs.h>
 #include <QComboBox>
@@ -39,11 +40,13 @@ enum class ItemHandle : uint32_t {
 #define HANDLE_RADIUS 4.0f
 #define HANDLE_SEL_RADIUS (HANDLE_RADIUS * 1.5f)
 
+class OBSProjector;
 
 class CanvasDock : public QFrame {
 	Q_OBJECT
 private:
 	friend class CanvasCloneDock;
+	friend class OBSProjector;
 	std::string canvas_name;
 	QSplitter *canvas_split;
 	QSplitter *panel_split;
@@ -87,6 +90,7 @@ private:
 	OBSWeakSource source;
 	std::vector<OBSSource> transitions;
 	QComboBox *transition;
+	std::vector<OBSProjector *> projectors;
 
 	bool mouseDown = false;
 	bool mouseMoved = false;
@@ -188,7 +192,9 @@ private:
 		Horizontal,
 	};
 	void CenterSelectedItems(CenterType centerType);
-	void AddProjectorMenuMonitors(QMenu *parent, QObject *target, const char *slot);
+	void DeleteProjector(OBSProjector *projector);
+	OBSProjector *OpenProjector(int monitor);
+	static void AddProjectorMenuMonitors(QMenu *parent, QObject *target, const char *slot);
 
 	static bool FindSelected(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
@@ -251,6 +257,9 @@ private slots:
 	void MainSceneChanged();
 	void LoadMode(int index);
 	void SaveSettings(bool closing = false);
+	void OpenPreviewProjector();
+	void OpenSourceProjector();
+
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
 	~CanvasDock();
