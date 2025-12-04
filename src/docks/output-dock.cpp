@@ -40,7 +40,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	layout->addWidget(scrollArea);
 
 	auto toolbar = new QToolBar();
-	
+
 	toolbar->setObjectName(QStringLiteral("outputsToolbar"));
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setFloatable(false);
@@ -57,12 +57,12 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			       [addMenu] { addMenu->exec(QCursor::pos()); });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
-	
-	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")),
-			       QString::fromUtf8(obs_module_text("Stream")), [this] { open_config_dialog(2, "stream"); });
 
-	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/record.svg")),
-			       QString::fromUtf8(obs_module_text("Record")), [this] { open_config_dialog(2, "record"); });
+	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")), QString::fromUtf8(obs_module_text("Stream")),
+			       [this] { open_config_dialog(2, "stream"); });
+
+	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/record.svg")), QString::fromUtf8(obs_module_text("Record")),
+			       [this] { open_config_dialog(2, "record"); });
 
 	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/backtrack_off.svg")),
 			       QString::fromUtf8(obs_module_text("Backtrack")), [this] { open_config_dialog(2, "backtrack"); });
@@ -465,7 +465,8 @@ obs_data_array_t *OutputDock::GetOutputsArray()
 	return outputs2;
 }
 
-bool OutputDock::AddChapterToOutput(const char* output_name, const char* chapter_name) {
+bool OutputDock::AddChapterToOutput(const char *output_name, const char *chapter_name)
+{
 	auto on = QString::fromUtf8(output_name);
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
 		if ((*it)->objectName() == on) {
