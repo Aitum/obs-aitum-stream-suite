@@ -238,6 +238,16 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	mainVirtualCamButton->setCheckable(true);
 	mainVirtualCamButton->setChecked(false);
 
+	connect(mainVirtualCamButton, &QPushButton::clicked, [this] {
+		if (obs_frontend_virtualcam_active()) {
+			obs_frontend_stop_virtualcam();
+			mainVirtualCamButton->setChecked(false);
+		} else {
+			obs_frontend_start_virtualcam();
+			mainVirtualCamButton->setChecked(true);
+		}
+	});
+
 	l2->addWidget(mainVirtualCamButton);
 
 	mainVirtualCamGroup = new QFrame;
