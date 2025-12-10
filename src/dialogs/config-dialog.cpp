@@ -2210,6 +2210,31 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 
 	videoEncoderGroupLayout->addRow(scale);
 
+	auto output_type = obs_data_get_string(settings, "type");
+
+	bool is_stream = (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
+
+	const char *current_type = obs_data_get_string(settings, "video_encoder");
+	const char *type;
+	size_t idx = 0;
+	while (obs_enum_encoder_types(idx++, &type)) {
+		if (obs_get_encoder_type(type) != OBS_ENCODER_VIDEO)
+			continue;
+		uint32_t caps = obs_get_encoder_caps(type);
+		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
+			continue;
+		if (is_stream) {
+			const char *codec = obs_get_encoder_codec(type);
+			if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
+				continue;
+		}
+		videoEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
+		if (strcmp(type, current_type) == 0)
+			videoEncoder->setCurrentIndex(videoEncoder->count() - 1);
+	}
+	if (videoEncoder->currentIndex() <= 0)
+		videoEncoderGroup->setVisible(false);
+
 	auto ouputVideoEncoderChanged = [settings, outputVideoEncoder, videoEncoder, videoEncoderIndex, videoEncoderGroup,
 					 videoPageLayout] {
 		obs_data_set_string(settings, "output_video_encoder",
@@ -2301,31 +2326,6 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 			}
 		});
 
-	auto output_type = obs_data_get_string(settings, "type");
-
-	bool is_stream = (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
-
-	const char *current_type = obs_data_get_string(settings, "video_encoder");
-	const char *type;
-	size_t idx = 0;
-	while (obs_enum_encoder_types(idx++, &type)) {
-		if (obs_get_encoder_type(type) != OBS_ENCODER_VIDEO)
-			continue;
-		uint32_t caps = obs_get_encoder_caps(type);
-		if ((caps & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) != 0)
-			continue;
-		if (is_stream) {
-			const char *codec = obs_get_encoder_codec(type);
-			if (astrcmpi(codec, "h264") != 0 && astrcmpi(codec, "hevc") != 0 && astrcmpi(codec, "av1") != 0)
-				continue;
-		}
-		videoEncoder->addItem(QString::fromUtf8(obs_encoder_get_display_name(type)), QVariant(QString::fromUtf8(type)));
-		if (strcmp(type, current_type) == 0)
-			videoEncoder->setCurrentIndex(videoEncoder->count() - 1);
-	}
-	if (videoEncoder->currentIndex() <= 0)
-		videoEncoderGroup->setVisible(false);
-
 	ouputVideoEncoderChanged();
 }
 
@@ -2400,7 +2400,8 @@ void OBSBasicSettings::AddRecord(bool backtrack)
 	delete outputDialog;
 }
 
-void OBSBasicSettings::AddVirtualCam() {
+void OBSBasicSettings::AddVirtualCam()
+{
 	QStringList otherNames;
 	obs_data_array_enum(
 		extra_outputs,
