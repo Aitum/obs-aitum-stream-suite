@@ -274,10 +274,13 @@ void PropertiesDock::TransitionChanged(OBSSource transition)
 		}
 
 		auto prev_transition = obs_weak_source_get_source(current_transition);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_start", transition_start,
-					  this);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_stop", transition_stop, this);
-		obs_source_release(prev_transition);
+		if (prev_transition) {
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_start",
+						  transition_start, this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_stop",
+						  transition_stop, this);
+			obs_source_release(prev_transition);
+		}
 
 		obs_weak_source_release(current_transition);
 	}
