@@ -170,6 +170,11 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		if (obs_canvas_removed(canvas)) {
 			obs_canvas_release(canvas);
 			canvas = nullptr;
+		} else if (obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
+			obs_frontend_remove_canvas(canvas);
+			obs_canvas_remove(canvas);
+			obs_canvas_release(canvas);
+			canvas = nullptr;
 		} else {
 			std::string name = obs_canvas_get_name(canvas);
 			if (name != canvas_name) {
@@ -180,6 +185,11 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	if (!canvas) {
 		canvas = obs_get_canvas_by_name(canvas_name.c_str());
 		if (canvas && obs_canvas_removed(canvas)) {
+			obs_canvas_release(canvas);
+			canvas = nullptr;
+		} else if (canvas && obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
+			obs_frontend_remove_canvas(canvas);
+			obs_canvas_remove(canvas);
 			obs_canvas_release(canvas);
 			canvas = nullptr;
 		}
@@ -208,7 +218,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		ovi.base_width = canvas_width;
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
-		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, PROGRAM | EPHEMERAL);
+		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, ACTIVATE | SCENE_REF | EPHEMERAL);
 		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u", canvas_name.c_str(), canvas_width,
 		     canvas_height);
 		if (canvas) {
@@ -291,7 +301,6 @@ void CanvasCloneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 
 	gs_ortho(0.0f, float(sourceCX), 0.0f, float(sourceCY), -100.0f, 100.0f);
 	gs_set_viewport(x, y, (int)newCX, (int)newCY);
-	//obs_view_render(window->view);
 	obs_canvas_render(window->canvas);
 
 	gs_set_linear_srgb(previous);

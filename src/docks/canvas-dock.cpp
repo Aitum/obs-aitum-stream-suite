@@ -82,6 +82,11 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		if (obs_canvas_removed(canvas)) {
 			obs_canvas_release(canvas);
 			canvas = nullptr;
+		} else if (obs_canvas_get_flags(canvas) != PROGRAM) {
+			obs_frontend_remove_canvas(canvas);
+			obs_canvas_remove(canvas);
+			obs_canvas_release(canvas);
+			canvas = nullptr;
 		} else {
 			std::string name = obs_canvas_get_name(canvas);
 			if (name != canvas_name) {
@@ -92,6 +97,11 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	if (!canvas) {
 		canvas = obs_get_canvas_by_name(canvas_name.c_str());
 		if (canvas && obs_canvas_removed(canvas)) {
+			obs_canvas_release(canvas);
+			canvas = nullptr;
+		} else if (canvas && obs_canvas_get_flags(canvas) != PROGRAM) {
+			obs_frontend_remove_canvas(canvas);
+			obs_canvas_remove(canvas);
 			obs_canvas_release(canvas);
 			canvas = nullptr;
 		}
