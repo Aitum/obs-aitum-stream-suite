@@ -216,7 +216,7 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_add", scene_item_add, this);
 
 			obs_scene_enum_items(
-				obs_scene_from_source(scene),
+				obs_scene_from_source(prev_scene),
 				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
 					UNUSED_PARAMETER(scene);
 					if (!obs_sceneitem_is_group(item))
