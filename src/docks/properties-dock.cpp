@@ -206,24 +206,30 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 		if (obs_weak_source_references_source(current_scene, scene))
 			return;
 		auto prev_scene = obs_weak_source_get_source(current_scene);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_select", scene_item_select, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_deselect", scene_item_deselect, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_remove", scene_item_remove, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_add", scene_item_add, this);
-		obs_scene_enum_items(
-			obs_scene_from_source(scene),
-			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
-				UNUSED_PARAMETER(scene);
-				if (!obs_sceneitem_is_group(item))
+		if (prev_scene) {
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_select", scene_item_select,
+						  this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_deselect", scene_item_deselect,
+						  this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_remove", scene_item_remove,
+						  this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_add", scene_item_add, this);
+
+			obs_scene_enum_items(
+				obs_scene_from_source(scene),
+				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+					UNUSED_PARAMETER(scene);
+					if (!obs_sceneitem_is_group(item))
+						return true;
+					auto group = obs_sceneitem_get_source(item);
+					auto gsh = obs_source_get_signal_handler(group);
+					signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
+					signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
 					return true;
-				auto group = obs_sceneitem_get_source(item);
-				auto gsh = obs_source_get_signal_handler(group);
-				signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
-				signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
-				return true;
-			},
-			this);
-		obs_source_release(prev_scene);
+				},
+				this);
+			obs_source_release(prev_scene);
+		}
 
 		obs_weak_source_release(current_scene);
 	}
