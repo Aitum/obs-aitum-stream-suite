@@ -802,6 +802,28 @@ void save_current_profile_config()
 	dstr_free(&path);
 }
 
+void load_browser_panels()
+{
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
+				    new BrowserDock("https://chat.aitumsuite.tv/chat", main_window));
+	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),
+				    new BrowserDock("https://chat.aitumsuite.tv/activity", main_window));
+	obs_frontend_add_dock_by_id("AitumStreamSuiteInfo", obs_module_text("AitumStreamSuiteInfo"),
+				    new BrowserDock("https://chat.aitumsuite.tv/info", main_window));
+	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
+				    new BrowserDock("https://chat.aitumsuite.tv/portal", main_window));
+}
+
+void unload_browser_panels()
+{
+	obs_frontend_remove_dock("AitumStreamSuiteChat");
+	obs_frontend_remove_dock("AitumStreamSuiteActivity");
+	obs_frontend_remove_dock("AitumStreamSuiteInfo");
+	obs_frontend_remove_dock("AitumStreamSuitePortal");
+}
+
+void DestroyPanelCookieManager();
 static bool restart = false;
 
 static void frontend_event(enum obs_frontend_event event, void *private_data)
@@ -815,6 +837,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			QTimer::singleShot(200, main_window, [main_window] { main_window->close(); });
 			return;
 		}
+		load_browser_panels();
 		size_t scene_count = 0;
 		obs_enum_scenes(
 			[](void *param, obs_source_t *) {
@@ -853,9 +876,12 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
+		DestroyPanelCookieManager();
+		load_browser_panels();
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGING) {
 		save_current_profile_config();
+		unload_browser_panels();
 	} else if (event == OBS_FRONTEND_EVENT_EXIT || event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
 		if (current_profile_config) {
 			obs_data_release(current_profile_config);
@@ -867,6 +893,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 		}
 		empty_docks.clear();
+		unload_browser_panels();
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
@@ -1558,16 +1585,6 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 
 void obs_module_post_load()
 {
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
-				    new BrowserDock("https://chat.aitumsuite.tv/chat", main_window));
-	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),
-				    new BrowserDock("https://chat.aitumsuite.tv/activity", main_window));
-	obs_frontend_add_dock_by_id("AitumStreamSuiteInfo", obs_module_text("AitumStreamSuiteInfo"),
-				    new BrowserDock("https://chat.aitumsuite.tv/info", main_window));
-	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
-				    new BrowserDock("https://chat.aitumsuite.tv/portal", main_window));
-
 	obs_frontend_add_save_callback(save_load, nullptr);
 
 	vendor = obs_websocket_register_vendor("aitum-stream-suite");
@@ -1582,6 +1599,10 @@ void obs_module_post_load()
 	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
 }
+
+struct QCef;
+
+extern QCef *cef;
 
 void obs_module_unload()
 {
@@ -1602,6 +1623,11 @@ void obs_module_unload()
 		obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 	}
 	empty_docks.clear();
+
+	unload_browser_panels();
+	DestroyPanelCookieManager();
+	delete cef;
+	cef = nullptr;
 }
 
 const char *obs_module_name(void)

@@ -1,7 +1,9 @@
 #include "browser-dock.hpp"
 #include <QVBoxLayout>
+#include <obs-frontend-api.h>
 
 QCef *cef = nullptr;
+QCefCookieManager *panel_cookies = nullptr;
 
 BrowserDock::BrowserDock(const char *url, QWidget *parent) : QWidget(parent)
 {
@@ -18,11 +20,37 @@ BrowserDock::BrowserDock(const char *url, QWidget *parent) : QWidget(parent)
 		}
 	}
 
-	auto l = new QVBoxLayout(this);
-	l->setContentsMargins(0, 0, 0, 0);
-	setLayout(l);
-	if (cef) {
-		cefWidget = cef->create_widget(nullptr, url);
-		l->addWidget(cefWidget);
+	if (!panel_cookies && cef) {
+		const char *cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
+		if (cookie_id && cookie_id[0] != '\0') {
+			std::string sub_path;
+			sub_path += "obs_profile_cookies/";
+			sub_path += cookie_id;
+			panel_cookies = cef->create_cookie_manager(sub_path);
+		}
 	}
+
+	layout = new QVBoxLayout(this);
+	layout->setContentsMargins(0, 0, 0, 0);
+	setLayout(layout);
+	if (cef) {
+		cefWidget = cef->create_widget(this, url, panel_cookies);
+		layout->addWidget(cefWidget);
+	}
+}
+
+BrowserDock::~BrowserDock()
+{
+	layout->removeWidget(cefWidget);
+	cefWidget->setParent(nullptr);
+	cefWidget->deleteLater();
+}
+
+void DestroyPanelCookieManager()
+{
+	if (!panel_cookies)
+		return;
+	panel_cookies->FlushStore();
+	delete panel_cookies;
+	panel_cookies = nullptr;
 }
