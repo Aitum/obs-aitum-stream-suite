@@ -48,6 +48,8 @@ LiveScenesDock *live_scenes_dock = nullptr;
 
 QString newer_version_available;
 
+QTimer load_dock_state_timer;
+
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
 
@@ -766,7 +768,7 @@ void load_current_profile_config()
 		QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
 	} else {
 		modesTab = -1;
-		modesTabBar->setCurrentIndex(index);
+		QMetaObject::invokeMethod(modesTabBar, [index] { modesTabBar->setCurrentIndex(index); }, Qt::QueuedConnection);
 	}
 	load_outputs();
 }
@@ -823,6 +825,8 @@ void unload_browser_panels()
 	obs_frontend_remove_dock("AitumStreamSuitePortal");
 }
 
+struct QCef;
+extern QCef *cef;
 void DestroyPanelCookieManager();
 static bool restart = false;
 
@@ -894,6 +898,11 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 		empty_docks.clear();
 		unload_browser_panels();
+		DestroyPanelCookieManager();
+		if (cef) {
+			delete cef;
+			cef = nullptr;
+		}
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
@@ -914,9 +923,9 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		output_dock->UpdateMainRecordingStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
 		output_dock->UpdateMainRecordingStatus(false);
-	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED){
+	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED) {
 		output_dock->UpdateMainBacktrackStatus(true);
-	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING|| event ==  OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED){
+	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
 		output_dock->UpdateMainBacktrackStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
 		QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
@@ -1005,7 +1014,7 @@ bool obs_data_array_equal(obs_data_array_t *a, obs_data_array_t *b)
 	return true;
 }
 
-void open_config_dialog(int tab, const char* create_type)
+void open_config_dialog(int tab, const char *create_type)
 {
 	if (!configDialog) {
 		configDialog = new OBSBasicSettings((QMainWindow *)obs_frontend_get_main_window());
@@ -1321,6 +1330,8 @@ void TabToolBar::checkOrientation() const
 
 void TabToolBar::resizeEvent(QResizeEvent *event)
 {
+	load_dock_state_timer.stop();
+	load_dock_state_timer.start();
 	checkOrientation();
 	QToolBar::resizeEvent(event);
 }
@@ -1585,6 +1596,10 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 
 void obs_module_post_load()
 {
+	load_dock_state_timer.setInterval(100);
+	load_dock_state_timer.setSingleShot(true);
+	QObject::connect(&load_dock_state_timer, &QTimer::timeout, []() { load_dock_state(modesTabBar->currentIndex()); });
+
 	obs_frontend_add_save_callback(save_load, nullptr);
 
 	vendor = obs_websocket_register_vendor("aitum-stream-suite");
@@ -1599,10 +1614,6 @@ void obs_module_post_load()
 	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
 }
-
-struct QCef;
-
-extern QCef *cef;
 
 void obs_module_unload()
 {
@@ -1624,10 +1635,11 @@ void obs_module_unload()
 	}
 	empty_docks.clear();
 
-	unload_browser_panels();
 	DestroyPanelCookieManager();
-	delete cef;
-	cef = nullptr;
+	if (cef) {
+		delete cef;
+		cef = nullptr;
+	}
 }
 
 const char *obs_module_name(void)
