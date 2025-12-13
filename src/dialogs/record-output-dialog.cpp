@@ -12,9 +12,10 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames, bool backtrack)
+RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames, bool backtrack_)
 	: QDialog(parent),
-	  otherNames(_otherNames)
+	  otherNames(_otherNames),
+	  backtrack(backtrack_)
 {
 
 	setWindowTitle(obs_module_text(backtrack ? "NewBacktrackOutputWindowTitle" : "NewRecordOutputWindowTitle"));
@@ -117,9 +118,9 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 	maxTime->setMinimum(0);
 	maxTime->setMaximum(31536000);
 	maxTime->setSuffix(" s");
+	connect(maxTime, &QSpinBox::valueChanged, [this](int value) { this->maxTime = value; });
 	if (backtrack)
 		maxTime->setValue(30);
-	connect(maxTime, &QSpinBox::valueChanged, [this](int value) { this->maxTime = value; });
 
 	auto maxSize = new QSpinBox();
 	maxSize->setMinimum(0);
@@ -173,10 +174,10 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 }
 
 RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString path, QString filename, QString format,
-				       long long max_size, long long max_time,
-				       QStringList _otherNames, bool backtrack)
+				       long long max_size, long long max_time, QStringList _otherNames, bool backtrack_)
 	: QDialog(parent),
-	  otherNames(_otherNames)
+	  otherNames(_otherNames),
+	  backtrack(backtrack_)
 {
 	outputName = name;
 	recordPath = path;
@@ -272,6 +273,8 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	fileFormatCombo->addItem(QString::fromUtf8("mkv"));
 	fileFormatCombo->addItem(QString::fromUtf8("ts"));
 	fileFormatCombo->addItem(QString::fromUtf8("mp3u8"));
+	if (filenameFormat.isEmpty())
+		fileFormat = QString::fromUtf8("hybrid_mp4");
 	fileFormatCombo->setCurrentText(fileFormat);
 	connect(fileFormatCombo, &QComboBox::currentTextChanged, [this, fileFormatCombo, confirmButton] {
 		fileFormat = fileFormatCombo->currentText();
@@ -338,7 +341,6 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 									   : "Basic.Settings.Output.SplitFile.Size")),
 		maxSize);
 
-
 	auto controlsLayout = new QHBoxLayout;
 	controlsLayout->setSpacing(0);
 	controlsLayout->setContentsMargins(0, 0, 0, 0);
@@ -358,6 +360,8 @@ void RecordOutputDialog::validateOutputs(QPushButton *confirmButton)
 	if (outputName.isEmpty() || otherNames.contains(outputName)) {
 		confirmButton->setEnabled(false);
 	} else if (recordPath.isEmpty() || filenameFormat.isEmpty() || fileFormat.isEmpty()) {
+		confirmButton->setEnabled(false);
+	} else if (backtrack && maxSize == 0 && maxTime == 0) {
 		confirmButton->setEnabled(false);
 	} else {
 		confirmButton->setEnabled(true);

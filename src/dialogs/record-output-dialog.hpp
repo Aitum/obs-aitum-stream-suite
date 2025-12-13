@@ -5,6 +5,7 @@ class RecordOutputDialog : public QDialog {
 	Q_OBJECT
 private:
 	QStringList otherNames;
+	bool backtrack;
 
 	void validateOutputs(QPushButton *confirmButton);
 
