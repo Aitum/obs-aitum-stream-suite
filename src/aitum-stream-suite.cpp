@@ -557,11 +557,13 @@ void load_canvas()
 			for (const auto &it : canvas_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					break;
 				}
 			}
 			for (const auto &it : canvas_clone_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					break;
 				}
 			}
 			obs_canvas_t *c = obs_get_canvas_by_uuid(uuid);
@@ -585,32 +587,40 @@ void load_canvas()
 			canvas_count--;
 		} else if (strcmp(obs_data_get_string(t, "type"), "clone") == 0) {
 			auto uuid = obs_data_get_string(t, "uuid");
+			auto name = obs_data_get_string(t, "name");
 			for (const auto &it : canvas_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					break;
 				}
 			}
 			CanvasCloneDock *ccd = nullptr;
 			for (const auto &it : canvas_clone_docks) {
-				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) != 0)
-					continue;
-
-				if (obs_canvas_removed(it->GetCanvas())) {
-					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
-						  obs_data_get_string(t, "name")) != 0) {
-					// canvas name changed, remove old dock and create a new one
-					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-				} else {
+				auto cuuid = obs_canvas_get_uuid(it->GetCanvas());
+				if (strcmp(cuuid, uuid) == 0) {
+					if (obs_canvas_removed(it->GetCanvas()) ||
+					    strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) != 0) {
+						// canvas name changed, remove old dock and create a new one
+						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					} else {
+						ccd = it;
+					}
+					break;
+				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) == 0) {
+					if (obs_canvas_removed(it->GetCanvas())) {
+						obs_frontend_remove_dock(name);
+						break;
+					}
+					obs_data_set_string(t, "uuid", cuuid);
 					ccd = it;
+					break;
 				}
 			}
 			if (ccd) {
 				ccd->UpdateSettings(t);
 			} else {
 				ccd = new CanvasCloneDock(t, main_window);
-				if (obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
-								ccd)) {
+				if (obs_frontend_add_dock_by_id(name, name, ccd)) {
 					canvas_clone_docks.push_back(ccd);
 					if (!obs_data_get_bool(t, "has_loaded")) {
 						ccd->parentWidget()->show();
@@ -623,6 +633,7 @@ void load_canvas()
 			i++;
 		} else {
 			auto uuid = obs_data_get_string(t, "uuid");
+			auto name = obs_data_get_string(t, "name");
 			for (const auto &it : canvas_clone_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
@@ -631,25 +642,32 @@ void load_canvas()
 			}
 			CanvasDock *cd = nullptr;
 			for (const auto &it : canvas_docks) {
-				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) != 0)
-					continue;
-				if (obs_canvas_removed(it->GetCanvas())) {
-					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(),
-						  obs_data_get_string(t, "name")) != 0) {
-					// canvas name changed, remove old dock and create a new one
-					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
-				} else {
+				auto cuuid = obs_canvas_get_uuid(it->GetCanvas());
+				if (strcmp(cuuid, uuid) == 0) {
+					if (obs_canvas_removed(it->GetCanvas()) ||
+					    strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) != 0) {
+						// canvas name changed, remove old dock and create a new one
+						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					} else {
+						cd = it;
+					}
+					break;
+				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) == 0) {
+					if (obs_canvas_removed(it->GetCanvas())) {
+						obs_frontend_remove_dock(name);
+						break;
+					}
+					obs_data_set_string(t, "uuid", cuuid);
 					cd = it;
+					break;
 				}
-				break;
 			}
+
 			if (cd) {
 				cd->UpdateSettings(t);
 			} else {
 				cd = new CanvasDock(t, main_window);
-				if (obs_frontend_add_dock_by_id(obs_data_get_string(t, "name"), obs_data_get_string(t, "name"),
-								cd)) {
+				if (obs_frontend_add_dock_by_id(name, name, cd)) {
 					canvas_docks.push_back(cd);
 					if (!obs_data_get_bool(t, "has_loaded")) {
 						cd->parentWidget()->show();
