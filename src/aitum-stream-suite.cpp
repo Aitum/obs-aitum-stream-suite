@@ -915,12 +915,22 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 		}
 		empty_docks.clear();
-		unload_browser_panels();
-		DestroyPanelCookieManager();
-		if (cef) {
-			delete cef;
-			cef = nullptr;
-		}
+		obs_queue_task(
+			OBS_TASK_GRAPHICS,
+			[](void *) {
+				obs_queue_task(
+					OBS_TASK_UI,
+					[](void *) {
+						unload_browser_panels();
+						DestroyPanelCookieManager();
+						if (cef) {
+							delete cef;
+							cef = nullptr;
+						}
+					},
+					nullptr, false);
+			},
+			nullptr, false);
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
 		if (!studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
