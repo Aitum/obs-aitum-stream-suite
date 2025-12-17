@@ -1359,7 +1359,8 @@ void TabToolBar::checkOrientation() const
 void TabToolBar::resizeEvent(QResizeEvent *event)
 {
 	load_dock_state_timer.stop();
-	load_dock_state_timer.start();
+	if (!isFloating())
+		load_dock_state_timer.start();
 	checkOrientation();
 	QToolBar::resizeEvent(event);
 }
