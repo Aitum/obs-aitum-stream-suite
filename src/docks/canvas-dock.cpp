@@ -183,6 +183,45 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 
 	//obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
 
+	auto addNudge = [this](const QKeySequence &seq, MoveDir direction, int distance) {
+		QAction *nudge = new QAction(preview);
+		nudge->setShortcut(seq);
+		nudge->setShortcutContext(Qt::WidgetShortcut);
+		preview->addAction(nudge);
+		connect(nudge, &QAction::triggered, [this, distance, direction]() { Nudge(distance, direction); });
+	};
+
+	addNudge(Qt::Key_Up, MoveDir::Up, 1);
+	addNudge(Qt::Key_Down, MoveDir::Down, 1);
+	addNudge(Qt::Key_Left, MoveDir::Left, 1);
+	addNudge(Qt::Key_Right, MoveDir::Right, 1);
+	addNudge(Qt::SHIFT | Qt::Key_Up, MoveDir::Up, 10);
+	addNudge(Qt::SHIFT | Qt::Key_Down, MoveDir::Down, 10);
+	addNudge(Qt::SHIFT | Qt::Key_Left, MoveDir::Left, 10);
+	addNudge(Qt::SHIFT | Qt::Key_Right, MoveDir::Right, 10);
+
+	QAction *deleteAction = new QAction(preview);
+	connect(deleteAction, &QAction::triggered, [this]() {
+		obs_sceneitem_t *sceneItem = GetSelectedItem();
+		if (!sceneItem)
+			return;
+		QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
+			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text"))
+				       .arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(sceneItem)))),
+			       QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
+		mb.setDefaultButton(QMessageBox::NoButton);
+		if (mb.exec() == QMessageBox::Yes) {
+			obs_sceneitem_remove(sceneItem);
+		}
+	});
+#ifdef __APPLE__
+	deleteAction->setShortcut({Qt::Key_Backspace});
+#else
+	deleteAction->setShortcut({Qt::Key_Delete});
+#endif
+	deleteAction->setShortcutContext(Qt::WidgetShortcut);
+	preview->addAction(deleteAction);
+
 	panel_split = new SwitchingSplitter;
 	panel_split->setContentsMargins(0, 0, 0, 0);
 	auto scenesGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Scenes")));
@@ -5141,4 +5180,63 @@ OBSProjector *CanvasDock::OpenProjector(int monitor)
 	projectors.emplace_back(projector);
 
 	return projector;
+}
+
+bool CanvasDock::nudge_callback(obs_scene_t *, obs_sceneitem_t *item, void *param)
+{
+	if (obs_sceneitem_locked(item))
+		return true;
+
+	struct vec2 &offset = *reinterpret_cast<struct vec2 *>(param);
+	struct vec2 pos;
+
+	if (!obs_sceneitem_selected(item)) {
+		if (obs_sceneitem_is_group(item)) {
+			struct vec3 offset3;
+			vec3_set(&offset3, offset.x, offset.y, 0.0f);
+
+			struct matrix4 matrix;
+			obs_sceneitem_get_draw_transform(item, &matrix);
+			vec4_set(&matrix.t, 0.0f, 0.0f, 0.0f, 1.0f);
+			matrix4_inv(&matrix, &matrix);
+			vec3_transform(&offset3, &offset3, &matrix);
+
+			struct vec2 new_offset;
+			vec2_set(&new_offset, offset3.x, offset3.y);
+			obs_sceneitem_group_enum_items(item, nudge_callback, &new_offset);
+		}
+
+		return true;
+	}
+
+	obs_sceneitem_get_pos(item, &pos);
+	vec2_add(&pos, &pos, &offset);
+	obs_sceneitem_set_pos(item, &pos);
+	return true;
+}
+
+void CanvasDock::Nudge(int dist, MoveDir dir)
+{
+	if (locked)
+		return;
+
+	struct vec2 offset;
+	vec2_set(&offset, 0.0f, 0.0f);
+
+	switch (dir) {
+	case MoveDir::Up:
+		offset.y = (float)-dist;
+		break;
+	case MoveDir::Down:
+		offset.y = (float)dist;
+		break;
+	case MoveDir::Left:
+		offset.x = (float)-dist;
+		break;
+	case MoveDir::Right:
+		offset.x = (float)dist;
+		break;
+	}
+
+	obs_scene_enum_items(scene, nudge_callback, &offset);
 }

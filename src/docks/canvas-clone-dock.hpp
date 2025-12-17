@@ -1,3 +1,4 @@
+#pragma once
 #include "../utils/widgets/qt-display.hpp"
 #include <obs.h>
 #include <QFrame>

@@ -1,4 +1,3 @@
-
 #pragma once
 #include "../utils/event-filter.hpp"
 #include "../utils/widgets/qt-display.hpp"
@@ -184,6 +183,9 @@ private:
 	void SetGridMode(bool checked);
 	bool IsGridMode();
 
+	enum class MoveDir { Up, Down, Left, Right };
+	void Nudge(int dist, MoveDir dir);
+
 	void LogScenes();
 
 	enum class CenterType {
@@ -245,6 +247,7 @@ private:
 
 	static bool LogSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *v_val);
 	static void LogFilter(obs_source_t *, obs_source_t *filter, void *v_val);
+	static bool nudge_callback(obs_scene_t *, obs_sceneitem_t *item, void *param);
 
 private slots:
 	void AddSourceFromAction();
