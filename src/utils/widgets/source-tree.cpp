@@ -80,6 +80,7 @@ SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tre
 	vis = new VisibilityCheckBox();
 	vis->setProperty("class", "checkbox-icon indicator-visibility");
 	vis->setChecked(sourceVisible);
+	vis->setStyleSheet("background: none");
 	vis->setAccessibleName(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.Visibility")));
 	vis->setAccessibleDescription(
 		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.VisibilityDescription")).arg(name));
@@ -88,6 +89,7 @@ SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tre
 	lock = new LockedCheckBox();
 	lock->setProperty("class", "checkbox-icon indicator-lock");
 	lock->setChecked(obs_sceneitem_locked(sceneitem));
+	lock->setStyleSheet("background: none");
 	lock->setAccessibleName(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.Lock")));
 	lock->setAccessibleDescription(
 		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Sources.LockDescription")).arg(name));
@@ -193,7 +195,7 @@ void SourceTreeItem::itemVisible(void *data, calldata_t *cd)
 	bool visible = calldata_bool(cd, "visible");
 
 	if (curItem == this_->sceneitem)
-		QMetaObject::invokeMethod(this_, "VisibilityChanged", Q_ARG(bool, visible));
+		QMetaObject::invokeMethod(this_, "VisibilityChanged", Qt::QueuedConnection, Q_ARG(bool, visible));
 }
 
 void SourceTreeItem::itemLocked(void *data, calldata_t *cd)
@@ -203,7 +205,7 @@ void SourceTreeItem::itemLocked(void *data, calldata_t *cd)
 	bool locked = calldata_bool(cd, "locked");
 
 	if (curItem == this_->sceneitem)
-		QMetaObject::invokeMethod(this_, "LockedChanged", Q_ARG(bool, locked));
+		QMetaObject::invokeMethod(this_, "LockedChanged", Qt::QueuedConnection, Q_ARG(bool, locked));
 }
 
 void SourceTreeItem::itemSelect(void *data, calldata_t *cd)
@@ -212,7 +214,7 @@ void SourceTreeItem::itemSelect(void *data, calldata_t *cd)
 	obs_sceneitem_t *curItem = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 
 	if (curItem == this_->sceneitem)
-		QMetaObject::invokeMethod(this_, "Select");
+		QMetaObject::invokeMethod(this_, "Select", Qt::QueuedConnection);
 }
 
 void SourceTreeItem::itemDeselect(void *data, calldata_t *cd)
@@ -221,13 +223,13 @@ void SourceTreeItem::itemDeselect(void *data, calldata_t *cd)
 	obs_sceneitem_t *curItem = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 
 	if (curItem == this_->sceneitem)
-		QMetaObject::invokeMethod(this_, "Deselect");
+		QMetaObject::invokeMethod(this_, "Deselect", Qt::QueuedConnection);
 }
 
 void SourceTreeItem::reorderGroup(void *data, calldata_t *)
 {
 	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
-	QMetaObject::invokeMethod(this_->tree, "ReorderItems");
+	QMetaObject::invokeMethod(this_->tree, "ReorderItems", Qt::QueuedConnection);
 };
 
 void SourceTreeItem::renamed(void *data, calldata_t *cd)
@@ -235,7 +237,7 @@ void SourceTreeItem::renamed(void *data, calldata_t *cd)
 	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
 	const char *name = calldata_string(cd, "new_name");
 
-	QMetaObject::invokeMethod(this_, "Renamed", Q_ARG(QString, QString::fromUtf8(name)));
+	QMetaObject::invokeMethod(this_, "Renamed", Qt::QueuedConnection, Q_ARG(QString, QString::fromUtf8(name)));
 }
 
 void SourceTreeItem::removeSource(void *data, calldata_t *)
@@ -243,7 +245,7 @@ void SourceTreeItem::removeSource(void *data, calldata_t *)
 	SourceTreeItem *this_ = reinterpret_cast<SourceTreeItem *>(data);
 	this_->DisconnectSignals();
 	this_->sceneitem = nullptr;
-	QMetaObject::invokeMethod(this_->tree, "RefreshItems");
+	QMetaObject::invokeMethod(this_->tree, "RefreshItems", Qt::QueuedConnection);
 }
 
 void SourceTreeItem::ReconnectSignals()
@@ -390,8 +392,10 @@ void SourceTreeItem::ExitEditModeInternal(bool save)
 
 	/* ----------------------------------------- */
 	/* check for existing source                 */
-
-	OBSSourceAutoRelease existingSource = obs_get_source_by_name(newName.c_str());
+	obs_canvas_t *canvas = (obs_source_get_output_flags(source) & OBS_SOURCE_REQUIRES_CANVAS) ? obs_source_get_canvas(source)
+												  : nullptr;
+	OBSSourceAutoRelease existingSource = canvas ? obs_canvas_get_source_by_name(canvas, newName.c_str())
+						     : obs_get_source_by_name(newName.c_str());
 	bool exists = !!existingSource;
 
 	if (exists) {
@@ -1078,7 +1082,7 @@ void SourceTree::SelectItem(obs_sceneitem_t *sceneitem, bool select)
 		return;
 
 	QModelIndex index = stm->createIndex(i, 0);
-	if (index.isValid())
+	if (index.isValid() && selectionModel()->isSelected(index) != select)
 		selectionModel()->select(index, select ? QItemSelectionModel::Select : QItemSelectionModel::Deselect);
 }
 
@@ -1293,7 +1297,7 @@ void SourceTree::dropEvent(QDropEvent *event)
 	using insertCollapsed_t = decltype(insertCollapsed);
 
 	auto preInsertCollapsed = [](obs_scene_t *, obs_sceneitem_t *item, void *param) {
-		(*reinterpret_cast<insertCollapsed_t *>(param))(item);
+		(*static_cast<insertCollapsed_t *>(param))(item);
 		return true;
 	};
 
@@ -1353,7 +1357,7 @@ void SourceTree::dropEvent(QDropEvent *event)
 	using updateScene_t = decltype(updateScene);
 
 	auto preUpdateScene = [](void *d, obs_scene_t *) {
-		(*reinterpret_cast<updateScene_t *>(d))();
+		(*static_cast<updateScene_t *>(d))();
 	};
 
 	ignoreReorder = true;
