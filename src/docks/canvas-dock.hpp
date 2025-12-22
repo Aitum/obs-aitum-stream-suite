@@ -1,3 +1,4 @@
+
 #pragma once
 #include "../utils/event-filter.hpp"
 #include "../utils/widgets/qt-display.hpp"
@@ -47,10 +48,10 @@ private:
 	friend class CanvasCloneDock;
 	friend class OBSProjector;
 	std::string canvas_name;
-	QSplitter *canvas_split;
-	QSplitter *panel_split;
+	QSplitter *canvas_split = nullptr;
+	QSplitter *panel_split = nullptr;
 	OBSQTDisplay *preview;
-	obs_data_t *settings;
+	obs_data_t *settings = nullptr;
 
 	OBSSourceAutoRelease spacerLabel[4];
 	int spacerPx[4] = {0};
@@ -84,11 +85,12 @@ private:
 
 	SourceTree *sourceList = nullptr;
 	QListWidget *sceneList = nullptr;
+	QComboBox *sceneCombo = nullptr;
 	bool hideScenes = true;
 	QString currentSceneName;
 	OBSWeakSource source;
 	std::vector<OBSSource> transitions;
-	QComboBox *transition;
+	QComboBox *transition = nullptr;
 	std::vector<OBSProjector *> projectors;
 
 	bool mouseDown = false;
@@ -121,6 +123,7 @@ private:
 
 	std::unique_ptr<OBSEventFilter> eventFilter;
 	OBSEventFilter *BuildEventFilter();
+	void LoadUI();
 	bool HandleMousePressEvent(QMouseEvent *event);
 	bool HandleMouseReleaseEvent(QMouseEvent *event);
 	bool HandleMouseMoveEvent(QMouseEvent *event);
@@ -247,6 +250,7 @@ private:
 
 	static bool LogSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *v_val);
 	static void LogFilter(obs_source_t *, obs_source_t *filter, void *v_val);
+	static void check_descendant(obs_source_t *parent, obs_source_t *child, void *param);
 	static bool nudge_callback(obs_scene_t *, obs_sceneitem_t *item, void *param);
 
 private slots:
@@ -265,6 +269,7 @@ private slots:
 
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
+	CanvasDock(const char* canvas_name, QWidget *parent = nullptr);
 	~CanvasDock();
 
 	obs_canvas_t *GetCanvas() const { return canvas; }
@@ -321,4 +326,10 @@ struct HandleFindData {
 	{
 		obs_sceneitem_get_draw_transform(parent, &parent_xform);
 	}
+};
+
+struct descendant_info {
+	bool exists;
+	obs_weak_source_t *target;
+	obs_source_t *target2;
 };

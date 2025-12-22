@@ -45,6 +45,7 @@ OutputDock *output_dock = nullptr;
 PropertiesDock *properties_dock = nullptr;
 FiltersDock *filters_dock = nullptr;
 LiveScenesDock *live_scenes_dock = nullptr;
+CanvasDock *component_dock = nullptr;
 
 QString newer_version_available;
 
@@ -493,6 +494,12 @@ void reset_design_dock_state()
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
 	if (d)
 		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteComponent"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+	}
 }
 
 void load_dock_state(int index)
@@ -789,6 +796,7 @@ void load_current_profile_config()
 		QMetaObject::invokeMethod(modesTabBar, [index] { modesTabBar->setCurrentIndex(index); }, Qt::QueuedConnection);
 	}
 	load_outputs();
+	//component_dock->Load();
 }
 
 void save_current_profile_config()
@@ -1125,10 +1133,13 @@ void open_config_dialog(int tab, const char *create_type)
 		obs_data_release(settings);
 	}
 }
+extern "C" const struct obs_source_info component_info;
 
 bool obs_module_load(void)
 {
 	blog(LOG_INFO, "[Aitum Stream Suite] loaded version %s", PROJECT_VERSION);
+
+	obs_register_source(&component_info);
 
 	QFontDatabase::addApplicationFont(":/aitum/media/Roboto.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/Roboto-Italic.ttf");
@@ -1176,7 +1187,7 @@ bool obs_module_load(void)
 
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
-	//modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
+	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
 	toolbar->addWidget(modesTabBar);
 	toolbar->addSeparator();
 
@@ -1312,6 +1323,8 @@ bool obs_module_load(void)
 
 	output_dock = new OutputDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
+	component_dock = new CanvasDock("Components", main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteComponent", obs_module_text("AitumStreamSuiteComponent"), component_dock);
 	properties_dock = new PropertiesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"), properties_dock);
 	filters_dock = new FiltersDock(main_window);
@@ -1674,4 +1687,22 @@ void obs_module_unload()
 const char *obs_module_name(void)
 {
 	return obs_module_text("AitumStreamSuite");
+}
+
+extern "C" void show_component_editor(const char *name);
+
+void show_component_editor(const char *name)
+{
+	if (component_dock) {
+		QMetaObject::invokeMethod(component_dock, "SwitchScene", Q_ARG(QString, QString::fromUtf8(name)));
+		QMetaObject::invokeMethod(component_dock, [] {
+			auto window = QApplication::activeWindow();
+			if (window->objectName() == "OBSBasicProperties") {
+				window->close();
+			}
+			component_dock->parentWidget()->show();
+			component_dock->parentWidget()->raise();
+			component_dock->parentWidget()->setFocus();
+		});
+	}
 }

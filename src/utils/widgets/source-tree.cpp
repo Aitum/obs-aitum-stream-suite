@@ -755,7 +755,7 @@ void SourceTreeModel::Add(obs_sceneitem_t *item)
 
 void SourceTreeModel::Remove(obs_sceneitem_t *item)
 {
-	if (std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
+	if (st->canvasDock && std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
 		return;
 	int idx = -1;
 	for (int i = 0; i < items.count(); i++) {
@@ -1522,7 +1522,7 @@ bool SourceTree::GroupedItemsSelected() const
 
 void SourceTree::Remove(OBSSceneItem item, OBSScene scene)
 {
-	if (std::find(canvas_docks.begin(), canvas_docks.end(), canvasDock) == canvas_docks.end())
+	if (canvasDock && std::find(canvas_docks.begin(), canvas_docks.end(), canvasDock) == canvas_docks.end())
 		return;
 	GetStm()->Remove(item);
 	obs_frontend_save();

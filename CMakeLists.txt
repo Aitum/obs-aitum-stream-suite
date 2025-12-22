@@ -60,6 +60,7 @@ endif()
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/aitum-stream-suite.cpp
+  src/component-source.c
   resources.qrc
   src/version.h)
 

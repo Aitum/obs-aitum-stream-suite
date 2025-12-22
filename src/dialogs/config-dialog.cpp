@@ -726,7 +726,10 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	obs_enum_canvases(
 		[](void *param, obs_canvas_t *canvas) {
 			auto combo = (QComboBox *)param;
-			combo->addItem(QString::fromUtf8(obs_canvas_get_name(canvas)));
+			auto name = QString::fromUtf8(obs_canvas_get_name(canvas));
+			if (name == "Components")
+				return true;
+			combo->addItem(name);
 			return true;
 		},
 		cloneCombo);
@@ -1433,7 +1436,10 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	obs_enum_canvases(
 		[](void *param, obs_canvas_t *canvas) {
 			auto c = (QComboBox *)param;
-			c->addItem(QString::fromUtf8(obs_canvas_get_name(canvas)));
+			auto name = QString::fromUtf8(obs_canvas_get_name(canvas));
+			if (name == "Components")
+				return true;
+			c->addItem(name);
 			return true;
 		},
 		canvasCombo);
