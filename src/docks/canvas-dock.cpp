@@ -3513,11 +3513,18 @@ void CanvasDock::source_rename(void *data, calldata_t *calldata)
 	}
 	obs_frontend_source_list_free(&scenes);
 
-	for (int i = 0; i < d->sceneList->count(); i++) {
-		const auto item = d->sceneList->item(i);
-		if (item->text() != prev_name)
-			continue;
-		item->setText(new_name);
+	if (d->sceneList) {
+		for (int i = 0; i < d->sceneList->count(); i++) {
+			const auto item = d->sceneList->item(i);
+			if (item->text() != prev_name)
+				continue;
+			item->setText(new_name);
+		}
+	}
+	if (d->sceneCombo) {
+		const auto index = d->sceneCombo->findText(prev_name);
+		if (index >= 0)
+			d->sceneCombo->setItemText(index, new_name);
 	}
 }
 
