@@ -168,6 +168,7 @@ void SourceTreeItem::Clear()
 	sceneitem = nullptr;
 }
 extern std::list<CanvasDock *> canvas_docks;
+extern CanvasDock *component_dock;
 
 void SourceTreeItem::removeScene(void *data, calldata_t *)
 {
@@ -303,7 +304,6 @@ void SourceTreeItem::mouseDoubleClickEvent(QMouseEvent *event)
 #else
 			obs_frontend_open_source_properties(source);
 #endif
-			
 		}
 	}
 }
@@ -755,7 +755,8 @@ void SourceTreeModel::Add(obs_sceneitem_t *item)
 
 void SourceTreeModel::Remove(obs_sceneitem_t *item)
 {
-	if (st->canvasDock && std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
+	if (st->canvasDock && st->canvasDock != component_dock &&
+	    std::find(canvas_docks.begin(), canvas_docks.end(), st->canvasDock) == canvas_docks.end())
 		return;
 	int idx = -1;
 	for (int i = 0; i < items.count(); i++) {
@@ -1522,7 +1523,8 @@ bool SourceTree::GroupedItemsSelected() const
 
 void SourceTree::Remove(OBSSceneItem item, OBSScene scene)
 {
-	if (canvasDock && std::find(canvas_docks.begin(), canvas_docks.end(), canvasDock) == canvas_docks.end())
+	if (canvasDock && canvasDock != component_dock &&
+	    std::find(canvas_docks.begin(), canvas_docks.end(), canvasDock) == canvas_docks.end())
 		return;
 	GetStm()->Remove(item);
 	obs_frontend_save();
