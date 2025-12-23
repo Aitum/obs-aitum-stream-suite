@@ -220,8 +220,10 @@ static obs_properties_t *component_get_properties(void *data, void *type_data)
 	UNUSED_PARAMETER(data);
 	UNUSED_PARAMETER(type_data);
 	obs_properties_t *props = obs_properties_create();
-	obs_properties_add_int(props, "cx", obs_module_text("Width"), 1, 16384, 1);
-	obs_properties_add_int(props, "cy", obs_module_text("Height"), 1, 16384, 1);
+	obs_property_t* p = obs_properties_add_int(props, "cx", obs_module_text("Width"), 1, 16384, 1);
+	obs_property_int_set_suffix(p, "px");
+	p = obs_properties_add_int(props, "cy", obs_module_text("Height"), 1, 16384, 1);
+	obs_property_int_set_suffix(p, "px");
 	obs_properties_add_button2(props, "edit_button", obs_module_text("Edit"), component_edit_button_clicked, data);
 	return props;
 }
