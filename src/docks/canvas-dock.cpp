@@ -1381,10 +1381,19 @@ void CanvasDock::RenderSpacingHelper(int sourceIndex, vec3 &start, vec3 &end, ve
 
 	float px;
 
-	if (horizontal) {
-		px = length * (float)canvas_width;
+	if (settings) {
+		if (horizontal) {
+			px = length * (float)canvas_width;
+		} else {
+			px = length * (float)canvas_height;
+		}
 	} else {
-		px = length * (float)canvas_height;
+		obs_source_t *source = obs_scene_get_source(scene);
+		if (horizontal) {
+			px = length * (float)obs_source_get_width(source);
+		} else {
+			px = length * (float)obs_source_get_height(source);
+		}
 	}
 
 	if (px <= 0.0f)
@@ -3179,7 +3188,13 @@ void CanvasDock::CenterSelectedItems(CenterType centerType)
 
 	// Get coordinates of screen center
 	vec3 screenCenter;
-	vec3_set(&screenCenter, float(canvas_width), float(canvas_height), 0.0f);
+	if (settings) {
+		vec3_set(&screenCenter, float(canvas_width), float(canvas_height), 0.0f);
+	} else {
+		obs_source_t *scene_source = obs_scene_get_source(scene);
+		vec3_set(&screenCenter, float(obs_source_get_width(scene_source)), float(obs_source_get_height(scene_source)),
+			 0.0f);
+	}
 
 	vec3_mulf(&screenCenter, &screenCenter, 0.5f);
 
