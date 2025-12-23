@@ -232,6 +232,7 @@ private:
 	static bool MultiplySelectedItemScale(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool CenterAlignSelectedItems(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 	static bool GetSelectedItemsWithSize(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
+	static void source_add(void *p, calldata_t *calldata);
 	static void source_rename(void *p, calldata_t *calldata);
 	static void source_remove(void *p, calldata_t *calldata);
 	static bool select_one(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
@@ -255,6 +256,7 @@ private:
 
 private slots:
 	void AddSourceFromAction();
+	void SceneAdded(const QString name);
 	void SceneRemoved(const QString name);
 	void AddSceneItem(OBSSceneItem item);
 	void RefreshSources(OBSScene scene);

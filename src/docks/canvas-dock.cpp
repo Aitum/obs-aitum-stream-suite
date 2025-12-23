@@ -117,6 +117,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			obs_data_set_int(settings, "height", canvas_height);
 		}
 	}
+	auto sh = obs_canvas_get_signal_handler(canvas);
+	signal_handler_connect(sh, "source_add", source_add, this);
 
 	LoadUI();
 }
@@ -2010,13 +2012,7 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 			signal_handler_connect(sh, "remove", source_remove, this);
 		}
 		auto sn = QString::fromUtf8(obs_source_get_name(new_scene));
-		if (sceneCombo)
-			sceneCombo->addItem(sn);
-		if (sceneList) {
-			auto sli = new QListWidgetItem(sn, sceneList);
-			sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
-			sceneList->addItem(sli);
-		}
+
 		SwitchScene(sn);
 		obs_source_release(new_scene);
 	} while (ask_name && s);
@@ -3320,7 +3316,6 @@ void CanvasDock::LoadScenes()
 			QString name = QString::fromUtf8(obs_source_get_name(src));
 			obs_data_t *settings = obs_source_get_settings(src);
 			if (t->sceneList) {
-
 				auto sli = new QListWidgetItem(name, t->sceneList);
 				sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 				const int order = (int)obs_data_get_int(settings, "order");
@@ -3524,6 +3519,57 @@ void CanvasDock::source_rename(void *data, calldata_t *calldata)
 			continue;
 		item->setText(new_name);
 	}
+}
+
+void CanvasDock::source_add(void *data, calldata_t *calldata)
+{
+	const auto d = static_cast<CanvasDock *>(data);
+	const auto source = (obs_source_t *)calldata_ptr(calldata, "source");
+	if (!obs_source_is_scene(source))
+		return;
+	const auto canvas = obs_source_get_canvas(source);
+	obs_canvas_release(canvas);
+	if (!canvas || canvas != d->canvas)
+		return;
+	const auto name = QString::fromUtf8(obs_source_get_name(source));
+	if (name.isEmpty())
+		return;
+	QMetaObject::invokeMethod(d, "SceneAdded", Q_ARG(QString, name));
+}
+
+void CanvasDock::SceneAdded(const QString sn)
+{
+	auto scene = obs_canvas_get_source_by_name(canvas, sn.toUtf8().constData());
+	if (!scene)
+		return;
+	std::string ssn = obs_canvas_get_name(canvas);
+	ssn += " ";
+	ssn += obs_frontend_get_locale_string("Basic.Hotkeys.SelectScene");
+	obs_hotkey_register_source(
+		scene, "OBSBasic.SelectScene", ssn.c_str(),
+		[](void *data, obs_hotkey_id, obs_hotkey_t *key, bool pressed) {
+			if (!pressed)
+				return;
+			auto p = (CanvasDock *)data;
+			auto potential_source = (obs_weak_source_t *)obs_hotkey_get_registerer(key);
+			OBSSourceAutoRelease source = obs_weak_source_get_source(potential_source);
+			if (source) {
+				auto sn = QString::fromUtf8(obs_source_get_name(source));
+				QMetaObject::invokeMethod(p, "SwitchScene", Q_ARG(QString, sn), Q_ARG(bool, true));
+			}
+		},
+		this);
+	auto sh = obs_source_get_signal_handler(scene);
+	signal_handler_connect(sh, "rename", source_rename, this);
+	signal_handler_connect(sh, "remove", source_remove, this);
+
+	if (sceneList) {
+		auto sli = new QListWidgetItem(sn, sceneList);
+		sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
+		sceneList->addItem(sli);
+	}
+	if (sceneCombo)
+		sceneCombo->addItem(sn);
 }
 
 void CanvasDock::source_remove(void *data, calldata_t *calldata)
@@ -5166,6 +5212,9 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 			} else {
 				obs_canvas_reset_video(window->canvas, &ovi);
 			}
+			auto sh = obs_canvas_get_signal_handler(window->canvas);
+			signal_handler_disconnect(sh, "source_add", source_add, window);
+			signal_handler_connect(sh, "source_add", source_add, window);
 			auto index = -1;
 			if (modesTabBar)
 				index = modesTabBar->currentIndex();

@@ -39,7 +39,10 @@ static void component_video_tick(void *data, float seconds)
 	if (component->scene_source) {
 		obs_source_t *source = obs_weak_source_get_source(component->scene_source);
 		if (source) {
-			if (strcmp(obs_source_get_name(component->source), obs_source_get_name(source)) != 0) {
+			if (obs_source_removed(source)) {
+				obs_weak_source_release(component->scene_source);
+				component->scene_source = NULL;
+			} else if (strcmp(obs_source_get_name(component->source), obs_source_get_name(source)) != 0) {
 				obs_canvas_t *canvas = obs_source_get_canvas(source);
 				if (!canvas)
 					canvas = obs_get_canvas_by_name("Components");
@@ -68,6 +71,10 @@ static void component_video_tick(void *data, float seconds)
 		obs_canvas_t *canvas = obs_get_canvas_by_name("Components");
 		if (canvas) {
 			obs_source_t *source = obs_canvas_get_source_by_name(canvas, obs_source_get_name(component->source));
+			if (source && obs_source_removed(source)) {
+				obs_source_release(source);
+				source = NULL;
+			}
 			if (source) {
 				if (obs_source_is_scene(source)) {
 					component->scene_source = obs_source_get_weak_source(source);
