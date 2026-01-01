@@ -50,6 +50,7 @@ CanvasDock *component_dock = nullptr;
 QString newer_version_available;
 
 QTimer load_dock_state_timer;
+QList<QString> loaded_docks;
 
 extern std::list<CanvasDock *> canvas_docks;
 extern std::list<CanvasCloneDock *> canvas_clone_docks;
@@ -526,9 +527,16 @@ void load_dock_state(int index)
 			return;
 		}
 	}
+	loaded_docks.clear();
 	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
+
+		auto docks = main_window->findChildren<QDockWidget *>();
+		for (auto &dock : docks) {
+			if (dock->isVisible())
+				loaded_docks.append(dock->objectName());
+		}
 	}
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
@@ -1372,8 +1380,21 @@ void TabToolBar::checkOrientation() const
 void TabToolBar::resizeEvent(QResizeEvent *event)
 {
 	load_dock_state_timer.stop();
-	if (!isFloating())
-		load_dock_state_timer.start();
+	if (!isFloating()) {
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		auto docks = main_window->findChildren<QDockWidget *>();
+		QList<QString> current_docks;
+		for (auto &dock : docks) {
+			if (dock->isVisible())
+				current_docks.append(dock->objectName());
+		}
+		if (current_docks == loaded_docks) {
+			load_dock_state_timer.start();
+		} else if (main_window->isVisible()) {
+			save_dock_state(modesTabBar->currentIndex());
+			loaded_docks = current_docks;
+		}
+	}
 	checkOrientation();
 	QToolBar::resizeEvent(event);
 }

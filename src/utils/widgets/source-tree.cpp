@@ -26,7 +26,6 @@
 #include <windows.h>
 #endif
 
-
 /* ========================================================================= */
 
 SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tree(tree_), sceneitem(sceneitem_)
