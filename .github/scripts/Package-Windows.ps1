@@ -26,7 +26,7 @@ if ( $PSVersionTable.PSVersion -lt '7.2.0' ) {
     exit 2
 }
 
-function Package {
+function PackagePlugin {
     trap {
         Write-Error $_
         exit 2
@@ -78,7 +78,7 @@ function Package {
 
     $plugins = @('advanced-masks.1856','move.913','retro-effects.1972','composite-blur.1780','svg-source.2174','noise.1916','stroke-glow-shadow.1800','freeze-filter.950','3d-effect.1692','scene-notes-dock.1398','source-clone.1632','gradient-source.1172')
     foreach ($plugin in $plugins) {
-        $relPath = [regex]::Matches(((Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""), '<ahref="(/forum/resources/[^"]+)"((?!forum).)*windows(-x64)?.zip').Groups[1].Value
+        $relPath = [regex]::Matches(((Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""), '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*windows(-x64)?.zip').Groups[1].Value
         Invoke-WebRequest -OutFile "temp.zip" "https://obsproject.com${relPath}"
         Expand-Archive -Path "temp.zip" -DestinationPath "${ProjectRoot}/release/Package/" -Force
         Remove-Item -Path "temp.zip"
@@ -114,4 +114,4 @@ function Package {
     Log-Group
 }
 
-Package
+PackagePlugin

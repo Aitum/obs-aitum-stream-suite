@@ -897,10 +897,16 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 				},
 				&has_items);
 			if (!has_items) {
-				const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-				SceneCollectionWizard wizard(main_window);
-				wizard.exec();
-				QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
+				std::string path = obs_get_module_data_path(obs_current_module());
+				if (path.back() != '/')
+					path += '/';
+				path += "scenecollections";
+				if (os_file_exists(path.c_str())) {
+					const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+					SceneCollectionWizard wizard(main_window);
+					wizard.exec();
+					QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
+				}
 			}
 			obs_source_release(ss);
 		}

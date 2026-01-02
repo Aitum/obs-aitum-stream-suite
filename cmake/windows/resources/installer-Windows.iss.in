@@ -30,8 +30,68 @@ SetupIconFile="../media/icon.ico"
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Components]
+Name: "AitumStreamSuite"; Description: "Aitum Stream Suite"; Types: full compact custom; Flags: fixed checkablealone
+Name: "AitumStreamSuite\Theme"; Description: "Aitum Stream Suite Theme"; Types: full custom
+Name: "AitumStreamSuite\PresetSceneCollections"; Description: "Aitum Preset Scene Collections"; Types: full custom
+Name: "Plugins"; Description: "featured OBS plugins"; Types: full
+Name: "Plugins\3DEffect"; Description: "3D Effect (Exeldro)"; Types: full
+Name: "Plugins\AdvancedMasks"; Description: "Advanced Masks (FiniteSingularity)"; Types: full
+Name: "Plugins\CompositeBlur"; Description: "Composite Blur (FiniteSingularity)"; Types: full
+Name: "Plugins\FreezeFilter"; Description: "Freeze Filter (Exeldro)"; Types: full
+Name: "Plugins\GradientSource"; Description: "Gradient Source (Exeldro)"; Types: full
+Name: "Plugins\Move"; Description: "Move (Exeldro)"; Types: full
+Name: "Plugins\Noise"; Description: "Noise (FiniteSingularity)"; Types: full
+Name: "Plugins\RetroEffects"; Description: "Retro Effects (FiniteSingularity)"; Types: full
+Name: "Plugins\SceneNotesDock"; Description: "Scene Notes Dock (Exeldro)"; Types: full
+Name: "Plugins\SourceClone"; Description: "Source Clone (Exeldro)"; Types: full
+Name: "Plugins\StrokeGlowShadow"; Description: "Stroke Glow Shadow (FiniteSingularity)"; Types: full
+Name: "Plugins\SVGSource"; Description: "SVG Source (FiniteSingularity)"; Types: full
+
+
 [Files]
-Source: "..\release\Package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\release\Package\obs-plugins\64bit\aitum-stream-suite.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite"
+Source: "..\release\Package\data\obs-plugins\aitum-stream-suite\locale\*"; DestDir: "{app}\data\obs-plugins\aitum-stream-suite\locale"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite"
+Source: "..\release\Package\data\obs-studio\themes\*"; DestDir: "{app}\data\obs-studio\themes"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite\Theme"
+Source: "..\release\Package\data\obs-plugins\aitum-stream-suite\scenecollections\*"; DestDir: "{app}\data\obs-plugins\aitum-stream-suite\scenecollections"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite\PresetSceneCollections"
+
+Source: "..\release\Package\obs-plugins\64bit3d-effect.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\3DEffect"
+Source: "..\release\Package\data\obs-plugins\3d-effect\*"; DestDir: "{app}\data\obs-plugins\3d-effect"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\3DEffect"
+
+Source: "..\release\Package\obs-plugins\64bit\obs-advanced-masks.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\AdvancedMasks"
+Source: "..\release\Package\data\obs-plugins\obs-advanced-masks\*"; DestDir: "{app}\data\obs-plugins\obs-advanced-masks"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\AdvancedMasks"
+
+Source: "..\release\Package\obs-plugins\64bit\obs-composite-blur.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\CompositeBlur"
+Source: "..\release\Package\data\obs-plugins\obs-composite-blur\*"; DestDir: "{app}\data\obs-plugins\obs-composite-blur"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\CompositeBlur"
+
+Source: "..\release\Package\obs-plugins\64bit\freeze-filter.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\FreezeFilter"
+Source: "..\release\Package\data\obs-plugins\freeze-filter\*"; DestDir: "{app}\data\obs-plugins\freeze-filter"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\FreezeFilter"
+
+Source: "..\release\Package\obs-plugins\64bit\gradient-source.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\GradientSource"
+Source: "..\release\Package\data\obs-plugins\gradient-source\*"; DestDir: "{app}\data\obs-plugins\gradient-source"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\GradientSource"
+
+Source: "..\release\Package\obs-plugins\64bit\move-transition.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\Move"
+Source: "..\release\Package\data\obs-plugins\move-transition\*"; DestDir: "{app}\data\obs-plugins\move-transition"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\Move"
+
+Source: "..\release\Package\obs-plugins\64bit\obs-noise.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\Noise"
+Source: "..\release\Package\data\obs-plugins\obs-noise\*"; DestDir: "{app}\data\obs-plugins\obs-noise"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\Noise"
+
+Source: "..\release\Package\obs-plugins\64bit\obs-retro-effects.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\RetroEffects"
+Source: "..\release\Package\data\obs-plugins\obs-retro-effects\*"; DestDir: "{app}\data\obs-plugins\obs-retro-effects"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\RetroEffects"
+
+Source: "..\release\Package\obs-plugins\64bit\scene-notes-dock.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SceneNotesDock"
+Source: "..\release\Package\data\obs-plugins\scene-notes-dock\*"; DestDir: "{app}\data\obs-plugins\scene-notes-dock"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SceneNotesDock"
+
+Source: "..\release\Package\obs-plugins\64bit\source-clone.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SourceClone"
+Source: "..\release\Package\data\obs-plugins\source-clone\*"; DestDir: "{app}\data\obs-plugins\source-clone"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SourceClone"
+
+Source: "..\release\Package\obs-plugins\64bit\obs-stroke-glow-shadow.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\StrokeGlowShadow"
+Source: "..\release\Package\data\obs-plugins\obs-stroke-glow-shadow\*"; DestDir: "{app}\data\obs-plugins\obs-stroke-glow-shadow"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\StrokeGlowShadow"
+
+Source: "..\release\Package\obs-plugins\64bit\svg-source.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SVGSource"
+Source: "..\release\Package\data\obs-plugins\svg-source\*"; DestDir: "{app}\data\obs-plugins\svg-source"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\SVGSource"
+
+
 Source: "..\LICENSE"; Flags: dontcopy
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
