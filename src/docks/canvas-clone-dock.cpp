@@ -444,7 +444,6 @@ bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *
 		if (scene) {
 			obs_scene_enum_items(scene, SceneDetectReplacedSource, param);
 		}
-
 	}
 	return !*change_source;
 }
@@ -469,6 +468,9 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 		if ((current && !source) || (source && !current) ||
 		    (source && current && strcmp(obs_source_get_name(current), obs_source_get_name(source)) != 0)) {
 			duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
+			obs_transition_set_size(duplicate, obs_source_get_width(source), obs_source_get_height(source));
+			obs_transition_set_alignment(duplicate, obs_transition_get_alignment(source));
+			obs_transition_set_scale_type(duplicate, obs_transition_get_scale_type(source));
 		} else {
 			duplicate = obs_source_get_ref(current);
 		}
