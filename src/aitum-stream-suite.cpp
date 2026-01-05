@@ -196,11 +196,13 @@ void save_dock_state(int index)
 	}
 
 	for (const auto &it : canvas_docks) {
-		QMetaObject::invokeMethod(it, "SaveSettings");
+		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
 	}
 	for (const auto &it : canvas_clone_docks) {
-		QMetaObject::invokeMethod(it, "SaveSettings");
+		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
 	}
+	if (component_dock)
+		QMetaObject::invokeMethod(component_dock, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
 }
 
 void reset_live_dock_state()
@@ -541,6 +543,11 @@ void load_dock_state(int index)
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
 	}
+	for (const auto &it : canvas_clone_docks) {
+		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
+	}
+	if (component_dock)
+		QMetaObject::invokeMethod(component_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
 }
 
 void load_outputs()

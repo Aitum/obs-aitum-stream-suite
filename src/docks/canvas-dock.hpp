@@ -265,13 +265,13 @@ private slots:
 	void SwitchScene(const QString &scene_name, bool transition = true);
 	void MainSceneChanged();
 	void LoadMode(int index);
-	void SaveSettings(bool closing = false);
+	void SaveSettings(bool closing = false, int index = -1);
 	void OpenPreviewProjector();
 	void OpenSourceProjector();
 
 public:
 	CanvasDock(obs_data_t *settings, QWidget *parent = nullptr);
-	CanvasDock(const char* canvas_name, QWidget *parent = nullptr);
+	CanvasDock(const char *canvas_name, QWidget *parent = nullptr);
 	~CanvasDock();
 
 	obs_canvas_t *GetCanvas() const { return canvas; }

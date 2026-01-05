@@ -834,13 +834,14 @@ void CanvasCloneDock::RemoveSource(QString source_name)
 	}
 }
 
-void CanvasCloneDock::SaveSettings(bool closing)
+void CanvasCloneDock::SaveSettings(bool closing, int index)
 {
 	if (!closing) {
 		auto state = canvas_split->saveState();
 		auto b64 = state.toBase64();
 		auto state_chars = b64.constData();
-		auto index = modesTabBar->currentIndex();
+		if (index < 0 && modesTabBar)
+			index = modesTabBar->currentIndex();
 		if (index == 0) {
 			obs_data_set_string(settings, "canvas_split_live", state_chars);
 		} else if (index == 1) {

@@ -38,7 +38,7 @@ private:
 
 private slots:
 	void LoadMode(int index);
-	void SaveSettings(bool closing = false);
+	void SaveSettings(bool closing = false, int index = -1);
 
 public:
 	CanvasCloneDock(obs_data_t *settings, QWidget *parent = nullptr);

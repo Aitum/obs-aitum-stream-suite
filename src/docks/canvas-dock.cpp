@@ -984,7 +984,7 @@ CanvasDock::~CanvasDock()
 
 extern obs_data_t *current_profile_config;
 
-void CanvasDock::SaveSettings(bool closing)
+void CanvasDock::SaveSettings(bool closing, int index)
 {
 	if (!settings) {
 		if (!closing && current_profile_config) {
@@ -992,7 +992,8 @@ void CanvasDock::SaveSettings(bool closing)
 			auto state = canvas_split->saveState();
 			auto b64 = state.toBase64();
 			auto state_chars = b64.constData();
-			auto index = modesTabBar->currentIndex();
+			if (index < 0 && modesTabBar)
+				index = modesTabBar->currentIndex();
 			if (index == 0) {
 				std::string setting_name = canvas_name + "_canvas_split_live";
 				obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
