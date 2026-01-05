@@ -34,6 +34,7 @@ private:
 	static void source_create(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void source_rename(void *param, calldata_t *cd);
+	static bool SceneDetectReplacedSource(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 
 private slots:
 	void LoadMode(int index);

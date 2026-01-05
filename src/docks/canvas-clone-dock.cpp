@@ -429,6 +429,26 @@ void CanvasCloneDock::DrawBackdrop(float cx, float cy)
 	GS_DEBUG_MARKER_END();
 }
 
+bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *item, void *param)
+{
+	std::pair<bool *, CanvasCloneDock *> *p = (std::pair<bool *, CanvasCloneDock *> *)param;
+	CanvasCloneDock *ccd = p->second;
+	bool *change_source = p->first;
+	obs_source_t *source = obs_sceneitem_get_source(item);
+	if (ccd->replace_sources.find(source) != ccd->replace_sources.end()) {
+		*change_source = true;
+		return true;
+	} else {
+		obs_scene_t *scene = obs_scene_from_source(source);
+		if (!scene)
+			scene = obs_group_from_source(source);
+		if (scene) {
+			obs_scene_enum_items(scene, SceneDetectReplacedSource, param);
+		}
+	}
+	return true;
+}
+
 obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_t *current)
 {
 	if (!source)
@@ -482,20 +502,7 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 
 		bool change_source = false;
 		std::pair<bool *, CanvasCloneDock *> p = {&change_source, this};
-		obs_scene_enum_items(
-			scene,
-			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
-				UNUSED_PARAMETER(scene);
-				std::pair<bool *, CanvasCloneDock *> *p = (std::pair<bool *, CanvasCloneDock *> *)param;
-				CanvasCloneDock *ccd = p->second;
-				bool *change_source = p->first;
-				if (ccd->replace_sources.find(obs_sceneitem_get_source(item)) != ccd->replace_sources.end()) {
-					*change_source = true;
-					return true;
-				}
-				return true;
-			},
-			&p);
+		obs_scene_enum_items(scene, SceneDetectReplacedSource, &p);
 		if (!change_source) {
 			duplicate = obs_source_get_ref(source);
 		} else if (current && source &&
