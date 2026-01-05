@@ -795,16 +795,16 @@ void load_current_profile_config()
 	} else {
 		obs_data_array_release(canvas);
 	}
-	load_canvas();
 	auto index = obs_data_get_int(current_profile_config, "dock_state_mode");
-	if (modesTabBar->currentIndex() == index) {
-		QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
-	} else {
+	if (modesTabBar->currentIndex() != index) {
 		modesTab = -1;
-		QMetaObject::invokeMethod(modesTabBar, [index] { modesTabBar->setCurrentIndex(index); }, Qt::QueuedConnection);
+		modesTabBar->setCurrentIndex(index);
 	}
+	load_canvas();
+
 	load_outputs();
-	//component_dock->Load();
+
+	QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
 }
 
 void save_current_profile_config()

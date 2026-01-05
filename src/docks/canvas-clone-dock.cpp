@@ -437,7 +437,6 @@ bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *
 	obs_source_t *source = obs_sceneitem_get_source(item);
 	if (ccd->replace_sources.find(source) != ccd->replace_sources.end()) {
 		*change_source = true;
-		return true;
 	} else {
 		obs_scene_t *scene = obs_scene_from_source(source);
 		if (!scene)
@@ -445,8 +444,9 @@ bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *
 		if (scene) {
 			obs_scene_enum_items(scene, SceneDetectReplacedSource, param);
 		}
+
 	}
-	return true;
+	return !*change_source;
 }
 
 obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_t *current)
