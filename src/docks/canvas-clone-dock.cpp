@@ -515,6 +515,17 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			//duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
 			duplicate = obs_scene_get_source(
 				obs_scene_duplicate(scene, obs_source_get_name(source), OBS_SCENE_DUP_PRIVATE_REFS));
+			auto cx = obs_source_get_base_width(source);
+			auto cy = obs_source_get_base_height(source);
+			if (cx && cy && (cx != obs_source_get_base_width(duplicate) || cy != obs_source_get_base_height(duplicate))) {
+				obs_source_save(duplicate);
+				auto ss = obs_source_get_settings(duplicate);
+				obs_data_set_bool(ss, "custom_size", true);
+				obs_data_set_int(ss, "cx", cx);
+				obs_data_set_int(ss, "cy", cy);
+				obs_data_release(ss);
+				obs_source_load(duplicate);
+			}
 		}
 		if (duplicate != source) {
 			obs_scene_t *scene2 = obs_scene_from_source(duplicate);
