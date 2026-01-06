@@ -1209,6 +1209,7 @@ bool obs_module_load(void)
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
 	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
+	modesTabBar->setTabVisible(2, false); // Hide Design tab for now
 	toolbar->addWidget(modesTabBar);
 	toolbar->addSeparator();
 
@@ -1344,8 +1345,8 @@ bool obs_module_load(void)
 
 	output_dock = new OutputDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
-	component_dock = new CanvasDock("Components", main_window);
-	obs_frontend_add_dock_by_id("AitumStreamSuiteComponent", obs_module_text("AitumStreamSuiteComponent"), component_dock);
+	//component_dock = new CanvasDock("Components", main_window);
+	//obs_frontend_add_dock_by_id("AitumStreamSuiteComponent", obs_module_text("AitumStreamSuiteComponent"), component_dock);
 	properties_dock = new PropertiesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"), properties_dock);
 	filters_dock = new FiltersDock(main_window);
@@ -1727,16 +1728,16 @@ extern "C" void show_component_editor(const char *name);
 
 void show_component_editor(const char *name)
 {
-	if (component_dock) {
-		QMetaObject::invokeMethod(component_dock, "SwitchScene", Q_ARG(QString, QString::fromUtf8(name)));
-		QMetaObject::invokeMethod(component_dock, [] {
-			auto window = QApplication::activeWindow();
-			if (window->objectName() == "OBSBasicProperties") {
-				window->close();
-			}
-			component_dock->parentWidget()->show();
-			component_dock->parentWidget()->raise();
-			component_dock->parentWidget()->setFocus();
-		});
-	}
+	if (!component_dock)
+		return;
+	QMetaObject::invokeMethod(component_dock, "SwitchScene", Q_ARG(QString, QString::fromUtf8(name)));
+	QMetaObject::invokeMethod(component_dock, [] {
+		auto window = QApplication::activeWindow();
+		if (window->objectName() == "OBSBasicProperties") {
+			window->close();
+		}
+		component_dock->parentWidget()->show();
+		component_dock->parentWidget()->raise();
+		component_dock->parentWidget()->setFocus();
+	});
 }

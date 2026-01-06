@@ -330,7 +330,8 @@ enum gs_color_space component_video_get_color_space(void *data, size_t count, co
 const struct obs_source_info component_info = {
 	.id = "component_source",
 	.type = OBS_SOURCE_TYPE_INPUT,
-	.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_COMPOSITE | OBS_SOURCE_SRGB,
+	.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_COMPOSITE | OBS_SOURCE_SRGB |
+			OBS_SOURCE_CAP_DISABLED,
 	.get_name = component_getname,
 	.create = component_create,
 	.destroy = component_destroy,
