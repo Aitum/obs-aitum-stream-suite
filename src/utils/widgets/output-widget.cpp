@@ -280,6 +280,11 @@ OutputWidget::~OutputWidget()
 		signal_handler_t *signal = obs_output_get_signal_handler(output);
 		signal_handler_disconnect(signal, "start", output_start, this);
 		signal_handler_disconnect(signal, "stop", output_stop, this);
+		if (strcmp(obs_output_get_id(output), "virtualcam_output") == 0) {
+			obs_output_set_media(output, obs_get_video(), obs_get_audio());
+		}
+		obs_output_release(output);
+		output = nullptr;
 	}
 	obs_data_release(settings);
 }
@@ -319,6 +324,9 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 		QMetaObject::invokeMethod(
 			this_->outputButton,
 			[this_] {
+				if (this_->output && strcmp(obs_output_get_id(this_->output), "virtualcam_output") == 0) {
+					obs_output_set_media(this_->output, obs_get_video(), obs_get_audio());
+				}
 				obs_output_release(this_->output);
 				this_->output = nullptr;
 			},
