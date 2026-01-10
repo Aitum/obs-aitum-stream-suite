@@ -388,8 +388,10 @@ bool OutputWidget::StartOutput()
 		signal_handler_connect(signal, "stop", output_stop, this);
 
 		obs_output_set_media(vco, obs_canvas_get_video(canvas), obs_get_audio());
-		if (!obs_output_start(vco))
+		if (!obs_output_start(vco)) {
+			obs_canvas_release(canvas);
 			return false;
+		}
 		output = vco;
 		if (vendor) {
 			const auto d = obs_data_create();
@@ -398,6 +400,7 @@ bool OutputWidget::StartOutput()
 			obs_websocket_vendor_emit_event(vendor, "start_output", d);
 			obs_data_release(d);
 		}
+		obs_canvas_release(canvas);
 		return true;
 	}
 
