@@ -843,7 +843,7 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
 	connect(removeButton, &QPushButton::clicked, [this, canvasLayout, canvasGroup, settings, canvas] {
-		outputsLayout->removeWidget(canvasGroup);
+		canvasLayout->removeWidget(canvasGroup);
 		RemoveWidget(canvasGroup);
 		obs_data_set_bool(settings, "delete", true);
 	});
@@ -856,6 +856,54 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	canvasGroup->setLayout(canvasLayout);
 
 	canvasesLayout->addRow(canvasGroup);
+}
+
+void OBSBasicSettings::AddUnmanagedCanvas(std::string name)
+{
+	auto canvasGroup = new QGroupBox();
+	canvasGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+	canvasGroup->setProperty("altColor", QVariant(true));
+	canvasGroup->setProperty("customTitle", QVariant(true));
+	canvasGroup->setStyleSheet(
+		QString("QGroupBox[altColor=\"true\"]{background-color: %1;} QGroupBox[customTitle=\"true\"]{padding-top: 4px;}")
+			.arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb)));
+
+	// Title
+	auto canvas_title_layout = new QHBoxLayout;
+
+	canvas_title_layout->addWidget(new QLabel(QString::fromStdString(name)), 1, Qt::AlignLeft);
+
+	canvas_title_layout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("UnmanagedCanvas"))), 1,
+				       Qt::AlignLeft);
+
+	// Remove button
+	auto removeButton =
+		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
+	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
+	removeButton->setProperty("class", "icon-minus");
+	connect(removeButton, &QPushButton::clicked, [this, canvasGroup, name] {
+		canvasLayout->removeWidget(canvasGroup);
+		RemoveWidget(canvasGroup);
+		if (!main_settings)
+			return;
+		auto canvas = obs_data_get_array(main_settings, "canvas");
+		if (!canvas) {
+			canvas = obs_data_array_create();
+			obs_data_set_array(main_settings, "canvas", canvas);
+		}
+
+		obs_data_t *settings = obs_data_create();
+		obs_data_set_string(settings, "name", name.c_str());
+		obs_data_set_bool(settings, "delete", true);
+		obs_data_array_push_back(canvas, settings);
+		obs_data_release(settings);
+		obs_data_array_release(canvas);
+	});
+	canvas_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
+
+	canvasGroup->setLayout(canvas_title_layout);
+
+	canvasLayout->addRow(canvasGroup);
 }
 
 void OBSBasicSettings::LoadSettings(obs_data_t *settings)
@@ -882,6 +930,39 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		},
 		this);
 	obs_data_array_release(canvas);
+
+	std::vector<std::string> not_managed_canvases;
+	obs_enum_canvases(
+		[](void *param, obs_canvas_t *canvas) {
+			if (obs_canvas_removed(canvas))
+				return true;
+			auto canvases = (std::vector<std::string> *)param;
+			std::string cn = obs_canvas_get_name(canvas);
+			if (cn == "Components")
+				return true;
+			auto mc = obs_get_main_canvas();
+			if (mc != canvas)
+				canvases->push_back(cn);
+			obs_canvas_release(mc);
+			return true;
+		},
+		&not_managed_canvases);
+
+	obs_data_array_enum(
+		canvas,
+		[](obs_data_t *data2, void *param) {
+			if (obs_data_get_bool(data2, "delete"))
+				return;
+			auto canvases = (std::vector<std::string> *)param;
+			auto it = std::find(canvases->begin(), canvases->end(), obs_data_get_string(data2, "name"));
+			if (it != canvases->end())
+				canvases->erase(it);
+		},
+		&not_managed_canvases);
+
+	for (const auto &name : not_managed_canvases) {
+		AddUnmanagedCanvas(name);
+	}
 
 	while (outputsLayout->rowCount() > 2) {
 		auto i = outputsLayout->takeRow(2).fieldItem;

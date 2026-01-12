@@ -50,7 +50,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		std::string splitDescription = obs_frontend_get_locale_string("Basic.Main.SplitFile");
 		splitDescription = splitDescription + " " + nameChars;
 
-		splitHotkey = obs_hotkey_register_frontend(splitName.c_str(), splitDescription.c_str(),
+		splitHotkey = obs_hotkey_register_frontend(
+			splitName.c_str(), splitDescription.c_str(),
 			[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
 				UNUSED_PARAMETER(id);
 				UNUSED_PARAMETER(hotkey);
@@ -75,7 +76,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		std::string chapterDescription = obs_frontend_get_locale_string("Basic.Main.AddChapterMarker");
 		chapterDescription = chapterDescription + " " + nameChars;
 
-		chapterHotkey = obs_hotkey_register_frontend(chapterName.c_str(), chapterDescription.c_str(),
+		chapterHotkey = obs_hotkey_register_frontend(
+			chapterName.c_str(), chapterDescription.c_str(),
 			[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
 				UNUSED_PARAMETER(id);
 				UNUSED_PARAMETER(hotkey);

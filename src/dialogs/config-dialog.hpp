@@ -48,6 +48,7 @@ private:
 	QIcon GetAitumIcon() const;
 
 	void AddCanvas(QFormLayout *canvasLayout, obs_data_t *settings, obs_data_array_t *canvas);
+	void AddUnmanagedCanvas(const std::string name);
 	void AddOutput(QFormLayout *outputsLayout, obs_data_t *settings, obs_data_array_t *outputs, bool isNew = false);
 	void AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *output_settings, obs_data_array_t *outputs,
 				 QComboBox *canvasCombo, int idx);
