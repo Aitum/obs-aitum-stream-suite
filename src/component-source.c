@@ -209,8 +209,10 @@ static bool component_audio_render(void *data, uint64_t *ts_out, struct obs_sour
 	if (!source)
 		return false;
 
-	if (obs_source_audio_pending(source))
+	if (obs_source_audio_pending(source)) {
+		obs_source_release(source);
 		return false;
+	}
 
 	uint64_t timestamp = obs_source_get_audio_timestamp(source);
 
