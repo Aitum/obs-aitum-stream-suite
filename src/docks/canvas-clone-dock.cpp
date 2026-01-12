@@ -252,6 +252,8 @@ CanvasCloneDock::~CanvasCloneDock()
 	obs_remove_tick_callback(Tick, this);
 	obs_data_release(settings);
 	obs_weak_canvas_release(clone);
+	obs_frontend_remove_canvas(canvas);
+	obs_canvas_remove(canvas);
 	obs_canvas_release(canvas);
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
