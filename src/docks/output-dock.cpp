@@ -58,6 +58,84 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 
+	a = toolbar->addAction(QIcon(":/res/images/media/media_play.svg"), QString::fromUtf8(obs_module_text("StartAllOutputs")),
+			       [this] {
+				       outputsToStart.clear();
+				       if (mainStreamButton) {
+					       outputsToStart.push_back([this](std::function<void()> onStarted) {
+						       if (obs_frontend_streaming_active()) {
+							       onStarted();
+							       return true;
+						       }
+						       this->mainStreamOnStarted = onStarted;
+						       obs_frontend_streaming_start();
+						       return true;
+					       });
+				       }
+				       if (mainRecordButton) {
+					       outputsToStart.push_back([this](std::function<void()> onStarted) {
+						       if (obs_frontend_recording_active()) {
+							       onStarted();
+							       return true;
+						       }
+						       this->mainRecordOnStarted = onStarted;
+						       obs_frontend_recording_start();
+						       return true;
+					       });
+				       }
+				       if (mainBacktrackCheckboxButton) {
+					       outputsToStart.push_back([this](std::function<void()> onStarted) {
+						       if (obs_frontend_replay_buffer_active()) {
+							       onStarted();
+							       return true;
+						       }
+						       this->mainBacktrackOnStarted = onStarted;
+						       obs_frontend_replay_buffer_start();
+						       return true;
+					       });
+				       }
+				       if (mainVirtualCamButton) {
+					       outputsToStart.push_back([this](std::function<void()> onStarted) {
+						       if (obs_frontend_virtualcam_active()) {
+							       onStarted();
+							       return true;
+						       }
+						       this->mainVirtualCamOnStarted = onStarted;
+						       obs_frontend_start_virtualcam();
+						       return true;
+					       });
+				       }
+				       for (auto &ow : outputWidgets) {
+					       outputsToStart.push_back([this, ow](std::function<void()> onStarted) {
+						       return ow->StartOutput(onStarted);
+					       });
+				       }
+				       if (outputsToStart.empty())
+					       return;
+				       blog(LOG_INFO, "[Aitum Stream Suite] Starting %zu outputs", outputsToStart.size());
+				       StartNextOutput();
+			       });
+	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
+	toolbar->widgetForAction(a)->setProperty("class", "icon-media-play");
+
+	a = toolbar->addAction(QIcon(":/res/images/media/media_stop.svg"), QString::fromUtf8(obs_module_text("StopOutput")),
+			       [this] {
+				       outputsToStart.clear();
+				       if (mainStreamButton && obs_frontend_streaming_active())
+					       obs_frontend_streaming_stop();
+				       if (mainRecordButton && obs_frontend_recording_active())
+					       obs_frontend_recording_stop();
+				       if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
+					       obs_frontend_replay_buffer_stop();
+				       if (mainVirtualCamButton && obs_frontend_virtualcam_active())
+					       obs_frontend_stop_virtualcam();
+				       for (auto &ow : outputWidgets) {
+					       ow->StopOutput();
+				       }
+			       });
+	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("stopIcon")));
+	toolbar->widgetForAction(a)->setProperty("class", "icon-media-stop");
+
 	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")), QString::fromUtf8(obs_module_text("Stream")),
 			       [this] { open_config_dialog(2, "stream"); });
 
@@ -308,6 +386,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 		}
 	});
 	videoCheckTimer.start(500);
+	obs_frontend_add_event_callback(frontend_event, this);
 }
 
 extern OutputDock *output_dock;
@@ -315,6 +394,7 @@ void RemoveWidget(QWidget *widget);
 
 OutputDock::~OutputDock()
 {
+	obs_frontend_add_event_callback(frontend_event, this);
 	videoCheckTimer.stop();
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
 		mainLayout->removeWidget(*it);
@@ -474,4 +554,69 @@ bool OutputDock::AddChapterToOutput(const char *output_name, const char *chapter
 		}
 	}
 	return false;
+}
+
+void OutputDock::StartNextOutput()
+{
+	if (outputsToStart.empty())
+		return;
+	if (outputStarting >= outputsToStart.size())
+		outputStarting = 0;
+	auto startedAt = outputStarting;
+	while (true) {
+		auto action = std::next(outputsToStart.begin(), outputStarting);
+		if ((*action)([this] { QMetaObject::invokeMethod(this, [this] { StartNextOutput(); }, Qt::QueuedConnection); })) {
+			outputsToStart.erase(action);
+			break;
+		}
+		outputStarting++;
+		if (outputStarting >= outputsToStart.size()) {
+			outputStarting = 0;
+		}
+		if (outputStarting == startedAt) {
+			blog(LOG_WARNING, "[Aitum Stream Suite] went through all outputs and %zu could not be started",
+			     outputsToStart.size());
+			outputsToStart.clear();
+			break;
+		}
+	}
+}
+
+void OutputDock::frontend_event(enum obs_frontend_event event, void *private_data)
+{
+	auto dock = static_cast<OutputDock *>(private_data);
+	if (!dock)
+		return;
+	switch (event) {
+	case OBS_FRONTEND_EVENT_STREAMING_STARTED:
+	case OBS_FRONTEND_EVENT_STREAMING_STOPPED:
+		if (dock->mainStreamOnStarted) {
+			dock->mainStreamOnStarted();
+			dock->mainStreamOnStarted = nullptr;
+		}
+		break;
+	case OBS_FRONTEND_EVENT_RECORDING_STARTED:
+	case OBS_FRONTEND_EVENT_RECORDING_STOPPED:
+		if (dock->mainRecordOnStarted) {
+			dock->mainRecordOnStarted();
+			dock->mainRecordOnStarted = nullptr;
+		}
+		break;
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED:
+		if (dock->mainBacktrackOnStarted) {
+			dock->mainBacktrackOnStarted();
+			dock->mainBacktrackOnStarted = nullptr;
+		}
+		break;
+	case OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED:
+	case OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED:
+		if (dock->mainVirtualCamOnStarted) {
+			dock->mainVirtualCamOnStarted();
+			dock->mainVirtualCamOnStarted = nullptr;
+		}
+		break;
+	default:
+		break;
+	}
 }

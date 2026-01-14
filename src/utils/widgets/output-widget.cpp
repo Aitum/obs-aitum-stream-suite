@@ -295,6 +295,10 @@ void OutputWidget::output_start(void *data, calldata_t *calldata)
 {
 	UNUSED_PARAMETER(calldata);
 	auto this_ = (OutputWidget *)data;
+	if (this_->onStarted) {
+		this_->onStarted();
+		this_->onStarted = nullptr;
+	}
 	if (this_->outputButton->isChecked())
 		return;
 	QMetaObject::invokeMethod(this_->outputButton, [this_] { this_->outputButton->setChecked(true); }, Qt::QueuedConnection);
@@ -306,6 +310,17 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 {
 	UNUSED_PARAMETER(calldata);
 	auto this_ = (OutputWidget *)data;
+	if (this_->onStarted) {
+		const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
+		if (last_error)
+			blog(LOG_WARNING, "[Aitum Stream Suite] failed to start '%s': %s", this_->objectName().toUtf8().constData(),
+			     last_error);
+		else
+			blog(LOG_WARNING, "[Aitum Stream Suite] failed to start '%s'", this_->objectName().toUtf8().constData());
+
+		this_->onStarted();
+		this_->onStarted = nullptr;
+	}
 	if (this_->outputButton->isChecked()) {
 		QMetaObject::invokeMethod(
 			this_->outputButton, [this_] { this_->outputButton->setChecked(false); }, Qt::QueuedConnection);
@@ -334,17 +349,15 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 			},
 			Qt::QueuedConnection);
 	}
-
-	//const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
 }
 
-bool OutputWidget::StartOutput()
+bool OutputWidget::StartOutput(bool automated)
 {
 	if (!settings)
 		return false;
 
 	auto output_type = obs_data_get_string(settings, "type");
-	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+	if (!automated && (output_type[0] == '\0' || strcmp(output_type, "stream") == 0)) {
 
 		bool warnBeforeStreamStart =
 			config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStartingStream");
@@ -415,7 +428,7 @@ bool OutputWidget::StartOutput()
 	auto video_encoders = obs_data_get_array(settings, "video_encoders");
 	auto video_encoders_count = obs_data_array_count(video_encoders);
 	if (video_encoders_count == 0) {
-		auto venc = GetVideoEncoder(settings, advanced, is_record, name);
+		auto venc = GetVideoEncoder(settings, advanced, is_record, name, automated);
 		if (venc)
 			vencs.push_back(venc);
 	} else {
@@ -423,7 +436,7 @@ bool OutputWidget::StartOutput()
 			auto item = obs_data_array_item(video_encoders, i);
 			if (!item)
 				continue;
-			auto venc = GetVideoEncoder(item, advanced, is_record, name);
+			auto venc = GetVideoEncoder(item, advanced, is_record, name, automated);
 			if (venc)
 				vencs.push_back(venc);
 			obs_data_release(item);
@@ -456,8 +469,9 @@ bool OutputWidget::StartOutput()
 				obs_output_release(main_output);
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start output '%s' because main was not started",
 				     name);
-				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
-						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
+				if (!automated)
+					QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
+							     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return false;
 			}
 			auto aenc = obs_output_get_audio_encoder(main_output, 0);
@@ -465,8 +479,10 @@ bool OutputWidget::StartOutput()
 			if (!aenc) {
 				blog(LOG_WARNING,
 				     "[Aitum Stream Suite] failed to start output '%s' because audio encoder was not found", name);
-				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
-						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
+				if (!automated)
+					QMessageBox::warning(this,
+							     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
+							     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
 				return false;
 			}
 			aencs.push_back(aenc);
@@ -572,14 +588,16 @@ bool OutputWidget::StartOutput()
 
 	if (vencs.empty()) {
 		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to start '%s', no video encoder found", name);
-		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoVideoEncoder")),
-				     QString::fromUtf8(obs_module_text("NoVideoEncoder")));
+		if (!automated)
+			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoVideoEncoder")),
+					     QString::fromUtf8(obs_module_text("NoVideoEncoder")));
 		return false;
 	}
 	if (aencs.empty()) {
 		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to start '%s', no audio encoder found", name);
-		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoAudioEncoder")),
-				     QString::fromUtf8(obs_module_text("NoAudioEncoder")));
+		if (!automated)
+			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoAudioEncoder")),
+					     QString::fromUtf8(obs_module_text("NoAudioEncoder")));
 		return false;
 	}
 
@@ -716,14 +734,16 @@ bool OutputWidget::StartOutput()
 	return true;
 }
 
-obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char *output_name)
+obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char *output_name,
+					     bool automated)
 {
 	const char *canvas_name = obs_data_get_string(settings, "canvas");
 	auto canvas = (!canvas_name || canvas_name[0] == '\0') ? obs_get_main_canvas() : obs_get_canvas_by_name(canvas_name);
 	if (!canvas) {
 		blog(LOG_WARNING, "[Aitum Stream Suite] canvas '%s' not found", canvas_name);
-		QMessageBox::warning(this, QString::fromUtf8(obs_module_text("CanvasNotFound")),
-				     QString::fromUtf8(obs_module_text("CanvasNotFound")));
+		if (!automated)
+			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("CanvasNotFound")),
+					     QString::fromUtf8(obs_module_text("CanvasNotFound")));
 		return nullptr;
 	}
 	auto main_canvas = obs_get_main_canvas();
@@ -746,8 +766,9 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 			if (!venc) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start output '%s' because '%s' was not started",
 				     output_name, output_video_encoder_name);
-				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("OtherOutputNotActive")),
-						     QString::fromUtf8(obs_module_text("OtherOutputNotActive")));
+				if (!automated)
+					QMessageBox::warning(this, QString::fromUtf8(obs_module_text("OtherOutputNotActive")),
+							     QString::fromUtf8(obs_module_text("OtherOutputNotActive")));
 				return nullptr;
 			}
 
@@ -778,9 +799,10 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 						blog(LOG_WARNING,
 						     "[Aitum Stream Suite] failed to start output '%s' because main was not started",
 						     output_name);
-						QMessageBox::warning(this,
-								     QString::fromUtf8(obs_module_text("MainOutputNotActive")),
-								     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
+						if (!automated)
+							QMessageBox::warning(
+								this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
+								QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 						return nullptr;
 					}
 					auto vei = (int)obs_data_get_int(settings, "video_encoder_index");
@@ -790,9 +812,12 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 						blog(LOG_WARNING,
 						     "[Aitum Stream Suite] failed to start output '%s' because encoder index %d was not found",
 						     output_name, vei);
-						QMessageBox::warning(
-							this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
-							QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
+						if (!automated)
+							QMessageBox::warning(this,
+									     QString::fromUtf8(obs_module_text(
+										     "MainOutputEncoderIndexNotFound")),
+									     QString::fromUtf8(obs_module_text(
+										     "MainOutputEncoderIndexNotFound")));
 						return nullptr;
 					}
 				} else {
@@ -916,8 +941,9 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 			if (!venc || !obs_output_active(main_output)) {
 				blog(LOG_WARNING, "[Aitum Stream Suite] failed to start output '%s' because main was not started",
 				     output_name);
-				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
-						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
+				if (!automated)
+					QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
+							     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return nullptr;
 			}
 		} else if (!venc) {
@@ -1072,4 +1098,24 @@ bool OutputWidget::AddChapter(const char *chapter_name)
 	bool result = proc_handler_call(ph, "add_chapter", &cd);
 	calldata_free(&cd);
 	return result;
+}
+
+bool OutputWidget::StartOutput(std::function<void()> onStarted)
+{
+	if (output && obs_output_active(output)) {
+		onStarted();
+		return true;
+	}
+	auto name = this->objectName();
+	this->onStarted = onStarted;
+	auto starting = StartOutput(true);
+	if (!starting)
+		this->onStarted = nullptr;
+	return starting;
+}
+
+void OutputWidget::StopOutput() {
+	if (output && obs_output_active(output)) {
+		obs_output_stop(output);
+	}
 }

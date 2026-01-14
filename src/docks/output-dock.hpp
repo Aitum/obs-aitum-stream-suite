@@ -1,6 +1,7 @@
 #pragma once
 
 #include <obs.h>
+#include <obs-frontend-api.h>
 #include <QCheckBox>
 #include <QFrame>
 #include <QGridLayout>
@@ -32,6 +33,17 @@ private:
 	QTimer videoCheckTimer;
 
 	std::vector<OutputWidget *> outputWidgets;
+
+	std::list<std::function<bool(std::function<void()>)>> outputsToStart;
+	size_t outputStarting = 0;
+
+	std::function<void()> mainStreamOnStarted;
+	std::function<void()> mainRecordOnStarted;
+	std::function<void()> mainBacktrackOnStarted;
+	std::function<void()> mainVirtualCamOnStarted;
+	void StartNextOutput();
+
+	static void frontend_event(enum obs_frontend_event event, void *private_data);
 
 public:
 	OutputDock(QWidget *parent = nullptr);
