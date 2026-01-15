@@ -1,13 +1,13 @@
 /* Just Edit OBS theme v2.52 */
 /* Last update : 10/02/2025 */
-/* https://obsproject.com/forum/resources/just-edit-obs-theme.1534/ */
-/* www.just-edit.fr */
-/* noar@just-edit.fr */
+/* https://aitum.tv/products/stream-suite */
+/* aitum.tv */
+/* support@aitum.tv */
 
 @OBSThemeMeta {
     name: 'Aitum';
     id: 'com.obsproject.Aitum';
-    author: 'noar';
+    author: 'Aitum';
     dark: 'true';
 }
 
@@ -18,42 +18,49 @@
     --blue3: #4F47C2;
     --blue4: #213E97;
     --blue5: #1A3278;
+    --blue6: #162A64;
 
     --red1: #E85E75;
     --red2: #E33B57;
     --red3: #C01C37;
     --red4: #A1172E;
     --red5: #7D1224;
+    --red6: #590D1A;
 
     --pink1: #E5619A;
     --pink2: #E03E84;
     --pink3: #C11F65;
     --pink4: #9E1A53;
     --pink5: #7B1441;
+    --pink6: #580E2E;
 
     --teal1: #3DBEF5;
     --teal2: #16B1F3;
     --teal3: #0981B4;
     --teal4: #086F9B;
     --teal5: #065374;
+    --teal6: #04374E;
 
     --purple1: #997FDC;
     --purple2: #805FD3;
     --purple3: #5B34BF;
     --purple4: #4D2CA0;
     --purple5: #3D2380;
+    --purple6: #2E1A60;
 
     --green1: #59D966;
     --green2: #37D247;
     --green3: #25A231;
     --green4: #1E8528;
     --green5: #17641E;
+    --green6: #0F4313;
 
     --yellow1: #EABC48;
     --yellow2: #E5AF24;
     --yellow3: #B88A16;
     --yellow4: #926E11;
     --yellow5: #6E520D;
+    --yellow6: #493709;
 
     --grey1: #5B6273;
     --grey2: #4E5566;
@@ -331,6 +338,18 @@
 
 .icon-save {
     qproperty-icon: url(theme:Aitum/save.svg);
+}
+
+.icon-pin {
+    qproperty-icon: url(theme:Aitum/pin.svg);
+}
+
+.icon-layout-vertical {
+    qproperty-icon: url(theme:Aitum/sliders-vertical.svg);
+}
+
+.icon-layout-horizontal {
+    qproperty-icon: url(theme:Aitum/sliders-horizontal.svg);
 }
 
 /* Media icons */
@@ -1513,12 +1532,59 @@ VolControl #volLabel {
 #vMixerScrollArea VolControl MuteCheckBox {
     margin-left: var(--padding_xlarge);
 }
-VolControl {
-    background: var(--bg_base);
+
+/* Mute Button */
+
+.btn-mute {
+    color: var(--text);
+    qproperty-icon: url(theme:Aitum/settings/audio.svg);
 }
 
-VolumeMeter {
+.btn-mute.checked {
+    color: var(--red3);
     background: transparent;
+    qproperty-icon: url(theme:Aitum/mute.svg);
+}
+
+.btn-mute.mute-unassigned {
+    color: var(--yellow1);
+    background: var(--yellow6);
+    qproperty-icon: url(theme:Aitum/unassigned.svg);
+}
+
+.btn-mute.mute-unassigned.hover,
+.btn-mute.mute-unassigned:focus {
+    border-color: var(--yellow1);
+}
+
+/* Monitor Button */
+
+.btn-monitor {
+    background: transparent;
+    qproperty-icon: url(theme:Aitum/monitor-off.svg);
+}
+
+.btn-monitor:focus {
+    border-color: var(--red1);
+}
+
+.btn-monitor.checked {
+    background: var(--green4);
+    qproperty-icon: url(theme:Aitum/monitor-on.svg);
+}
+
+.btn-monitor.checked:focus,
+.btn-monitor:checked:focus {
+    border-color: var(--green1);
+}
+
+.btn-monitor.checked:hover {
+    background: var(--green3);
+    border-color: var(--green1);
+}
+
+VolControl, VolumeMeter {
+    background: var(--bg_base);
 }
 
 VolumeMeter {
