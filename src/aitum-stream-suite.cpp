@@ -505,10 +505,13 @@ void reset_design_dock_state()
 	}
 }
 
+static bool scene_collection_changing = false;
+
 void load_dock_state(int index)
 {
 	if (!current_profile_config)
 		return;
+	scene_collection_changing = false;
 	std::string state;
 	if (index == 0) {
 		state = obs_data_get_string(current_profile_config, "dock_state_live");
@@ -814,7 +817,7 @@ void load_current_profile_config()
 	QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
 }
 
-void save_current_profile_config()
+void save_current_profile_config(bool save_docks)
 {
 	if (!current_profile_config)
 		return;
@@ -830,9 +833,11 @@ void save_current_profile_config()
 		dstr_cat_ch(&path, '/');
 	dstr_cat(&path, "aitum.json");
 
-	auto index = modesTabBar->currentIndex();
-	save_dock_state(index);
-	obs_data_set_int(current_profile_config, "dock_state_mode", index);
+	if (save_docks) {
+		auto index = modesTabBar->currentIndex();
+		save_dock_state(index);
+		obs_data_set_int(current_profile_config, "dock_state_mode", index);
+	}
 	if (output_dock)
 		output_dock->SaveSettings();
 
@@ -931,7 +936,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		load_browser_panels();
 		load_current_profile_config();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGING) {
-		save_current_profile_config();
+		save_current_profile_config(true);
 		unload_browser_panels();
 	} else if (event == OBS_FRONTEND_EVENT_EXIT || event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
 		if (current_profile_config) {
@@ -1000,6 +1005,8 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			obs_frontend_source_list_free(&transitions);
 			load_current_profile_config();
 		}
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING) {
+		scene_collection_changing = true;
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP) {
 		for (auto i = canvas_clone_docks.size(); i > 0; i--) {
 			auto it = canvas_clone_docks.begin();
@@ -1145,7 +1152,7 @@ void open_config_dialog(int tab, const char *create_type)
 		obs_data_set_string(current_profile_config, "config_geometry", configDialog->saveGeometry().toBase64().constData());
 		configDialog->SaveHotkeys();
 
-		save_current_profile_config();
+		save_current_profile_config(true);
 		if (canvas_changed)
 			load_canvas();
 		if (outputs_changed)
@@ -1435,7 +1442,7 @@ static void save_load(obs_data_t *save_data, bool saving, void *private_data)
 	UNUSED_PARAMETER(save_data);
 	UNUSED_PARAMETER(private_data);
 	if (saving)
-		save_current_profile_config();
+		save_current_profile_config(!scene_collection_changing);
 }
 
 obs_websocket_vendor vendor = nullptr;
