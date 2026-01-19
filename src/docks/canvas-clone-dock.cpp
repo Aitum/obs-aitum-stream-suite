@@ -893,3 +893,22 @@ void CanvasCloneDock::reset_build_state()
 {
 	canvas_split->setSizes({1, 1});
 }
+
+void CanvasCloneDock::SetPanelVisible(const QString &panel_name, bool visible)
+{
+	if (panel_name == "canvas") {
+		auto canvas_sizes = canvas_split->sizes();
+		if (canvas_sizes[0] == 0 && visible) {
+			canvas_split->setSizes({1, canvas_sizes[1] > 0 ? 1 : 0});
+		} else if (canvas_sizes[0] > 0 && !visible) {
+			canvas_split->setSizes({0, 1});
+		}
+	} else if (panel_name == "sources") {
+		auto canvas_sizes = canvas_split->sizes();
+		if (canvas_sizes[1] == 0 && visible) {
+			canvas_split->setSizes({canvas_sizes[0] > 0 ? 1 : 0, 1});
+		} else if (canvas_sizes[1] > 0 && !visible) {
+			canvas_split->setSizes({1, 0});
+		}
+	}
+}

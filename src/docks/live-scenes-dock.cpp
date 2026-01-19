@@ -121,16 +121,7 @@ void LiveScenesDock::save_load(obs_data_t *save_data, bool saving, void *private
 	auto lsd = (LiveScenesDock *)private_data;
 
 	if (saving) {
-		auto ls = obs_data_array_create();
-		for (int idx = 0; idx < lsd->sceneList->count(); idx++) {
-			auto sn = lsd->sceneList->item(idx)->text().toUtf8();
-			auto uuid = lsd->sceneList->item(idx)->data(Qt::UserRole).toString().toUtf8();
-			auto item = obs_data_create();
-			obs_data_set_string(item, "name", sn.constData());
-			obs_data_set_string(item, "uuid", uuid.constData());
-			obs_data_array_push_back(ls, item);
-			obs_data_release(item);
-		}
+		auto ls = lsd->GetLiveScenesArray();
 		obs_data_set_array(save_data, "live_scenes", ls);
 		obs_data_array_release(ls);
 	} else {
@@ -233,4 +224,52 @@ void LiveScenesDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	}
 	item->setSelected(true);
 	sceneList->blockSignals(false);
+}
+
+obs_data_array_t *LiveScenesDock::GetLiveScenesArray()
+{
+	auto ls = obs_data_array_create();
+	for (int idx = 0; idx < sceneList->count(); idx++) {
+		auto sn = sceneList->item(idx)->text().toUtf8();
+		auto uuid = sceneList->item(idx)->data(Qt::UserRole).toString().toUtf8();
+		auto item = obs_data_create();
+		obs_data_set_string(item, "name", sn.constData());
+		obs_data_set_string(item, "uuid", uuid.constData());
+		obs_data_array_push_back(ls, item);
+		obs_data_release(item);
+	}
+	return ls;
+}
+
+bool LiveScenesDock::AddLiveScene(const QString &name)
+{
+	if (name.isEmpty())
+		return false;
+
+	auto scene = obs_get_source_by_name(name.toUtf8().constData());
+	if (!scene)
+		return false;
+
+	auto sli = new QListWidgetItem(name, sceneList);
+	sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
+	obs_source_release(scene);
+
+	sceneList->addItem(sli);
+	return true;
+}
+
+bool LiveScenesDock::RemoveLiveScene(const QString &name)
+{
+	if (name.isEmpty())
+		return false;
+	for (int i = 0; i < sceneList->count(); i++) {
+		auto item = sceneList->item(i);
+		if (!item)
+			continue;
+		if (item->text() == name) {
+			delete sceneList->takeItem(i);
+			return true;
+		}
+	}
+	return false;
 }

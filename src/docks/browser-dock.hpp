@@ -9,9 +9,12 @@ class BrowserDock : public QWidget {
 private:
 	QCefWidget *cefWidget = nullptr;
 	QVBoxLayout *layout = nullptr;
-
+	std::string url;
 public:
-	BrowserDock(const char *url, QWidget *parent = nullptr);
+	BrowserDock(const char* name, const char *url, QWidget *parent = nullptr);
 	~BrowserDock();
+
+	void Refresh();
+	void Reset();
 };
 

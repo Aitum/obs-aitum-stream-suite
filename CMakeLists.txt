@@ -99,6 +99,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/event-filter.cpp
   src/utils/file-download.c
   src/utils/icon.cpp
+  src/utils/obs-websocket.cpp
   src/utils/widgets/capture-widget.cpp
   src/utils/widgets/double-slider.cpp
   src/utils/widgets/hotkey-edit.cpp

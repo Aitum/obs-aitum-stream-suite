@@ -140,10 +140,9 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			if (button == QMessageBox::No)
 				return;
 		} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
-			auto button = QMessageBox::question(
-				this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
+			auto button = QMessageBox::question(this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
 				QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
-				QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+							    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 			if (button == QMessageBox::No)
 				return;
 		}

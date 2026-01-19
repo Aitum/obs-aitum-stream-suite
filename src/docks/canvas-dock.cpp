@@ -34,6 +34,7 @@
 std::list<CanvasDock *> canvas_docks;
 
 extern QTabBar *modesTabBar;
+extern obs_websocket_vendor vendor;
 
 CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
@@ -2021,8 +2022,15 @@ void CanvasDock::AddScene(QString duplicate, bool ask_name)
 			signal_handler_connect(sh, "rename", source_rename, this);
 			signal_handler_connect(sh, "remove", source_remove, this);
 		}
+		if (vendor) {
+			const auto d = obs_data_create();
+			obs_data_set_string(d, "canvas", obs_canvas_get_name(canvas));
+			obs_data_set_string(d, "name", obs_source_get_name(new_scene));
+			obs_data_set_string(d, "uuid", obs_source_get_uuid(new_scene));
+			obs_websocket_vendor_emit_event(vendor, "scene_added", d);
+			obs_data_release(d);
+		}
 		auto sn = QString::fromUtf8(obs_source_get_name(new_scene));
-
 		SwitchScene(sn);
 		obs_source_release(new_scene);
 	} while (ask_name && s);
@@ -2045,12 +2053,18 @@ void CanvasDock::RemoveScene(const QString &sceneName)
 	mb.setDefaultButton(QMessageBox::NoButton);
 	if (mb.exec() == QMessageBox::Yes) {
 		obs_source_remove(s);
+		if (vendor) {
+			const auto d = obs_data_create();
+			obs_data_set_string(d, "canvas", obs_canvas_get_name(canvas));
+			obs_data_set_string(d, "name", obs_source_get_name(s));
+			obs_data_set_string(d, "uuid", obs_source_get_uuid(s));
+			obs_websocket_vendor_emit_event(vendor, "scene_removed", d);
+			obs_data_release(d);
+		}
 	}
 
 	obs_source_release(s);
 }
-
-extern obs_websocket_vendor vendor;
 
 void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 {
@@ -5574,4 +5588,104 @@ void CanvasDock::Nudge(int dist, MoveDir dir)
 	}
 
 	obs_scene_enum_items(scene, nudge_callback, &offset);
+}
+
+void CanvasDock::SetPanelVisible(const QString &panel_name, bool visible)
+{
+	if (panel_name == "canvas") {
+		auto canvas_sizes = canvas_split->sizes();
+		if (canvas_sizes[0] == 0 && visible) {
+			canvas_split->setSizes({1, canvas_sizes[1] > 0 ? 1 : 0});
+		} else if (canvas_sizes[0] > 0 && !visible) {
+			canvas_split->setSizes({0, 1});
+		}
+	} else if (panel_name == "scenes") {
+		auto canvas_sizes = canvas_split->sizes();
+		auto panel_sizes = panel_split->sizes();
+		if (canvas_sizes[1] == 0 && visible) {
+			canvas_split->setSizes({canvas_sizes[0] > 0 ? 1 : 0, 1});
+		} else if (canvas_sizes[1] > 0 && !visible && panel_sizes[1] == 0 && panel_sizes[2] == 0) {
+			canvas_split->setSizes({1, 0});
+		}
+
+		if (panel_sizes[0] == 0 && visible) {
+			panel_split->setSizes({1, panel_sizes[1] > 0 ? 1 : 0, panel_sizes[2] > 0 ? 1 : 0});
+		} else if (panel_sizes[0] > 0 && !visible) {
+			panel_split->setSizes({0, panel_sizes[1] > 0 ? 1 : 0, panel_sizes[2] > 0 ? 1 : 0});
+		}
+	} else if (panel_name == "sources") {
+		auto canvas_sizes = canvas_split->sizes();
+		auto panel_sizes = panel_split->sizes();
+		if (canvas_sizes[1] == 0 && visible) {
+			canvas_split->setSizes({canvas_sizes[0] > 0 ? 1 : 0, 1});
+		} else if (canvas_sizes[1] > 0 && !visible && panel_sizes[0] == 0 && panel_sizes[2] == 0) {
+			canvas_split->setSizes({1, 0});
+		}
+
+		if (panel_sizes[1] == 0 && visible) {
+			panel_split->setSizes({panel_sizes[0] > 0 ? 1 : 0, 1, panel_sizes[2] > 0 ? 1 : 0});
+		} else if (panel_sizes[1] > 0 && !visible) {
+			panel_split->setSizes({panel_sizes[0] > 0 ? 1 : 0, 0, panel_sizes[2] > 0 ? 1 : 0});
+		}
+	} else if (panel_name == "transitions") {
+		auto canvas_sizes = canvas_split->sizes();
+		auto panel_sizes = panel_split->sizes();
+		if (canvas_sizes[1] == 0 && visible) {
+			canvas_split->setSizes({canvas_sizes[0] > 0 ? 1 : 0, 1});
+		} else if (canvas_sizes[1] > 0 && !visible && panel_sizes[0] == 0 && panel_sizes[1] == 0) {
+			canvas_split->setSizes({1, 0});
+		}
+
+		if (panel_sizes[2] == 0 && visible) {
+			panel_split->setSizes({panel_sizes[0] > 0 ? 1 : 0, panel_sizes[1] > 0 ? 1 : 0, 1});
+		} else if (panel_sizes[2] > 0 && !visible) {
+			panel_split->setSizes({panel_sizes[0] > 0 ? 1 : 0, panel_sizes[1] > 0 ? 1 : 0, 0});
+		}
+	}
+}
+
+void CanvasDock::SetSelectedTransition(const QString &transition_name)
+{
+	auto pos = transition->findText(transition_name);
+	if (pos >= 0)
+		transition->setCurrentIndex(pos);
+}
+
+void CanvasDock::AddTransition(const char *source_type, const char *name, obs_data_t *settings)
+{
+	if (!source_type || source_type[0] == '\0')
+		return;
+	if (!name || name[0] == '\0')
+		return;
+	for (auto tr : transitions) {
+		if (strcmp(obs_source_get_name(tr), name) == 0)
+			return;
+	}
+
+	OBSSourceAutoRelease source = obs_source_create(source_type, name, settings, nullptr);
+	if (source) {
+		transitions.emplace_back(source);
+		auto n = QString::fromUtf8(name);
+		QMetaObject::invokeMethod(this, [this, n]() {
+			transition->addItem(n);
+		});
+	}
+}
+
+void CanvasDock::RemoveTransition(const char *transition_name)
+{
+	for (auto it = transitions.begin(); it != transitions.end(); ++it) {
+		if (strcmp(transition_name, obs_source_get_name(it->Get())) == 0) {
+			if (!obs_is_source_configurable(obs_source_get_unversioned_id(it->Get())))
+				return;
+			transitions.erase(it);
+			break;
+		}
+	}
+	auto name = QString::fromUtf8(transition_name);
+	QMetaObject::invokeMethod(this, [this, name]() {
+		auto pos = transition->findText(name);
+		if (pos >= 0)
+			transition->removeItem(pos);
+	});
 }

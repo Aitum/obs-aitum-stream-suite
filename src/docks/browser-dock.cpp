@@ -5,9 +5,10 @@
 QCef *cef = nullptr;
 QCefCookieManager *panel_cookies = nullptr;
 
-BrowserDock::BrowserDock(const char *url, QWidget *parent) : QWidget(parent)
+BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : QWidget(parent), url(url_)
 {
 	setMinimumSize(200, 100);
+	setObjectName(QString::fromUtf8(name));
 
 	if (!cef) {
 		obs_module_t *browserModule = obs_get_module("obs-browser");
@@ -44,6 +45,17 @@ BrowserDock::~BrowserDock()
 	layout->removeWidget(cefWidget);
 	cefWidget->setParent(nullptr);
 	cefWidget->deleteLater();
+}
+
+void BrowserDock::Refresh() {
+	if (cefWidget)
+		cefWidget->reloadPage();
+}
+
+void BrowserDock::Reset()
+{
+	if (cefWidget)
+		cefWidget->setURL(url);
 }
 
 void DestroyPanelCookieManager()

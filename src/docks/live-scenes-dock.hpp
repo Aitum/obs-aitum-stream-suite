@@ -17,4 +17,8 @@ private slots:
 public:
 	LiveScenesDock(QWidget *parent = nullptr);
 	~LiveScenesDock();
+
+	obs_data_array_t *GetLiveScenesArray();
+	bool AddLiveScene(const QString &name);
+	bool RemoveLiveScene(const QString &name);
 };

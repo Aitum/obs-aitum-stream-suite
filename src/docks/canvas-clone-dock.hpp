@@ -52,4 +52,6 @@ public:
 
 	void reset_live_state();
 	void reset_build_state();
+
+	void SetPanelVisible(const QString &panel_name, bool visible);
 };

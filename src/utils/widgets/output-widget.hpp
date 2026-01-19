@@ -25,7 +25,8 @@ private:
 
 	bool StartOutput(bool automated = false);
 	void UpdateCanvas();
-	obs_encoder_t *GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char* output_name, bool automated);
+	obs_encoder_t *GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char *output_name,
+				       bool automated);
 
 	static void output_stop(void *data, calldata_t *calldata);
 	static void output_start(void *data, calldata_t *calldata);
