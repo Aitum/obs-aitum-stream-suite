@@ -1,6 +1,5 @@
 #include "dialogs/config-dialog.hpp"
 #include "dialogs/name-dialog.hpp"
-#include "dialogs/scene-collection-wizard.hpp"
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
@@ -928,40 +927,6 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			return;
 		}
 		load_browser_panels();
-		size_t scene_count = 0;
-		obs_enum_scenes(
-			[](void *param, obs_source_t *) {
-				size_t *scene_count = (size_t *)param;
-				(*scene_count)++;
-				return true;
-			},
-			&scene_count);
-		if (scene_count <= 1) {
-			obs_source_t *ss = obs_frontend_get_current_scene();
-			obs_scene_t *scene = obs_scene_from_source(ss);
-			bool has_items = false;
-			obs_scene_enum_items(
-				scene,
-				[](obs_scene_t *, obs_sceneitem_t *, void *param) {
-					bool *has_items = (bool *)param;
-					*has_items = true;
-					return false;
-				},
-				&has_items);
-			if (!has_items) {
-				std::string path = obs_get_module_data_path(obs_current_module());
-				if (path.back() != '/')
-					path += '/';
-				path += "scenecollections";
-				if (os_file_exists(path.c_str())) {
-					const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-					SceneCollectionWizard wizard(main_window);
-					wizard.exec();
-					QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
-				}
-			}
-			obs_source_release(ss);
-		}
 		struct obs_frontend_source_list transitions = {};
 		obs_frontend_get_transitions(&transitions);
 		for (size_t i = 0; i < transitions.sources.num; i++) {
@@ -1220,14 +1185,6 @@ bool obs_module_load(void)
 	QFontDatabase::addApplicationFont(":/aitum/media/Roboto-Italic.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed-Italic.ttf");
-
-	obs_frontend_add_tools_menu_item(
-		obs_module_text("SceneCollectionWizard"),
-		[](void *) {
-			SceneCollectionWizard wizard;
-			wizard.exec();
-		},
-		nullptr);
 
 	obs_frontend_add_event_callback(frontend_event, nullptr);
 

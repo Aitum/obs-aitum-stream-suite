@@ -89,8 +89,6 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/name-dialog.hpp
   src/dialogs/record-output-dialog.cpp
   src/dialogs/record-output-dialog.hpp
-  src/dialogs/scene-collection-wizard.cpp
-  src/dialogs/scene-collection-wizard.hpp
   src/dialogs/stream-output-dialog.cpp
   src/dialogs/stream-output-dialog.hpp)
 
