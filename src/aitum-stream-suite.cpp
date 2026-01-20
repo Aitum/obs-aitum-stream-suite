@@ -521,7 +521,7 @@ void load_dock_state(QString mode)
 	if (state.empty()) {
 		for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
 			auto translated = obs_module_text(it->first.c_str());
-			if ((translated && mode == translated) || mode == it->first) {
+			if ((translated && mode == translated) || mode == QString::fromStdString(it->first)) {
 				it->second();
 				return;
 			}
