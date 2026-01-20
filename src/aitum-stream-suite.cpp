@@ -35,7 +35,7 @@ download_info_t *version_download_info = nullptr;
 obs_data_t *current_profile_config = nullptr;
 QTabBar *modesTabBar = nullptr;
 QToolBar *toolbar = nullptr;
-int modesTab = -1;
+QString modesTab;
 
 QList<QAction *> partnerBlockActions;
 QAction *studioModeAction = nullptr;
@@ -178,9 +178,9 @@ void transition_start(void *, calldata_t *)
 	}
 }
 
-void save_dock_state(int index)
+void save_dock_state(QString mode)
 {
-	if (index < 0)
+	if (mode.isEmpty())
 		return;
 	if (!current_profile_config)
 		return;
@@ -188,22 +188,17 @@ void save_dock_state(int index)
 	auto state = main_window->saveState();
 	auto b64 = state.toBase64();
 	auto state_chars = b64.constData();
-	if (index == 0) {
-		obs_data_set_string(current_profile_config, "dock_state_live", state_chars);
-	} else if (index == 1) {
-		obs_data_set_string(current_profile_config, "dock_state_build", state_chars);
-	} else if (index == 2) {
-		obs_data_set_string(current_profile_config, "dock_state_design", state_chars);
-	}
+	std::string setting_name = "dock_state_" + mode.toStdString();
+	obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
 
 	for (const auto &it : canvas_docks) {
-		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
+		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
 	}
 	for (const auto &it : canvas_clone_docks) {
-		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
+		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
 	}
 	if (component_dock)
-		QMetaObject::invokeMethod(component_dock, "SaveSettings", Q_ARG(bool, false), Q_ARG(int, index));
+		QMetaObject::invokeMethod(component_dock, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
 }
 
 void reset_live_dock_state()
@@ -506,31 +501,31 @@ void reset_design_dock_state()
 	}
 }
 
+std::vector<std::pair<std::string, void (*)(void)>> fixed_tabs = {{"Live", reset_live_dock_state},
+								  {"Build", reset_build_dock_state}};
+//,{"Design", reset_design_dock_state}};
+
 static bool scene_collection_changing = false;
 
-void load_dock_state(int index)
+void load_dock_state(QString mode)
 {
 	if (!current_profile_config)
 		return;
 	scene_collection_changing = false;
 	std::string state;
-	if (index == 0) {
-		state = obs_data_get_string(current_profile_config, "dock_state_live");
-		if (state.empty()) {
-			reset_live_dock_state();
-			return;
-		}
-	} else if (index == 1) {
-		state = obs_data_get_string(current_profile_config, "dock_state_build");
-		if (state.empty()) {
-			reset_build_dock_state();
-			return;
-		}
-	} else if (index == 2) {
-		state = obs_data_get_string(current_profile_config, "dock_state_design");
-		if (state.empty()) {
-			reset_design_dock_state();
-			return;
+	std::string setting_name = "dock_state_" + mode.toStdString();
+	state = obs_data_get_string(current_profile_config, setting_name.c_str());
+	if (state.empty()) {
+		setting_name = "dock_state_" + mode.toLower().toStdString();
+		state = obs_data_get_string(current_profile_config, setting_name.c_str());
+	}
+	if (state.empty()) {
+		for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
+			auto translated = obs_module_text(it->first.c_str());
+			if ((translated && mode == translated) || mode == it->first) {
+				it->second();
+				return;
+			}
 		}
 	}
 	loaded_docks.clear();
@@ -545,13 +540,13 @@ void load_dock_state(int index)
 		}
 	}
 	for (const auto &it : canvas_docks) {
-		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
+		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 	}
 	for (const auto &it : canvas_clone_docks) {
-		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
+		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 	}
 	if (component_dock)
-		QMetaObject::invokeMethod(component_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(int, index));
+		QMetaObject::invokeMethod(component_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 }
 
 void load_outputs()
@@ -806,16 +801,51 @@ void load_current_profile_config()
 	} else {
 		obs_data_array_release(canvas);
 	}
-	auto index = obs_data_get_int(current_profile_config, "dock_state_mode");
-	if (modesTabBar->currentIndex() != index) {
-		modesTab = -1;
-		modesTabBar->setCurrentIndex(index);
+	auto dsm = obs_data_item_byname(current_profile_config, "dock_state_mode");
+	if (obs_data_item_gettype(dsm) == OBS_DATA_STRING) {
+		auto mode = QString::fromUtf8(obs_data_item_get_string(dsm));
+		for (int i = 0; i < modesTabBar->count(); i++) {
+			auto d = modesTabBar->tabData(i);
+			if (!d.isNull() && d.isValid() && d.toString() == mode) {
+				if (modesTabBar->currentIndex() != i) {
+					modesTab = "";
+					modesTabBar->setCurrentIndex(i);
+				}
+				break;
+			} else if (modesTabBar->tabText(i) == mode) {
+				if (modesTabBar->currentIndex() != i) {
+					modesTab = "";
+					modesTabBar->setCurrentIndex(i);
+				}
+				break;
+			}
+		}
+	} else {
+		auto index = obs_data_item_get_int(dsm);
+		if (modesTabBar->currentIndex() != index) {
+			modesTab = "";
+			modesTabBar->setCurrentIndex(index);
+		}
 	}
+	obs_data_item_release(&dsm);
 	load_canvas();
 
 	load_outputs();
 
-	QMetaObject::invokeMethod(modesTabBar, [index] { load_dock_state(index); }, Qt::QueuedConnection);
+	QMetaObject::invokeMethod(
+		modesTabBar,
+		[] {
+			auto index = modesTabBar->currentIndex();
+			if (index >= 0) {
+				auto d = modesTabBar->tabData(index);
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					load_dock_state(d.toString());
+				} else {
+					load_dock_state(modesTabBar->tabText(index));
+				}
+			}
+		},
+		Qt::QueuedConnection);
 }
 
 void save_current_profile_config(bool save_docks)
@@ -836,8 +866,17 @@ void save_current_profile_config(bool save_docks)
 
 	if (save_docks) {
 		auto index = modesTabBar->currentIndex();
-		save_dock_state(index);
-		obs_data_set_int(current_profile_config, "dock_state_mode", index);
+		if (index >= 0) {
+			QString tn;
+			auto d = modesTabBar->tabData(index);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				tn = d.toString();
+			} else {
+				tn = modesTabBar->tabText(index);
+			}
+			save_dock_state(tn);
+			obs_data_set_string(current_profile_config, "dock_state_mode", tn.toUtf8().constData());
+		}
 	}
 	if (output_dock)
 		output_dock->SaveSettings();
@@ -1221,31 +1260,39 @@ bool obs_module_load(void)
 	//tb->setMovable(false);
 	//tb->setAllowedAreas(Qt::ToolBarArea::TopToolBarArea);
 
-	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Live")));
-	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Build")));
-	modesTabBar->addTab(QString::fromUtf8(obs_module_text("Design")));
-	modesTabBar->setTabVisible(2, false); // Hide Design tab for now
+	for (auto it : fixed_tabs) {
+		auto index = modesTabBar->addTab(QString::fromUtf8(obs_module_text(it.first.c_str())));
+		modesTabBar->setTabData(index, QString::fromUtf8(it.first.c_str()));
+	}
 	toolbar->addWidget(modesTabBar);
 	toolbar->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
 		save_dock_state(modesTab);
-		modesTab = index;
-		load_dock_state(index);
+		auto d = modesTabBar->tabData(index);
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			modesTab = d.toString();
+			load_dock_state(d.toString());
+		} else {
+			modesTab = modesTabBar->tabText(index);
+			load_dock_state(modesTabBar->tabText(index));
+		}
 	});
 
 	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
 		QMenu menu;
-		menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [] {
-			auto index = modesTabBar->currentIndex();
-			if (index == 0) {
-				reset_live_dock_state();
-			} else if (index == 1) {
-				reset_build_dock_state();
-			} else if (index == 2) {
-				reset_design_dock_state();
-			}
-		});
+		auto index = modesTabBar->currentIndex();
+		auto d = modesTabBar->tabData(index);
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [d] {
+				for (auto it : fixed_tabs) {
+					if (it.first == d.toString().toUtf8().constData()) {
+						it.second();
+						return;
+					}
+				}
+			});
+		}
 		menu.addSeparator();
 		menu.addAction(QString::fromUtf8(obs_module_text("AddEmptyDock")), [] {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -1420,7 +1467,15 @@ void TabToolBar::resizeEvent(QResizeEvent *event)
 		if (current_docks == loaded_docks) {
 			load_dock_state_timer.start();
 		} else if (main_window->isVisible()) {
-			save_dock_state(modesTabBar->currentIndex());
+			auto index = modesTabBar->currentIndex();
+			if (index >= 0) {
+				auto d = modesTabBar->tabData(index);
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					save_dock_state(d.toString());
+				} else {
+					save_dock_state(modesTabBar->tabText(index));
+				}
+			}
 			loaded_docks = current_docks;
 		}
 	}
@@ -1459,7 +1514,17 @@ void obs_module_post_load()
 {
 	load_dock_state_timer.setInterval(100);
 	load_dock_state_timer.setSingleShot(true);
-	QObject::connect(&load_dock_state_timer, &QTimer::timeout, []() { load_dock_state(modesTabBar->currentIndex()); });
+	QObject::connect(&load_dock_state_timer, &QTimer::timeout, []() {
+		auto index = modesTabBar->currentIndex();
+		if (index >= 0) {
+			auto d = modesTabBar->tabData(index);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				load_dock_state(d.toString());
+			} else {
+				load_dock_state(modesTabBar->tabText(index));
+			}
+		}
+	});
 
 	obs_frontend_add_save_callback(save_load, nullptr);
 

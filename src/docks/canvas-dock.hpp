@@ -264,8 +264,8 @@ private slots:
 	void SwitchBackToSelectedTransition();
 	void SwitchScene(const QString &scene_name, bool transition = true);
 	void MainSceneChanged();
-	void LoadMode(int index);
-	void SaveSettings(bool closing = false, int index = -1);
+	void LoadMode(QString mode);
+	void SaveSettings(bool closing = false, QString mode = "");
 	void OpenPreviewProjector();
 	void OpenSourceProjector();
 

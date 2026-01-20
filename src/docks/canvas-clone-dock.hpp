@@ -37,8 +37,8 @@ private:
 	static bool SceneDetectReplacedSource(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 
 private slots:
-	void LoadMode(int index);
-	void SaveSettings(bool closing = false, int index = -1);
+	void LoadMode(QString mode);
+	void SaveSettings(bool closing = false, QString mode = "");
 
 public:
 	CanvasCloneDock(obs_data_t *settings, QWidget *parent = nullptr);

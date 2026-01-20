@@ -236,10 +236,18 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	signal_handler_connect(sh, "source_remove", source_remove, this);
 	signal_handler_connect(sh, "source_rename", source_rename, this);
 
-	auto index = -1;
-	if (modesTabBar)
-		index = modesTabBar->currentIndex();
-	LoadMode(index);
+
+	if (modesTabBar) {
+		auto index = modesTabBar->currentIndex();
+		if (index >= 0) {
+			auto d = modesTabBar->tabData(index);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				LoadMode(d.toString());
+			} else {
+				LoadMode(modesTabBar->tabText(index));
+			}
+		}
+	}
 }
 
 CanvasCloneDock::~CanvasCloneDock()
@@ -849,37 +857,37 @@ void CanvasCloneDock::RemoveSource(QString source_name)
 	}
 }
 
-void CanvasCloneDock::SaveSettings(bool closing, int index)
+void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 {
 	if (!closing) {
 		auto state = canvas_split->saveState();
 		auto b64 = state.toBase64();
 		auto state_chars = b64.constData();
-		if (index < 0 && modesTabBar)
-			index = modesTabBar->currentIndex();
-		if (index == 0) {
-			obs_data_set_string(settings, "canvas_split_live", state_chars);
-		} else if (index == 1) {
-			obs_data_set_string(settings, "canvas_split_build", state_chars);
-		} else if (index == 2) {
-			obs_data_set_string(settings, "canvas_split_design", state_chars);
+		if (mode.isEmpty() && modesTabBar) {
+			auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				mode = d.toString();
+			} else {
+				mode = modesTabBar->tabText(modesTabBar->currentIndex());
+			}
 		}
-		obs_data_set_string(settings, "canvas_split", state_chars);
+		if (mode.isEmpty()) {
+			obs_data_set_string(settings, "canvas_split", state_chars);
+		} else {
+			std::string setting_name = "canvas_split_" + mode.toStdString();
+			obs_data_set_string(settings, setting_name.c_str(), state_chars);
+		}		
 	}
 }
 
-void CanvasCloneDock::LoadMode(int index)
+void CanvasCloneDock::LoadMode(QString mode)
 {
-	auto state = "";
-	if (index == 0) {
-		state = obs_data_get_string(settings, "canvas_split_live");
-	} else if (index == 1) {
-		state = obs_data_get_string(settings, "canvas_split_build");
-	} else if (index == 2) {
-		state = obs_data_get_string(settings, "canvas_split_design");
+	std::string setting_name = "canvas_split_" + mode.toStdString();
+	auto state = obs_data_get_string(settings, setting_name.c_str());
+	if (state[0] == '\0') {
+		setting_name = "canvas_split_" + mode.toLower().toStdString();
+		state = obs_data_get_string(settings, setting_name.c_str());
 	}
-	if (state[0] == '\0')
-		state = obs_data_get_string(settings, "canvas_split");
 	if (state[0] != '\0')
 		canvas_split->restoreState(QByteArray::fromBase64(state));
 }

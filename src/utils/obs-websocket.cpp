@@ -663,8 +663,8 @@ void load_obs_websocket() {
 	obs_websocket_vendor_register_request(vendor, "start_output", vendor_request_start_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
-	obs_websocket_vendor_register_request(vendor, "switch_dock_mode", vendor_request_switch_dock_mode, nullptr);
 
+	obs_websocket_vendor_register_request(vendor, "switch_dock_mode", vendor_request_switch_dock_mode, nullptr);
 	obs_websocket_vendor_register_request(vendor, "get_docks", vendor_request_get_docks, nullptr);
 	obs_websocket_vendor_register_request(vendor, "dock_show", vendor_request_dock_show, nullptr);
 	obs_websocket_vendor_register_request(vendor, "dock_hide", vendor_request_dock_hide, nullptr);

@@ -819,16 +819,23 @@ void CanvasDock::LoadUI()
 	}
 
 	if (settings) {
-		auto index = -1;
-		if (modesTabBar)
-			index = modesTabBar->currentIndex();
-		LoadMode(index);
+		if (modesTabBar) {
+			auto index = modesTabBar->currentIndex();
+			if (index >= 0) {
+				auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					LoadMode(d.toString());
+				} else {
+					LoadMode(modesTabBar->tabText(index));
+				}
+			}
+		}
 		LoadScenes();
 		LogScenes();
 	}
-	connect(canvas_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
+	connect(canvas_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
 	if (panel_split)
-		connect(panel_split, &SwitchingSplitter::splitterMoved, this, &CanvasDock::SaveSettings);
+		connect(panel_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
 
 	obs_frontend_add_save_callback(save_load, this);
 }
@@ -985,7 +992,7 @@ CanvasDock::~CanvasDock()
 
 extern obs_data_t *current_profile_config;
 
-void CanvasDock::SaveSettings(bool closing, int index)
+void CanvasDock::SaveSettings(bool closing, QString mode)
 {
 	if (!settings) {
 		if (!closing && current_profile_config) {
@@ -993,19 +1000,17 @@ void CanvasDock::SaveSettings(bool closing, int index)
 			auto state = canvas_split->saveState();
 			auto b64 = state.toBase64();
 			auto state_chars = b64.constData();
-			if (index < 0 && modesTabBar)
-				index = modesTabBar->currentIndex();
-			if (index == 0) {
-				std::string setting_name = canvas_name + "_canvas_split_live";
-				obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
-			} else if (index == 1) {
-				std::string setting_name = canvas_name + "_canvas_split_build";
-				obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
-			} else if (index == 2) {
-				std::string setting_name = canvas_name + "_canvas_split_design";
-				obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
+			if (mode.isEmpty() && modesTabBar) {
+				auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					mode = d.toString();
+				} else {
+					mode = modesTabBar->tabText(modesTabBar->currentIndex());
+				}
 			}
 			std::string setting_name = canvas_name + "_canvas_split";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
 			obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
 		}
 		return;
@@ -1014,28 +1019,27 @@ void CanvasDock::SaveSettings(bool closing, int index)
 		auto state = canvas_split->saveState();
 		auto b64 = state.toBase64();
 		auto state_chars = b64.constData();
-		auto index = modesTabBar->currentIndex();
-		if (index == 0) {
-			obs_data_set_string(settings, "canvas_split_live", state_chars);
-		} else if (index == 1) {
-			obs_data_set_string(settings, "canvas_split_build", state_chars);
-		} else if (index == 2) {
-			obs_data_set_string(settings, "canvas_split_design", state_chars);
+		if (mode.isEmpty() && modesTabBar) {
+			auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				mode = d.toString();
+			} else {
+				mode = modesTabBar->tabText(modesTabBar->currentIndex());
+			}
 		}
-		obs_data_set_string(settings, "canvas_split", state_chars);
+		std::string setting_name = "canvas_split";
+		if (!mode.isEmpty())
+			setting_name += "_" + mode.toStdString();
+		obs_data_set_string(settings, setting_name.c_str(), state_chars);
 		if (panel_split) {
 
 			state = panel_split->saveState();
 			b64 = state.toBase64();
 			state_chars = b64.constData();
-			if (index == 0) {
-				obs_data_set_string(settings, "panel_split_live", state_chars);
-			} else if (index == 1) {
-				obs_data_set_string(settings, "panel_split_build", state_chars);
-			} else if (index == 2) {
-				obs_data_set_string(settings, "panel_split_design", state_chars);
-			}
-			obs_data_set_string(settings, "panel_split", state_chars);
+			setting_name = "panel_split";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_string(settings, setting_name.c_str(), state_chars);
 		}
 	}
 
@@ -5254,61 +5258,50 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 			auto sh = obs_canvas_get_signal_handler(window->canvas);
 			signal_handler_disconnect(sh, "source_add", source_add, window);
 			signal_handler_connect(sh, "source_add", source_add, window);
-			auto index = -1;
-			if (modesTabBar)
-				index = modesTabBar->currentIndex();
-			window->LoadMode(index);
+			if (modesTabBar) {
+				auto index = modesTabBar->currentIndex();
+				if (index >= 0) {
+					auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+					if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+						window->LoadMode(d.toString());
+					} else {
+						window->LoadMode(modesTabBar->tabText(index));
+					}
+				}
+			}
 			window->LoadScenes();
 			window->LogScenes();
 		}
 	}
 }
 
-void CanvasDock::LoadMode(int index)
+void CanvasDock::LoadMode(QString mode)
 {
-	auto state = "";
-	if (panel_split) {
-		if (settings) {
-
-			if (index == 0) {
-				state = obs_data_get_string(settings, "panel_split_live");
-			} else if (index == 1) {
-				state = obs_data_get_string(settings, "panel_split_build");
-			} else if (index == 2) {
-				state = obs_data_get_string(settings, "panel_split_design");
-			}
-			if (state[0] == '\0')
-				state = obs_data_get_string(settings, "panel_split");
+	if (panel_split && settings) {
+		std::string setting_name = "panel_split_" + mode.toStdString();
+		auto state = obs_data_get_string(settings, setting_name.c_str());
+		if (state[0] == '\0') {
+			std::transform(setting_name.begin(), setting_name.end(), setting_name.begin(),
+				       [](unsigned char c) { return std::tolower(c); });
+			state = obs_data_get_string(settings, setting_name.c_str());
 		}
 		if (state[0] != '\0')
 			panel_split->restoreState(QByteArray::fromBase64(state));
 	}
 	if (canvas_split) {
-		state = "";
+		auto state = "";
 		if (settings) {
-
-			if (index == 0) {
-				state = obs_data_get_string(settings, "canvas_split_live");
-			} else if (index == 1) {
-				state = obs_data_get_string(settings, "canvas_split_build");
-			} else if (index == 2) {
-				state = obs_data_get_string(settings, "canvas_split_design");
-			}
-			if (state[0] == '\0')
-				state = obs_data_get_string(settings, "canvas_split");
-		} else if (current_profile_config) {
-			if (index == 0) {
-				std::string setting_name = canvas_name + "_canvas_split_live";
-				state = obs_data_get_string(current_profile_config, setting_name.c_str());
-			} else if (index == 1) {
-				std::string setting_name = canvas_name + "_canvas_split_build";
-				state = obs_data_get_string(current_profile_config, setting_name.c_str());
-			} else if (index == 2) {
-				std::string setting_name = canvas_name + "_canvas_split_design";
-				state = obs_data_get_string(current_profile_config, setting_name.c_str());
-			}
+			std::string setting_name = "canvas_split_" + mode.toStdString();
+			state = obs_data_get_string(settings, setting_name.c_str());
 			if (state[0] == '\0') {
-				std::string setting_name = canvas_name + "_canvas_split";
+				setting_name = "canvas_split_" + mode.toLower().toStdString();
+				state = obs_data_get_string(settings, setting_name.c_str());
+			}
+		} else if (current_profile_config) {
+			std::string setting_name = canvas_name + "_canvas_split_" + mode.toStdString();
+			state = obs_data_get_string(current_profile_config, setting_name.c_str());
+			if (state[0] == '\0') {
+				setting_name = canvas_name + "_canvas_split_" + mode.toLower().toStdString();
 				state = obs_data_get_string(current_profile_config, setting_name.c_str());
 			}
 		}
@@ -5666,9 +5659,7 @@ void CanvasDock::AddTransition(const char *source_type, const char *name, obs_da
 	if (source) {
 		transitions.emplace_back(source);
 		auto n = QString::fromUtf8(name);
-		QMetaObject::invokeMethod(this, [this, n]() {
-			transition->addItem(n);
-		});
+		QMetaObject::invokeMethod(this, [this, n]() { transition->addItem(n); });
 	}
 }
 
