@@ -8,7 +8,7 @@
 ; Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{@UUID_APP@}}
-AppName={#MyAppName}
+AppName="Aitum Stream Suite"
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
@@ -16,7 +16,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={code:GetDirName}
 AppendDefaultDirName=no
-DefaultGroupName={#MyAppName}
+DefaultGroupName="Aitum Stream Suite"
 OutputBaseFilename={#MyAppName}-{#MyAppVersion}-windows-installer
 Compression=lzma
 SolidCompression=yes
@@ -53,7 +53,7 @@ Source: "..\release\Package\obs-plugins\64bit\aitum-stream-suite.*"; DestDir: "{
 Source: "..\release\Package\data\obs-plugins\aitum-stream-suite\locale\*"; DestDir: "{app}\data\obs-plugins\aitum-stream-suite\locale"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite"
 Source: "..\release\Package\data\obs-studio\themes\*"; DestDir: "{app}\data\obs-studio\themes"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "AitumStreamSuite\Theme"
 
-Source: "..\release\Package\obs-plugins\64bit3d-effect.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\3DEffect"
+Source: "..\release\Package\obs-plugins\64bit\3d-effect.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\3DEffect"
 Source: "..\release\Package\data\obs-plugins\3d-effect\*"; DestDir: "{app}\data\obs-plugins\3d-effect"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\3DEffect"
 
 Source: "..\release\Package\obs-plugins\64bit\obs-advanced-masks.*"; DestDir: "{app}\obs-plugins\64bit"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: "Plugins\AdvancedMasks"
@@ -102,6 +102,63 @@ Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 [Code]
+
+procedure TypesComboChange(Sender: TObject);
+var
+    I: Integer;
+begin
+    for I := 0 to WizardForm.ComponentsList.Items.Count - 1 do begin
+      if (WizardForm.ComponentsList.Items[I] = '3D Effect (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\3d-effect.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Advanced Masks (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\obs-advanced-masks.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Composite Blur (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\obs-composite-blur.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Freeze Filter (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\freeze-filter.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Gradient Source (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\gradient-source.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Move (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\move-transition.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Noise (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\obs-noise.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Retro Effects (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\obs-retro-effects.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Scene Notes Dock (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\scene-notes-dock.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Source Clone (Exeldro)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\source-clone.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'Stroke Glow Shadow (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\obs-stroke-glow-shadow.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+      if (WizardForm.ComponentsList.Items[I] = 'SVG Source (FiniteSingularity)') and FileExists(ExpandConstant('{app}\obs-plugins\64bit\svg-source.dll')) then begin
+        WizardForm.ComponentsList.Checked[I] := False;
+        WizardForm.ComponentsList.ItemEnabled[I] := False;
+      end;
+    end;
+end;
+
 procedure InitializeWizard();
 var
   GPLText: AnsiString;
@@ -114,6 +171,7 @@ begin
     'Press Page Down to see the rest of the agreement. Once you are aware of your rights, click Next to continue.',
     String(GPLText)
   );
+  WizardForm.TypesCombo.OnChange := @TypesComboChange;
 end;
 
 // credit where it's due :
@@ -164,4 +222,5 @@ begin
         Result := False;
         exit;
     end;
+    TypesComboChange(nil);
 end;
