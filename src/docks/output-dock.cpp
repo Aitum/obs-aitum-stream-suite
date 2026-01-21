@@ -58,12 +58,21 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 
-	a = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStart, QIcon(":/res/images/media/media_play.svg")),
-			       QString::fromUtf8(obs_module_text("StartAll")));
+	a = toolbar->addAction(
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+		QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStart, QIcon(":/res/images/media/media_play.svg")),
+#else
+		QIcon(":/res/images/media/media_play.svg"),
+#endif
+		QString::fromUtf8(obs_module_text("StartAll")));
 	connect(a, &QAction::triggered, [this] {
 		QMenu startMenu;
 		auto a2 = startMenu.addAction(
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
 			QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStart, QIcon(":/res/images/media/media_play.svg")),
+#else
+			QIcon(":/res/images/media/media_play.svg"),
+#endif
 			QString::fromUtf8(obs_module_text("StartAllOutputs")), [this]() { StartAll(false, false); });
 		a2->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
 		a2->setProperty("class", "icon-media-play");
@@ -88,7 +97,11 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	toolbar->widgetForAction(a)->setStyleSheet("QToolButton { min-width: 80px; max-width: none; }");
 
 	a = toolbar->addAction(
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
 		QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStop, QIcon(":/res/images/media/media_stop.svg")),
+#else
+		QIcon(":/res/images/media/media_stop.svg"),
+#endif
 		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] {
 			outputsToStart.clear();
 			bool warnStream =
