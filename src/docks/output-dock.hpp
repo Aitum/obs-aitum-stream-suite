@@ -42,6 +42,7 @@ private:
 	std::function<void()> mainBacktrackOnStarted;
 	std::function<void()> mainVirtualCamOnStarted;
 	void StartNextOutput();
+	void StartAll(bool streamOnly, bool recordOnly);
 
 	static void frontend_event(enum obs_frontend_event event, void *private_data);
 

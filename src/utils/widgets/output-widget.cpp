@@ -606,6 +606,8 @@ bool OutputWidget::StartOutput(bool automated)
 		if (filenameFormat.empty())
 			filenameFormat = "%CCYY-%MM-%DD %hh-%mm-%ss";
 		auto format = obs_data_get_string(settings, "format");
+		if (format[0] == '\0')
+			format = "hybrid_mp4";
 		std::string ext = format;
 		if (ext == "fragmented_mp4" || ext == "hybrid_mp4")
 			ext = "mp4";
@@ -620,10 +622,13 @@ bool OutputWidget::StartOutput(bool automated)
 
 		auto dir = obs_data_get_string(settings, "path");
 		char path[512];
-		snprintf(path, 512, "%s/%s", dir, filename);
+		if (dir[0] != '\0') {
+			snprintf(path, 512, "%s/%s", dir, filename);
+			ensure_directory(path);
+		} else {
+			snprintf(path, 512, "%s", filename);
+		}
 		bfree(filename);
-
-		ensure_directory(path);
 
 		std::string output_name = "Aitum Stream Suite Output ";
 		output_name += name;
@@ -1114,8 +1119,21 @@ bool OutputWidget::StartOutput(std::function<void()> onStarted)
 	return starting;
 }
 
-void OutputWidget::StopOutput() {
+void OutputWidget::StopOutput()
+{
 	if (output && obs_output_active(output)) {
 		obs_output_stop(output);
 	}
+}
+
+bool OutputWidget::IsStream() const
+{
+	const auto output_type = obs_data_get_string(settings, "type");
+	return (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
+}
+
+bool OutputWidget::IsRecord() const
+{
+	const auto output_type = obs_data_get_string(settings, "type");
+	return (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0);
 }

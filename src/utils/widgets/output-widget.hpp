@@ -45,4 +45,6 @@ public:
 	bool AddChapter(const char *chapter_name);
 	bool StartOutput(std::function<void()> onStarted);
 	void StopOutput();
+	bool IsStream() const;
+	bool IsRecord() const;
 };

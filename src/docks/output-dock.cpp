@@ -58,107 +58,71 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 
-	a = toolbar->addAction(
-		QIcon(":/res/images/media/media_play.svg"), QString::fromUtf8(obs_module_text("StartAllOutputs")), [this] {
-			outputsToStart.clear();
-			if (mainStreamButton) {
-				bool warnBeforeStreamStart =
-					config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStartingStream");
-				if (warnBeforeStreamStart && isVisible()) {
-					auto button = QMessageBox::question(
-						this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStart.Title")),
-						QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStart.Text")),
-						QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-					if (button == QMessageBox::No)
-						return;
-				}
-
-				outputsToStart.push_back([this](std::function<void()> onStarted) {
-					if (obs_frontend_streaming_active()) {
-						onStarted();
-						return true;
-					}
-					this->mainStreamOnStarted = onStarted;
-					obs_frontend_streaming_start();
-					return true;
-				});
-			}
-			if (mainRecordButton) {
-				outputsToStart.push_back([this](std::function<void()> onStarted) {
-					if (obs_frontend_recording_active()) {
-						onStarted();
-						return true;
-					}
-					this->mainRecordOnStarted = onStarted;
-					obs_frontend_recording_start();
-					return true;
-				});
-			}
-			if (mainBacktrackCheckboxButton) {
-				outputsToStart.push_back([this](std::function<void()> onStarted) {
-					if (obs_frontend_replay_buffer_active()) {
-						onStarted();
-						return true;
-					}
-					this->mainBacktrackOnStarted = onStarted;
-					obs_frontend_replay_buffer_start();
-					return true;
-				});
-			}
-			if (mainVirtualCamButton) {
-				outputsToStart.push_back([this](std::function<void()> onStarted) {
-					if (obs_frontend_virtualcam_active()) {
-						onStarted();
-						return true;
-					}
-					this->mainVirtualCamOnStarted = onStarted;
-					obs_frontend_start_virtualcam();
-					return true;
-				});
-			}
-			for (auto &ow : outputWidgets) {
-				outputsToStart.push_back(
-					[this, ow](std::function<void()> onStarted) { return ow->StartOutput(onStarted); });
-			}
-			if (outputsToStart.empty())
-				return;
-			blog(LOG_INFO, "[Aitum Stream Suite] Starting %zu outputs", outputsToStart.size());
-			StartNextOutput();
-		});
+	a = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStart, QIcon(":/res/images/media/media_play.svg")),
+			       QString::fromUtf8(obs_module_text("StartAll")));
+	connect(a, &QAction::triggered, [this] {
+		QMenu startMenu;
+		auto a2 = startMenu.addAction(
+			QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStart, QIcon(":/res/images/media/media_play.svg")),
+			QString::fromUtf8(obs_module_text("StartAllOutputs")), [this]() { StartAll(false, false); });
+		a2->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
+		a2->setProperty("class", "icon-media-play");
+		if (mainStreamButton || std::find_if(outputWidgets.begin(), outputWidgets.end(),
+						     [](OutputWidget *w) { return w->IsStream(); }) != outputWidgets.end()) {
+			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")),
+					    QString::fromUtf8(obs_module_text("StartAllStreams")),
+					    [this]() { StartAll(true, false); });
+		}
+		if (mainRecordButton || std::find_if(outputWidgets.begin(), outputWidgets.end(),
+						     [](OutputWidget *w) { return w->IsRecord(); }) != outputWidgets.end()) {
+			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/record.svg")),
+					    QString::fromUtf8(obs_module_text("StartAllRecordings")),
+					    [this]() { StartAll(false, true); });
+		}
+		startMenu.exec(QCursor::pos());
+	});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-media-play");
+	a->setIconText(QString::fromUtf8(obs_module_text("StartAll")));
+	((QToolButton *)toolbar->widgetForAction(a))->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	toolbar->widgetForAction(a)->setStyleSheet("QToolButton { min-width: 80px; max-width: none; }");
 
-	a = toolbar->addAction(QIcon(":/res/images/media/media_stop.svg"), QString::fromUtf8(obs_module_text("StopOutput")), [this] {
-		outputsToStart.clear();
-		bool warnStream = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
-		bool warnRecord = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
-		if (warnStream && mainStreamButton && obs_frontend_streaming_active() && isVisible()) {
-			auto button = QMessageBox::question(this,
-							    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
-							    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
-							    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-			if (button == QMessageBox::No)
-				return;
-		} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
-			auto button = QMessageBox::question(this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
-				QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
-							    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-			if (button == QMessageBox::No)
-				return;
-		}
+	a = toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::MediaPlaybackStop, QIcon(":/res/images/media/media_stop.svg")),
+		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] {
+			outputsToStart.clear();
+			bool warnStream =
+				config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
+			bool warnRecord =
+				config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
+			if (warnStream && mainStreamButton && obs_frontend_streaming_active() && isVisible()) {
+				auto button = QMessageBox::question(
+					this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
+					QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
+					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+				if (button == QMessageBox::No)
+					return;
+			} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
+				auto button = QMessageBox::question(
+					this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
+					QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
+					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+				if (button == QMessageBox::No)
+					return;
+			}
 
-		if (mainStreamButton && obs_frontend_streaming_active())
-			obs_frontend_streaming_stop();
-		if (mainRecordButton && obs_frontend_recording_active())
-			obs_frontend_recording_stop();
-		if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
-			obs_frontend_replay_buffer_stop();
-		if (mainVirtualCamButton && obs_frontend_virtualcam_active())
-			obs_frontend_stop_virtualcam();
-		for (auto &ow : outputWidgets) {
-			ow->StopOutput();
-		}
-	});
+			if (mainStreamButton && obs_frontend_streaming_active())
+				obs_frontend_streaming_stop();
+			if (mainRecordButton && obs_frontend_recording_active())
+				obs_frontend_recording_stop();
+			if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
+				obs_frontend_replay_buffer_stop();
+			if (mainVirtualCamButton && obs_frontend_virtualcam_active())
+				obs_frontend_stop_virtualcam();
+			for (auto &ow : outputWidgets) {
+				ow->StopOutput();
+			}
+		});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("stopIcon")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-media-stop");
 
@@ -645,4 +609,99 @@ void OutputDock::frontend_event(enum obs_frontend_event event, void *private_dat
 	default:
 		break;
 	}
+}
+
+void OutputDock::StartAll(bool streamOnly, bool recordOnly)
+{
+	outputsToStart.clear();
+	if (mainStreamButton && !recordOnly) {
+		bool warnBeforeStreamStart =
+			config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStartingStream");
+		if (warnBeforeStreamStart && isVisible()) {
+			auto button = QMessageBox::question(this,
+							    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStart.Title")),
+							    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStart.Text")),
+							    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+			if (button == QMessageBox::No)
+				return;
+		}
+
+		outputsToStart.push_back([this](std::function<void()> onStarted) {
+			if (obs_frontend_streaming_active()) {
+				onStarted();
+				return true;
+			}
+			this->mainStreamOnStarted = onStarted;
+			obs_frontend_streaming_start();
+			auto output = obs_frontend_get_streaming_output();
+			if (!output) {
+				this->mainStreamOnStarted = nullptr;
+				onStarted();
+			}
+			obs_output_release(output);
+			return true;
+		});
+	}
+	if (mainRecordButton && !streamOnly) {
+		outputsToStart.push_back([this](std::function<void()> onStarted) {
+			if (obs_frontend_recording_active()) {
+				onStarted();
+				return true;
+			}
+			this->mainRecordOnStarted = onStarted;
+			obs_frontend_recording_start();
+			auto output = obs_frontend_get_recording_output();
+			if (!output) {
+				this->mainRecordOnStarted = nullptr;
+				onStarted();
+			}
+			obs_output_release(output);
+			return true;
+		});
+	}
+	if (mainBacktrackCheckboxButton && !streamOnly) {
+		outputsToStart.push_back([this](std::function<void()> onStarted) {
+			if (obs_frontend_replay_buffer_active()) {
+				onStarted();
+				return true;
+			}
+			this->mainBacktrackOnStarted = onStarted;
+			obs_frontend_replay_buffer_start();
+			auto output = obs_frontend_get_replay_buffer_output();
+			if (!output) {
+				this->mainBacktrackOnStarted = nullptr;
+				onStarted();
+			}
+			obs_output_release(output);
+			return true;
+		});
+	}
+	if (mainVirtualCamButton && !streamOnly && !recordOnly) {
+		outputsToStart.push_back([this](std::function<void()> onStarted) {
+			if (obs_frontend_virtualcam_active()) {
+				onStarted();
+				return true;
+			}
+			this->mainVirtualCamOnStarted = onStarted;
+			obs_frontend_start_virtualcam();
+			auto output = obs_frontend_get_virtualcam_output();
+			if (!output) {
+				this->mainVirtualCamOnStarted = nullptr;
+				onStarted();
+			}
+			obs_output_release(output);
+			return true;
+		});
+	}
+	for (auto &ow : outputWidgets) {
+		if (streamOnly && !ow->IsStream())
+			continue;
+		if (recordOnly && !ow->IsRecord())
+			continue;
+		outputsToStart.push_back([this, ow](std::function<void()> onStarted) { return ow->StartOutput(onStarted); });
+	}
+	if (outputsToStart.empty())
+		return;
+	blog(LOG_INFO, "[Aitum Stream Suite] Starting %zu outputs", outputsToStart.size());
+	StartNextOutput();
 }
