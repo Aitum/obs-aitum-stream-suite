@@ -1195,7 +1195,7 @@ bool obs_module_load(void)
 			auto theme = config_get_string(user_config, "Appearance", "Theme");
 			if ((!theme || strcmp(theme, "com.obsproject.Aitum.Original") != 0) &&
 			    (os_file_exists("data/obs-studio/themes/Aitum") ||
-			     os_file_exists(OBS_DATA_PATH "/obs-studio/themes/Aitum"))) {
+			     os_file_exists("../../data/obs-studio/themes/Aitum"))) {
 				config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
 				restart = true;
 			}
