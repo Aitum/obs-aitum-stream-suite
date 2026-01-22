@@ -706,6 +706,62 @@ void load_canvas()
 	}
 }
 
+void save_current_profile_config(bool save_docks)
+{
+	if (!current_profile_config)
+		return;
+	char *profile_path = obs_frontend_get_current_profile_path();
+	if (!profile_path)
+		return;
+
+	struct dstr path;
+	dstr_init_copy(&path, profile_path);
+	bfree(profile_path);
+
+	if (!dstr_is_empty(&path) && dstr_end(&path) != '/')
+		dstr_cat_ch(&path, '/');
+	dstr_cat(&path, "aitum.json");
+
+	if (save_docks) {
+		if (!obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
+			auto index = modesTabBar->currentIndex();
+			if (index >= 0) {
+				QString tn;
+				auto d = modesTabBar->tabData(index);
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					tn = d.toString();
+				} else {
+					tn = modesTabBar->tabText(index);
+				}
+				save_dock_state(tn);
+				obs_data_set_string(current_profile_config, "dock_state_mode", tn.toUtf8().constData());
+			}
+		}
+		auto custom_modes = obs_data_array_create();
+		for (int i = 0; i < modesTabBar->count(); i++) {
+			auto d = modesTabBar->tabData(i);
+			if (d.isNull() || !d.isValid() || d.toString().isEmpty()) {
+				auto cm = obs_data_create();
+				obs_data_set_string(cm, "name", modesTabBar->tabText(i).toUtf8().constData());
+				obs_data_array_push_back(custom_modes, cm);
+				obs_data_release(cm);
+			}
+		}
+		obs_data_set_array(current_profile_config, "custom_dock_modes", custom_modes);
+		obs_data_array_release(custom_modes);
+	}
+	if (output_dock)
+		output_dock->SaveSettings();
+
+	if (!obs_data_save_json_safe(current_profile_config, path.array, "tmp", "bak")) {
+		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to save configuration file");
+	} else {
+		blog(LOG_INFO, "[Aitum Stream Suite] Saved configuration file");
+	}
+
+	dstr_free(&path);
+}
+
 void load_current_profile_config()
 {
 	obs_data_release(current_profile_config);
@@ -732,6 +788,14 @@ void load_current_profile_config()
 		obs_data_set_bool(current_profile_config, "main_backtrack_output_show", true);
 		obs_data_set_bool(current_profile_config, "main_virtual_cam_output_show", true);
 		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
+		if (modesTabBar->count() <= fixed_tabs.size()) {
+			modesTab = "";
+			auto tn = QString::fromUtf8(obs_module_text("User"));
+			auto index = modesTabBar->addTab(tn);
+			modesTabBar->setCurrentIndex(index);
+			save_dock_state(tn);
+			save_current_profile_config(true);
+		}
 	} else {
 		blog(LOG_INFO, "[Aitum Stream Suite] Loaded configuration file");
 	}
@@ -882,62 +946,6 @@ void load_current_profile_config()
 			}
 		},
 		Qt::QueuedConnection);
-}
-
-void save_current_profile_config(bool save_docks)
-{
-	if (!current_profile_config)
-		return;
-	char *profile_path = obs_frontend_get_current_profile_path();
-	if (!profile_path)
-		return;
-
-	struct dstr path;
-	dstr_init_copy(&path, profile_path);
-	bfree(profile_path);
-
-	if (!dstr_is_empty(&path) && dstr_end(&path) != '/')
-		dstr_cat_ch(&path, '/');
-	dstr_cat(&path, "aitum.json");
-
-	if (save_docks) {
-		if (!obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
-			auto index = modesTabBar->currentIndex();
-			if (index >= 0) {
-				QString tn;
-				auto d = modesTabBar->tabData(index);
-				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-					tn = d.toString();
-				} else {
-					tn = modesTabBar->tabText(index);
-				}
-				save_dock_state(tn);
-				obs_data_set_string(current_profile_config, "dock_state_mode", tn.toUtf8().constData());
-			}
-		}
-		auto custom_modes = obs_data_array_create();
-		for (int i = 0; i < modesTabBar->count(); i++) {
-			auto d = modesTabBar->tabData(i);
-			if (d.isNull() || !d.isValid() || d.toString().isEmpty()) {
-				auto cm = obs_data_create();
-				obs_data_set_string(cm, "name", modesTabBar->tabText(i).toUtf8().constData());
-				obs_data_array_push_back(custom_modes, cm);
-				obs_data_release(cm);
-			}
-		}
-		obs_data_set_array(current_profile_config, "custom_dock_modes", custom_modes);
-		obs_data_array_release(custom_modes);
-	}
-	if (output_dock)
-		output_dock->SaveSettings();
-
-	if (!obs_data_save_json_safe(current_profile_config, path.array, "tmp", "bak")) {
-		blog(LOG_WARNING, "[Aitum Stream Suite] Failed to save configuration file");
-	} else {
-		blog(LOG_INFO, "[Aitum Stream Suite] Saved configuration file");
-	}
-
-	dstr_free(&path);
 }
 
 void load_browser_panels()
