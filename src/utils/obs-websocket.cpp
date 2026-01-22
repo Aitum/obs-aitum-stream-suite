@@ -236,6 +236,54 @@ void vendor_request_stop_output(obs_data_t *request_data, obs_data_t *response_d
 	obs_data_set_bool(response_data, "success", false);
 }
 
+void vendor_request_start_all_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, false), Q_ARG(bool, false));
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_stop_all_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StopAll");
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_start_all_streams(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, true), Q_ARG(bool, false));
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_start_all_recordings(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, false), Q_ARG(bool, true));
+	obs_data_set_bool(response_data, "success", true);
+}
+
 void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	const char *output_name = obs_data_get_string(request_data, "output");
@@ -290,7 +338,8 @@ void vendor_request_switch_dock_mode(obs_data_t *request_data, obs_data_t *respo
 	obs_data_set_bool(response_data, "success", true);
 }
 
-void vendor_request_get_docks(obs_data_t *request_data, obs_data_t *response_data, void *) {
+void vendor_request_get_docks(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
 	UNUSED_PARAMETER(request_data);
 	auto da = obs_data_array_create();
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -650,8 +699,8 @@ void vendor_request_reset_browser_panel(obs_data_t *request_data, obs_data_t *re
 	obs_data_set_bool(response_data, "success", false);
 }
 
-
-void load_obs_websocket() {
+void load_obs_websocket()
+{
 	vendor = obs_websocket_register_vendor("aitum-stream-suite");
 
 	obs_websocket_vendor_register_request(vendor, "version", vendor_request_version, nullptr);
@@ -659,9 +708,15 @@ void load_obs_websocket() {
 	obs_websocket_vendor_register_request(vendor, "switch_scene", vendor_request_switch_scene, nullptr);
 	obs_websocket_vendor_register_request(vendor, "current_scene", vendor_request_current_scene, nullptr);
 	obs_websocket_vendor_register_request(vendor, "get_scenes", vendor_request_get_scenes, nullptr);
+
 	obs_websocket_vendor_register_request(vendor, "get_outputs", vendor_request_get_outputs, nullptr);
 	obs_websocket_vendor_register_request(vendor, "start_output", vendor_request_start_output, nullptr);
 	obs_websocket_vendor_register_request(vendor, "stop_output", vendor_request_stop_output, nullptr);
+	obs_websocket_vendor_register_request(vendor, "start_all_outputs", vendor_request_start_all_outputs, nullptr);
+	obs_websocket_vendor_register_request(vendor, "stop_all_outputs", vendor_request_stop_all_outputs, nullptr);
+	obs_websocket_vendor_register_request(vendor, "start_all_streams", vendor_request_start_all_streams, nullptr);
+	obs_websocket_vendor_register_request(vendor, "start_all_recordings", vendor_request_start_all_recordings, nullptr);
+
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
 
 	obs_websocket_vendor_register_request(vendor, "switch_dock_mode", vendor_request_switch_dock_mode, nullptr);
@@ -684,4 +739,3 @@ void load_obs_websocket() {
 	obs_websocket_vendor_register_request(vendor, "refresh_browser_panel", vendor_request_refresh_browser_panel, nullptr);
 	obs_websocket_vendor_register_request(vendor, "reset_browser_panel", vendor_request_reset_browser_panel, nullptr);
 }
-

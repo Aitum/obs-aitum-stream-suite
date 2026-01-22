@@ -236,7 +236,6 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	signal_handler_connect(sh, "source_remove", source_remove, this);
 	signal_handler_connect(sh, "source_rename", source_rename, this);
 
-
 	if (modesTabBar) {
 		auto index = modesTabBar->currentIndex();
 		if (index >= 0) {
@@ -527,7 +526,8 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 				obs_scene_duplicate(scene, obs_source_get_name(source), OBS_SCENE_DUP_PRIVATE_REFS));
 			auto cx = obs_source_get_base_width(source);
 			auto cy = obs_source_get_base_height(source);
-			if (cx && cy && (cx != obs_source_get_base_width(duplicate) || cy != obs_source_get_base_height(duplicate))) {
+			if (cx && cy &&
+			    (cx != obs_source_get_base_width(duplicate) || cy != obs_source_get_base_height(duplicate))) {
 				obs_source_save(duplicate);
 				auto ss = obs_source_get_settings(duplicate);
 				obs_data_set_bool(ss, "custom_size", true);
@@ -876,7 +876,7 @@ void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 		} else {
 			std::string setting_name = "canvas_split_" + mode.toStdString();
 			obs_data_set_string(settings, setting_name.c_str(), state_chars);
-		}		
+		}
 	}
 }
 

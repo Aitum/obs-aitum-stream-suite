@@ -102,40 +102,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 #else
 		QIcon(":/res/images/media/media_stop.svg"),
 #endif
-		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] {
-			outputsToStart.clear();
-			bool warnStream =
-				config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
-			bool warnRecord =
-				config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
-			if (warnStream && mainStreamButton && obs_frontend_streaming_active() && isVisible()) {
-				auto button = QMessageBox::question(
-					this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
-					QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
-					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-				if (button == QMessageBox::No)
-					return;
-			} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
-				auto button = QMessageBox::question(
-					this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
-					QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
-					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-				if (button == QMessageBox::No)
-					return;
-			}
-
-			if (mainStreamButton && obs_frontend_streaming_active())
-				obs_frontend_streaming_stop();
-			if (mainRecordButton && obs_frontend_recording_active())
-				obs_frontend_recording_stop();
-			if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
-				obs_frontend_replay_buffer_stop();
-			if (mainVirtualCamButton && obs_frontend_virtualcam_active())
-				obs_frontend_stop_virtualcam();
-			for (auto &ow : outputWidgets) {
-				ow->StopOutput();
-			}
-		});
+		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] { StopAll(); });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("stopIcon")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-media-stop");
 
@@ -390,6 +357,53 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	});
 	videoCheckTimer.start(500);
 	obs_frontend_add_event_callback(frontend_event, this);
+
+	StartStopHotkey = obs_hotkey_pair_register_frontend(
+		"AitumStreamSuiteStartAllOutputs", obs_module_text("StartAllOutputs"), "AitumStreamSuiteStopAllOutputs",
+		obs_module_text("StopAllOutputs"),
+		[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
+			if (!pressed)
+				return false;
+			auto dock = static_cast<OutputDock *>(data);
+			QMetaObject::invokeMethod(dock, [dock] { dock->StartAll(false, false); });
+			return true;
+		},
+		[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
+			if (!pressed)
+				return false;
+			auto dock = static_cast<OutputDock *>(data);
+			QMetaObject::invokeMethod(dock, [dock] { dock->StopAll(); });
+			return true;
+		},
+		this, this);
+
+	StartStreamHotkey = obs_hotkey_register_frontend(
+		"AitumStreamSuiteStartAllStreams", obs_module_text("StartAllStreams"),
+		[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
+			if (!pressed)
+				return;
+			auto dock = static_cast<OutputDock *>(data);
+			QMetaObject::invokeMethod(dock, [dock] { dock->StartAll(true, false); });
+		},
+		this);
+
+	StartRecordHotkey = obs_hotkey_register_frontend(
+		"AitumStreamSuiteStartAllRecordings", obs_module_text("StartAllRecordings"),
+		[](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool pressed) {
+			UNUSED_PARAMETER(id);
+			UNUSED_PARAMETER(hotkey);
+			if (!pressed)
+				return;
+			auto dock = static_cast<OutputDock *>(data);
+			QMetaObject::invokeMethod(dock, [dock] { dock->StartAll(false, true); });
+		},
+		this);
 }
 
 extern OutputDock *output_dock;
@@ -397,6 +411,12 @@ void RemoveWidget(QWidget *widget);
 
 OutputDock::~OutputDock()
 {
+	if (StartStopHotkey != OBS_INVALID_HOTKEY_PAIR_ID)
+		obs_hotkey_pair_unregister(StartStopHotkey);
+	if (StartStreamHotkey != OBS_INVALID_HOTKEY_ID)
+		obs_hotkey_unregister(StartStreamHotkey);
+	if (StartRecordHotkey != OBS_INVALID_HOTKEY_ID)
+		obs_hotkey_unregister(StartRecordHotkey);
 	obs_frontend_add_event_callback(frontend_event, this);
 	videoCheckTimer.stop();
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
@@ -468,12 +488,46 @@ void OutputDock::LoadSettings()
 	QWidget *spacer = new QWidget();
 	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	mainLayout->addWidget(spacer);
+
+	auto start_hotkey = obs_data_get_array(current_profile_config, "start_all_outputs_hotkey");
+	auto stop_hotkey = obs_data_get_array(current_profile_config, "stop_all_outputs_hotkey");
+	obs_hotkey_pair_load(StartStopHotkey, start_hotkey, stop_hotkey);
+	obs_data_array_release(start_hotkey);
+	obs_data_array_release(stop_hotkey);
+
+	auto stream_hotkey = obs_data_get_array(current_profile_config, "start_all_streams_hotkey");
+	obs_hotkey_load(StartStreamHotkey, stream_hotkey);
+	obs_data_array_release(stream_hotkey);
+
+	auto record_hotkey = obs_data_get_array(current_profile_config, "start_all_recordings_hotkey");
+	obs_hotkey_load(StartRecordHotkey, record_hotkey);
+	obs_data_array_release(record_hotkey);
 }
 
 void OutputDock::SaveSettings()
 {
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
 		(*it)->SaveSettings();
+	}
+
+	if (StartStopHotkey != OBS_INVALID_HOTKEY_PAIR_ID) {
+		obs_data_array_t *start_hotkey = nullptr;
+		obs_data_array_t *stop_hotkey = nullptr;
+		obs_hotkey_pair_save(StartStopHotkey, &start_hotkey, &stop_hotkey);
+		obs_data_set_array(current_profile_config, "start_all_outputs_hotkey", start_hotkey);
+		obs_data_set_array(current_profile_config, "stop_all_outputs_hotkey", stop_hotkey);
+		obs_data_array_release(start_hotkey);
+		obs_data_array_release(stop_hotkey);
+	}
+	if (StartStreamHotkey != OBS_INVALID_HOTKEY_ID) {
+		obs_data_array_t *stream_hotkey = obs_hotkey_save(StartStreamHotkey);
+		obs_data_set_array(current_profile_config, "start_all_streams_hotkey", stream_hotkey);
+		obs_data_array_release(stream_hotkey);
+	}
+	if (StartRecordHotkey != OBS_INVALID_HOTKEY_ID) {
+		obs_data_array_t *record_hotkey = obs_hotkey_save(StartRecordHotkey);
+		obs_data_set_array(current_profile_config, "start_all_recordings_hotkey", record_hotkey);
+		obs_data_array_release(record_hotkey);
 	}
 }
 
@@ -717,4 +771,37 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 		return;
 	blog(LOG_INFO, "[Aitum Stream Suite] Starting %zu outputs", outputsToStart.size());
 	StartNextOutput();
+}
+
+void OutputDock::StopAll()
+{
+	outputsToStart.clear();
+	bool warnStream = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
+	bool warnRecord = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
+	if (warnStream && mainStreamButton && obs_frontend_streaming_active() && isVisible()) {
+		auto button = QMessageBox::question(this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
+						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
+						    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+		if (button == QMessageBox::No)
+			return;
+	} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
+		auto button = QMessageBox::question(this,
+						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
+						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
+						    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+		if (button == QMessageBox::No)
+			return;
+	}
+
+	if (mainStreamButton && obs_frontend_streaming_active())
+		obs_frontend_streaming_stop();
+	if (mainRecordButton && obs_frontend_recording_active())
+		obs_frontend_recording_stop();
+	if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
+		obs_frontend_replay_buffer_stop();
+	if (mainVirtualCamButton && obs_frontend_virtualcam_active())
+		obs_frontend_stop_virtualcam();
+	for (auto &ow : outputWidgets) {
+		ow->StopOutput();
+	}
 }
