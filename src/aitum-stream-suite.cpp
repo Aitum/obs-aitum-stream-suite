@@ -803,7 +803,7 @@ void load_current_profile_config()
 	auto dock_modes = obs_data_get_array(current_profile_config, "custom_dock_modes");
 	obs_data_array_enum(
 		dock_modes,
-		[](obs_data_t *data, void *param) {
+		[](obs_data_t *data, void *) {
 			auto name = QString::fromUtf8(obs_data_get_string(data, "name"));
 			for (int i = 0; i < modesTabBar->count(); i++) {
 				auto d = modesTabBar->tabData(i);
