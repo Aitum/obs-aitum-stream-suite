@@ -800,6 +800,43 @@ void load_current_profile_config()
 	} else {
 		obs_data_array_release(canvas);
 	}
+	auto dock_modes = obs_data_get_array(current_profile_config, "custom_dock_modes");
+	obs_data_array_enum(
+		dock_modes,
+		[](obs_data_t *data, void *param) {
+			auto name = QString::fromUtf8(obs_data_get_string(data, "name"));
+			for (int i = 0; i < modesTabBar->count(); i++) {
+				auto d = modesTabBar->tabData(i);
+				if (!d.isNull() && d.isValid() && d.toString() == name) {
+					return;
+				} else if (modesTabBar->tabText(i) == name) {
+					return;
+				}
+			}
+			modesTabBar->addTab(name);
+		},
+		nullptr);
+	for (int i = modesTabBar->count() - 1; i >= 0; i--) {
+		auto d = modesTabBar->tabData(i);
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			continue;
+		}
+		bool found = false;
+		for (size_t j = 0; j < obs_data_array_count(dock_modes); j++) {
+			auto dm = obs_data_array_item(dock_modes, j);
+			auto name = QString::fromUtf8(obs_data_get_string(dm, "name"));
+			obs_data_release(dm);
+			if (name == modesTabBar->tabText(i)) {
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			modesTabBar->removeTab(i);
+	}
+
+	obs_data_array_release(dock_modes);
+
 	auto dsm = obs_data_item_byname(current_profile_config, "dock_state_mode");
 	if (obs_data_item_gettype(dsm) == OBS_DATA_STRING) {
 		auto mode = QString::fromUtf8(obs_data_item_get_string(dsm));
@@ -864,18 +901,32 @@ void save_current_profile_config(bool save_docks)
 	dstr_cat(&path, "aitum.json");
 
 	if (save_docks) {
-		auto index = modesTabBar->currentIndex();
-		if (index >= 0) {
-			QString tn;
-			auto d = modesTabBar->tabData(index);
-			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-				tn = d.toString();
-			} else {
-				tn = modesTabBar->tabText(index);
+		if (!obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
+			auto index = modesTabBar->currentIndex();
+			if (index >= 0) {
+				QString tn;
+				auto d = modesTabBar->tabData(index);
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					tn = d.toString();
+				} else {
+					tn = modesTabBar->tabText(index);
+				}
+				save_dock_state(tn);
+				obs_data_set_string(current_profile_config, "dock_state_mode", tn.toUtf8().constData());
 			}
-			save_dock_state(tn);
-			obs_data_set_string(current_profile_config, "dock_state_mode", tn.toUtf8().constData());
 		}
+		auto custom_modes = obs_data_array_create();
+		for (int i = 0; i < modesTabBar->count(); i++) {
+			auto d = modesTabBar->tabData(i);
+			if (d.isNull() || !d.isValid() || d.toString().isEmpty()) {
+				auto cm = obs_data_create();
+				obs_data_set_string(cm, "name", modesTabBar->tabText(i).toUtf8().constData());
+				obs_data_array_push_back(custom_modes, cm);
+				obs_data_release(cm);
+			}
+		}
+		obs_data_set_array(current_profile_config, "custom_dock_modes", custom_modes);
+		obs_data_array_release(custom_modes);
 	}
 	if (output_dock)
 		output_dock->SaveSettings();
@@ -1224,10 +1275,33 @@ bool obs_module_load(void)
 		modesTabBar->setTabData(index, QString::fromUtf8(it.first.c_str()));
 	}
 	toolbar->addWidget(modesTabBar);
+	auto addModeAction =
+		toolbar->addAction(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddDockMode")), [] {
+			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			std::string name = obs_module_text("DockMode");
+			if (NameDialog::AskForName(main_window, QString::fromUtf8(obs_module_text("DockMode")), name)) {
+				if (name.empty())
+					return;
+				for (int i = 0; i < modesTabBar->count(); i++) {
+					auto d = modesTabBar->tabData(i);
+					if (!d.isNull() && d.isValid() && d.toString().toStdString() == name) {
+						return;
+					} else if (modesTabBar->tabText(i).toStdString() == name) {
+						return;
+					}
+				}
+				auto index = modesTabBar->addTab(QString::fromStdString(name));
+				modesTabBar->setCurrentIndex(index);
+				save_current_profile_config(true);
+			}
+		});
+	toolbar->widgetForAction(addModeAction)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
+	toolbar->widgetForAction(addModeAction)->setProperty("class", "icon-plus");
 	toolbar->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
-		save_dock_state(modesTab);
+		if (!current_profile_config || !obs_data_get_bool(current_profile_config, "dock_mode_manual_save"))
+			save_dock_state(modesTab);
 		auto d = modesTabBar->tabData(index);
 		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 			modesTab = d.toString();
@@ -1265,7 +1339,37 @@ bool obs_module_load(void)
 					}
 				}
 			});
+		} else {
+			menu.addAction(QString::fromUtf8(obs_module_text("Remove")), [] {
+				auto index = modesTabBar->currentIndex();
+				if (index < 0)
+					return;
+				modesTabBar->removeTab(index);
+				save_current_profile_config(true);
+			});
 		}
+		auto a = menu.addAction(QString::fromUtf8(obs_module_text("DockModeAutoSave")), [] {
+			if (!current_profile_config)
+				return;
+			obs_data_set_bool(current_profile_config, "dock_mode_manual_save",
+					  !obs_data_get_bool(current_profile_config, "dock_mode_manual_save"));
+		});
+		a->setCheckable(true);
+		a->setChecked(current_profile_config ? !obs_data_get_bool(current_profile_config, "dock_mode_manual_save") : true);
+		menu.addAction(QString::fromUtf8(obs_module_text("DockModeSave")), [] {
+			auto index = modesTabBar->currentIndex();
+			if (index < 0)
+				return;
+			QString tn;
+			auto d = modesTabBar->tabData(index);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				tn = d.toString();
+			} else {
+				tn = modesTabBar->tabText(index);
+			}
+			save_dock_state(tn);
+			save_current_profile_config(true);
+		});
 		menu.addSeparator();
 		menu.addAction(QString::fromUtf8(obs_module_text("AddEmptyDock")), [] {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -1439,7 +1543,8 @@ void TabToolBar::resizeEvent(QResizeEvent *event)
 		}
 		if (current_docks == loaded_docks) {
 			load_dock_state_timer.start();
-		} else if (main_window->isVisible()) {
+		} else if (main_window->isVisible() && current_profile_config &&
+			   !obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
 			auto index = modesTabBar->currentIndex();
 			if (index >= 0) {
 				auto d = modesTabBar->tabData(index);
