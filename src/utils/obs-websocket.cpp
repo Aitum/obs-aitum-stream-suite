@@ -297,8 +297,49 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 	obs_data_set_bool(response_data, "success", result);
 }
 
+void vendor_request_get_dock_modes(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!modesTabBar) {
+		obs_data_set_string(response_data, "error", "Modes tab bar not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	auto modes = obs_data_array_create();
+	for (int i = 0; i < modesTabBar->count(); i++) {
+		auto mode = obs_data_create();
+		auto d = modesTabBar->tabData(i);
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			obs_data_set_string(mode, "name", d.toString().toUtf8().constData());
+			obs_data_set_bool(mode, "fixed", true);
+		} else {
+			obs_data_set_string(mode, "name", modesTabBar->tabText(i).toUtf8().constData());
+			obs_data_set_bool(mode, "fixed", false);
+		}
+		obs_data_array_push_back(modes, mode);
+		obs_data_release(mode);
+	}
+	obs_data_set_array(response_data, "modes", modes);
+	obs_data_array_release(modes);
+	auto index = modesTabBar->currentIndex();
+	if (index >= 0) {
+		auto d = modesTabBar->tabData(index);
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			obs_data_set_string(response_data, "current", d.toString().toUtf8().constData());
+		} else {
+			obs_data_set_string(response_data, "current", modesTabBar->tabText(index).toUtf8().constData());
+		}
+	}
+	obs_data_set_bool(response_data, "success", true);
+}
+
 void vendor_request_switch_dock_mode(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
+	if (!modesTabBar) {
+		obs_data_set_string(response_data, "error", "Modes tab bar not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
 	auto item = obs_data_item_byname(request_data, "mode");
 	if (!item) {
 		obs_data_set_string(response_data, "error", "'mode' not set");
@@ -307,35 +348,36 @@ void vendor_request_switch_dock_mode(obs_data_t *request_data, obs_data_t *respo
 	}
 	if (obs_data_item_gettype(item) == OBS_DATA_NUMBER) {
 		auto mode = obs_data_item_get_int(item);
-		if (mode < 0 || mode > 2) {
-			obs_data_set_string(response_data, "error", "'mode' invalid");
-			obs_data_set_bool(response_data, "success", false);
+		if (mode >= 0 && mode < modesTabBar->count()) {
+			QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, (int)mode));
 			obs_data_item_release(&item);
+			obs_data_set_bool(response_data, "success", true);
 			return;
 		}
-		QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, (int)mode));
 	} else if (obs_data_item_gettype(item) == OBS_DATA_STRING) {
 		auto mode = QString::fromUtf8(obs_data_item_get_string(item));
-		if (QString::compare(mode, "live", Qt::CaseInsensitive) == 0) {
-			QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, 0));
-		} else if (QString::compare(mode, "build", Qt::CaseInsensitive) == 0) {
-			QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, 1));
-		} else if (QString::compare(mode, "design", Qt::CaseInsensitive) == 0) {
-			QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, 2));
-		} else {
-			obs_data_set_string(response_data, "error", "'mode' invalid");
-			obs_data_set_bool(response_data, "success", false);
-			obs_data_item_release(&item);
-			return;
+		for (int i = 0; i < modesTabBar->count(); i++) {
+			auto d = modesTabBar->tabData(i);
+			if (!d.isNull() && d.isValid() && d.toString() == mode) {
+				if (modesTabBar->currentIndex() != i) {
+					QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, i));
+				}
+				obs_data_item_release(&item);
+				obs_data_set_bool(response_data, "success", true);
+				return;
+			} else if (modesTabBar->tabText(i) == mode) {
+				if (modesTabBar->currentIndex() != i) {
+					QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, i));
+				}
+				obs_data_item_release(&item);
+				obs_data_set_bool(response_data, "success", true);
+				return;
+			}
 		}
-	} else {
-		obs_data_set_string(response_data, "error", "'mode' invalid type");
-		obs_data_set_bool(response_data, "success", false);
-		obs_data_item_release(&item);
-		return;
 	}
+	obs_data_set_string(response_data, "error", "'mode' invalid");
+	obs_data_set_bool(response_data, "success", false);
 	obs_data_item_release(&item);
-	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_get_docks(obs_data_t *request_data, obs_data_t *response_data, void *)
@@ -719,6 +761,7 @@ void load_obs_websocket()
 
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);
 
+	obs_websocket_vendor_register_request(vendor, "get_dock_modes", vendor_request_get_dock_modes, nullptr);
 	obs_websocket_vendor_register_request(vendor, "switch_dock_mode", vendor_request_switch_dock_mode, nullptr);
 	obs_websocket_vendor_register_request(vendor, "get_docks", vendor_request_get_docks, nullptr);
 	obs_websocket_vendor_register_request(vendor, "dock_show", vendor_request_dock_show, nullptr);

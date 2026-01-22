@@ -1232,9 +1232,23 @@ bool obs_module_load(void)
 		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 			modesTab = d.toString();
 			load_dock_state(d.toString());
+			if (vendor) {
+				auto d2 = obs_data_create();
+				obs_data_set_string(d2, "name", d.toString().toUtf8().constData());
+				obs_data_set_bool(d2, "fixed", true);
+				obs_websocket_vendor_emit_event(vendor, "switched_dock_mode", d2);
+				obs_data_release(d2);
+			}
 		} else {
 			modesTab = modesTabBar->tabText(index);
 			load_dock_state(modesTabBar->tabText(index));
+			if (vendor) {
+				auto d2 = obs_data_create();
+				obs_data_set_string(d2, "name", modesTabBar->tabText(index).toUtf8().constData());
+				obs_data_set_bool(d2, "fixed", false);
+				obs_websocket_vendor_emit_event(vendor, "switched_dock_mode", d2);
+				obs_data_release(d2);
+			}
 		}
 	});
 
