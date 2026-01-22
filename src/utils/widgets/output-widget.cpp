@@ -327,25 +327,29 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 	}
 
 	if (this_->output) {
-		if (vendor) {
-			const auto d = obs_data_create();
-			obs_data_set_string(d, "output", obs_output_get_name(this_->output));
-			const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
-			if (last_error)
-				obs_data_set_string(d, "last_error", last_error);
-			obs_data_set_int(d, "code", calldata_int(calldata, "code"));
-
-			obs_websocket_vendor_emit_event(vendor, "stop_output", d);
-			obs_data_release(d);
-		}
+		const char *error = (const char *)calldata_ptr(calldata, "last_error");
+		std::string last_error;
+		if (error)
+			last_error = error;
+		auto code = calldata_int(calldata, "code");
 		QMetaObject::invokeMethod(
 			this_->outputButton,
-			[this_] {
+			[this_, last_error, code] {
 				if (this_->output && strcmp(obs_output_get_id(this_->output), "virtualcam_output") == 0) {
 					obs_output_set_media(this_->output, obs_get_video(), obs_get_audio());
 				}
 				obs_output_release(this_->output);
 				this_->output = nullptr;
+				if (vendor) {
+					const auto d = obs_data_create();
+					obs_data_set_string(d, "output", obs_output_get_name(this_->output));
+					if (!last_error.empty())
+						obs_data_set_string(d, "last_error", last_error.c_str());
+					obs_data_set_int(d, "code", code);
+
+					obs_websocket_vendor_emit_event(vendor, "stop_output", d);
+					obs_data_release(d);
+				}
 			},
 			Qt::QueuedConnection);
 	}
