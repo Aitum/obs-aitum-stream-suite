@@ -982,7 +982,13 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		finished_loading = true;
 		if (restart) {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-			QTimer::singleShot(200, main_window, [main_window] { main_window->close(); });
+			QTimer::singleShot(2000, main_window, [main_window] {
+				auto dialogs = main_window->findChildren<QDialog *>();
+				for (auto dialog : dialogs) {
+					dialog->close();
+				}
+				QMetaObject::invokeMethod(main_window, "close", Qt::QueuedConnection);
+			});
 			return;
 		}
 		load_browser_panels();
