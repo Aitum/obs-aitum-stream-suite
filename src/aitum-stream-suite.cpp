@@ -788,7 +788,7 @@ void load_current_profile_config()
 		obs_data_set_bool(current_profile_config, "main_backtrack_output_show", true);
 		obs_data_set_bool(current_profile_config, "main_virtual_cam_output_show", true);
 		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
-		if (modesTabBar->count() <= fixed_tabs.size()) {
+		if (modesTabBar->count() <= (int)fixed_tabs.size()) {
 			modesTab = "";
 			auto tn = QString::fromUtf8(obs_module_text("User"));
 			auto index = modesTabBar->addTab(tn);
