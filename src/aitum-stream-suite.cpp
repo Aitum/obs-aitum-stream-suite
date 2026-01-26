@@ -948,9 +948,15 @@ void load_current_profile_config()
 		Qt::QueuedConnection);
 }
 
+bool load_cef();
+
 void load_browser_panels()
 {
+	if (!load_cef())
+		return;
+
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+
 	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
 				    new BrowserDock("chat", "https://chat.aitumsuite.tv/chat", main_window));
 	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),

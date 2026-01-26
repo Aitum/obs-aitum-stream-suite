@@ -5,22 +5,28 @@
 QCef *cef = nullptr;
 QCefCookieManager *panel_cookies = nullptr;
 
+bool load_cef()
+{
+	if (cef)
+		return true;
+
+	obs_module_t *browserModule = obs_get_module("obs-browser");
+	QCef *(*create_qcef)(void) = nullptr;
+	if (browserModule) {
+		create_qcef = (decltype(create_qcef))os_dlsym(obs_get_module_lib(browserModule), "obs_browser_create_qcef");
+		if (create_qcef) {
+			cef = create_qcef();
+		}
+	}
+	return cef != nullptr;
+}
+
 BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : QWidget(parent), url(url_)
 {
 	setMinimumSize(200, 100);
 	setObjectName(QString::fromUtf8(name));
 
-	if (!cef) {
-		obs_module_t *browserModule = obs_get_module("obs-browser");
-		QCef *(*create_qcef)(void) = nullptr;
-		if (browserModule) {
-			create_qcef = (decltype(create_qcef))os_dlsym(obs_get_module_lib(browserModule), "obs_browser_create_qcef");
-			if (create_qcef) {
-				cef = create_qcef();
-			}
-		}
-	}
-
+	load_cef();
 	if (!panel_cookies && cef) {
 		const char *cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
 		if (cookie_id && cookie_id[0] != '\0') {
@@ -47,7 +53,8 @@ BrowserDock::~BrowserDock()
 	cefWidget->deleteLater();
 }
 
-void BrowserDock::Refresh() {
+void BrowserDock::Refresh()
+{
 	if (cefWidget)
 		cefWidget->reloadPage();
 }
