@@ -646,29 +646,57 @@ void OutputDock::frontend_event(enum obs_frontend_event event, void *private_dat
 		return;
 	switch (event) {
 	case OBS_FRONTEND_EVENT_STREAMING_STARTED:
+		if (dock->mainStreamOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main stream started, starting next output");
+			dock->mainStreamOnStarted();
+			dock->mainStreamOnStarted = nullptr;
+		}
+		break;
 	case OBS_FRONTEND_EVENT_STREAMING_STOPPED:
 		if (dock->mainStreamOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main stream stopped, starting next output");
 			dock->mainStreamOnStarted();
 			dock->mainStreamOnStarted = nullptr;
 		}
 		break;
 	case OBS_FRONTEND_EVENT_RECORDING_STARTED:
+		if (dock->mainRecordOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main recording started, starting next output");
+			dock->mainRecordOnStarted();
+			dock->mainRecordOnStarted = nullptr;
+		}
+		break;
 	case OBS_FRONTEND_EVENT_RECORDING_STOPPED:
 		if (dock->mainRecordOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main recording stopped, starting next output");
 			dock->mainRecordOnStarted();
 			dock->mainRecordOnStarted = nullptr;
 		}
 		break;
 	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED:
+		if (dock->mainBacktrackOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main replay buffer started, starting next output");
+			dock->mainBacktrackOnStarted();
+			dock->mainBacktrackOnStarted = nullptr;
+		}
+		break;
 	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED:
 		if (dock->mainBacktrackOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main replay buffer stopped, starting next output");
 			dock->mainBacktrackOnStarted();
 			dock->mainBacktrackOnStarted = nullptr;
 		}
 		break;
 	case OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED:
+		if (dock->mainVirtualCamOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main virtual camera started, starting next output");
+			dock->mainVirtualCamOnStarted();
+			dock->mainVirtualCamOnStarted = nullptr;
+		}
+		break;
 	case OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED:
 		if (dock->mainVirtualCamOnStarted) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Main virtual camera stopped, starting next output");
 			dock->mainVirtualCamOnStarted();
 			dock->mainVirtualCamOnStarted = nullptr;
 		}
@@ -695,6 +723,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_streaming_active()) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main stream, already active");
 				onStarted();
 				return true;
 			}
@@ -702,6 +731,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			obs_frontend_streaming_start();
 			auto output = obs_frontend_get_streaming_output();
 			if (!output) {
+				blog(LOG_INFO, "[Aitum Stream Suite] No main stream output found");
 				this->mainStreamOnStarted = nullptr;
 				onStarted();
 			}
@@ -712,6 +742,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 	if (mainRecordButton && !streamOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_recording_active()) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main recording, already active");
 				onStarted();
 				return true;
 			}
@@ -719,6 +750,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			obs_frontend_recording_start();
 			auto output = obs_frontend_get_recording_output();
 			if (!output) {
+				blog(LOG_INFO, "[Aitum Stream Suite] No main recording output found");
 				this->mainRecordOnStarted = nullptr;
 				onStarted();
 			}
@@ -729,6 +761,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 	if (mainBacktrackCheckboxButton && !streamOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_replay_buffer_active()) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main replay buffer, already active");
 				onStarted();
 				return true;
 			}
@@ -736,6 +769,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			obs_frontend_replay_buffer_start();
 			auto output = obs_frontend_get_replay_buffer_output();
 			if (!output) {
+				blog(LOG_INFO, "[Aitum Stream Suite] No main replay buffer output found");
 				this->mainBacktrackOnStarted = nullptr;
 				onStarted();
 			}
@@ -746,6 +780,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 	if (mainVirtualCamButton && !streamOnly && !recordOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_virtualcam_active()) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main virtual camera, already active");
 				onStarted();
 				return true;
 			}
@@ -753,6 +788,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			obs_frontend_start_virtualcam();
 			auto output = obs_frontend_get_virtualcam_output();
 			if (!output) {
+				blog(LOG_INFO, "[Aitum Stream Suite] No main virtual camera output found");
 				this->mainVirtualCamOnStarted = nullptr;
 				onStarted();
 			}
