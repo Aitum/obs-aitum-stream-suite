@@ -224,3 +224,11 @@ begin
     end;
     TypesComboChange(nil);
 end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+    if CurPageID = wpSelectComponents then begin
+        TypesComboChange(nil);
+        exit;
+    end;
+end;

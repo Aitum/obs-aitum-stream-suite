@@ -1125,8 +1125,13 @@ bool OutputWidget::StartOutput(std::function<void()> onStarted)
 
 void OutputWidget::StopOutput()
 {
-	if (output && obs_output_active(output)) {
+	if (!output || !obs_output_active(output))
+		return;
+
+	if (obs_output_get_active_delay(output) > 0) {
 		obs_output_stop(output);
+	} else {
+		obs_output_force_stop(output);
 	}
 }
 

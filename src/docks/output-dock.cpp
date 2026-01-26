@@ -729,13 +729,6 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			}
 			this->mainStreamOnStarted = onStarted;
 			obs_frontend_streaming_start();
-			auto output = obs_frontend_get_streaming_output();
-			if (!output) {
-				blog(LOG_INFO, "[Aitum Stream Suite] No main stream output found");
-				this->mainStreamOnStarted = nullptr;
-				onStarted();
-			}
-			obs_output_release(output);
 			return true;
 		});
 	}
