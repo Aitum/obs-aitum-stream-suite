@@ -598,7 +598,7 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 					} else {
 						item3 = item2;
 					}
-					DuplicateSceneItem(item, item3);
+					ccd->DuplicateSceneItem(item, item3);
 					obs_source_release(source3);
 					return true;
 				},
@@ -626,7 +626,7 @@ void CanvasCloneDock::DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t 
 	struct obs_sceneitem_crop crop;
 	struct obs_sceneitem_crop crop2;
 	obs_sceneitem_get_crop(item, &crop);
-	obs_sceneitem_get_crop(item, &crop2);
+	obs_sceneitem_get_crop(item2, &crop2);
 	if (memcmp(&crop, &crop2, sizeof(struct obs_sceneitem_crop)) != 0) {
 		obs_sceneitem_set_crop(item2, &crop);
 	}
@@ -651,26 +651,30 @@ void CanvasCloneDock::DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t 
 		obs_sceneitem_set_scale_filter(item2, scale_type);
 
 	obs_source_t *show_transition = obs_sceneitem_get_transition(item, true);
-	obs_source_t *show_transition2 = obs_sceneitem_get_transition(item, true);
-	if (show_transition != show_transition2) {
-		obs_sceneitem_set_transition(item2, true, show_transition);
+	obs_source_t *show_transition2 = obs_sceneitem_get_transition(item2, true);
+	obs_source_t *show_transition3 = DuplicateSource(show_transition, show_transition2);
+	if (show_transition3 != show_transition2) {
+		obs_sceneitem_set_transition(item2, true, show_transition3);
 	}
+	obs_source_release(show_transition3);
 
 	obs_source_t *hide_transition = obs_sceneitem_get_transition(item, false);
-	obs_source_t *hide_transition2 = obs_sceneitem_get_transition(item, false);
-	if (hide_transition != hide_transition2) {
-		obs_sceneitem_set_transition(item2, false, hide_transition);
+	obs_source_t *hide_transition2 = obs_sceneitem_get_transition(item2, false);
+	obs_source_t *hide_transition3 = DuplicateSource(hide_transition, hide_transition2);
+	if (hide_transition3 != hide_transition2) {
+		obs_sceneitem_set_transition(item2, false, hide_transition3);
 	}
+	obs_source_release(hide_transition3);
 
 	uint32_t show_transition_duration = obs_sceneitem_get_transition_duration(item, true);
 	uint32_t show_transition_duration2 = obs_sceneitem_get_transition_duration(item2, true);
 	if (show_transition_duration != show_transition_duration2)
-		obs_sceneitem_set_transition_duration(item, true, show_transition_duration);
+		obs_sceneitem_set_transition_duration(item2, true, show_transition_duration);
 
 	uint32_t hide_transition_duration = obs_sceneitem_get_transition_duration(item, false);
 	uint32_t hide_transition_duration2 = obs_sceneitem_get_transition_duration(item2, false);
 	if (hide_transition_duration != hide_transition_duration2)
-		obs_sceneitem_set_transition_duration(item, false, hide_transition_duration);
+		obs_sceneitem_set_transition_duration(item2, false, hide_transition_duration);
 
 	int order_position = obs_sceneitem_get_order_position(item);
 	int order_position2 = obs_sceneitem_get_order_position(item2);

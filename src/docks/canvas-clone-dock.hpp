@@ -24,12 +24,12 @@ private:
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
 
 	obs_source_t *DuplicateSource(obs_source_t *source, obs_source_t *current);
+	void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
 	void DrawBackdrop(float cx, float cy);
 	void LoadReplacements();
 	void RemoveSource(QString source_name);
 	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
 	static void Tick(void *param, float seconds);
-	static void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
 	static bool AddSourceToCombos(void *param, obs_source_t *source);
 	static void source_create(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
