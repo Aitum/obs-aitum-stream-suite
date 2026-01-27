@@ -93,9 +93,19 @@ Source: "..\release\Package\data\obs-plugins\svg-source\*"; DestDir: "{app}\data
 Source: "..\LICENSE"; Flags: dontcopy
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
+[InstallDelete]
+Type: files; Name: "{app}\obs-plugins\64bit\vertical-canvas.dll"
+Type: files; Name: "{app}\obs-plugins\64bit\vertical-canvas.pdb"
+
 [Ini]
-filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original;
-filename: {commonappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original;
+filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
+filename: {commonappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
+filename: {userappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
+filename: {userappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
+filename: {localappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
+filename: {localappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
+filename: {app}\config\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
+filename: {app}\config\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
 
 [Icons]
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
