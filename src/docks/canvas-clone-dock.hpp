@@ -1,4 +1,5 @@
 #pragma once
+#include "../utils/widgets/projector.hpp"
 #include "../utils/widgets/qt-display.hpp"
 #include <obs.h>
 #include <QFrame>
@@ -20,6 +21,7 @@ private:
 	float zoom = 1.0f;
 	float scrollX = 0.5f;
 	float scrollY = 0.5f;
+	std::vector<OBSProjector *> projectors;
 
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
 
@@ -28,6 +30,9 @@ private:
 	void DrawBackdrop(float cx, float cy);
 	void LoadReplacements();
 	void RemoveSource(QString source_name);
+	void DeleteProjector(OBSProjector *projector);
+	OBSProjector *OpenProjector(int monitor);
+	static void AddProjectorMenuMonitors(QMenu *parent, QObject *target, const char *slot);
 	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
 	static void Tick(void *param, float seconds);
 	static bool AddSourceToCombos(void *param, obs_source_t *source);
@@ -39,6 +44,7 @@ private:
 private slots:
 	void LoadMode(QString mode);
 	void SaveSettings(bool closing = false, QString mode = "");
+	void OpenPreviewProjector();
 
 public:
 	CanvasCloneDock(obs_data_t *settings, QWidget *parent = nullptr);

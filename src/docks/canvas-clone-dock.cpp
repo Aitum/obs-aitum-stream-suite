@@ -4,6 +4,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QLayout>
+#include <QMenu>
 #include <QScrollArea>
 #include <src/utils/color.hpp>
 #include <src/utils/widgets/switching-splitter.hpp>
@@ -125,6 +126,16 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	preview->show();
 	connect(preview, &OBSQTDisplay::DisplayCreated,
 		[this]() { obs_display_add_draw_callback(preview->GetDisplay(), DrawPreview, this); });
+
+	preview->setContextMenuPolicy(Qt::CustomContextMenu);
+	QObject::connect(preview, &OBSQTDisplay::customContextMenuRequested, [this] {
+		QMenu menu(this);
+		auto projectorMenu = menu.addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Open.Preview")));
+		AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenPreviewProjector()));
+		menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Window")),
+			       [this] { OpenProjector(-1); });
+		menu.exec(QCursor::pos());
+	});
 
 	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
 	canvas_height = (uint32_t)obs_data_get_int(settings, "height");
@@ -251,6 +262,9 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 
 CanvasCloneDock::~CanvasCloneDock()
 {
+	for (auto projector : projectors) {
+		delete projector;
+	}
 	auto sh = obs_get_signal_handler();
 	signal_handler_disconnect(sh, "source_create", source_create, this);
 	signal_handler_disconnect(sh, "source_remove", source_remove, this);
@@ -923,4 +937,87 @@ void CanvasCloneDock::SetPanelVisible(const QString &panel_name, bool visible)
 			canvas_split->setSizes({1, 0});
 		}
 	}
+}
+
+void CanvasCloneDock::DeleteProjector(OBSProjector *projector)
+{
+	for (size_t i = 0; i < projectors.size(); i++) {
+		if (projectors[i] == projector) {
+			projectors[i]->deleteLater();
+			projectors.erase(projectors.begin() + i);
+			break;
+		}
+	}
+}
+
+OBSProjector *CanvasCloneDock::OpenProjector(int monitor)
+{
+	/* seriously?  10 monitors? */
+	if (monitor > 9 || monitor > QGuiApplication::screens().size() - 1)
+		return nullptr;
+	auto config = obs_frontend_get_user_config();
+	if (!config)
+		return nullptr;
+
+	bool closeProjectors = config_get_bool(config, "BasicWindow", "CloseExistingProjectors");
+
+	if (closeProjectors && monitor > -1) {
+		for (size_t i = projectors.size(); i > 0; i--) {
+			size_t idx = i - 1;
+			if (projectors[idx]->GetMonitor() == monitor)
+				DeleteProjector(projectors[idx]);
+		}
+	}
+
+	OBSProjector *projector = new OBSProjector(canvas, nullptr, monitor, [this](OBSProjector *p) { DeleteProjector(p); });
+
+	projectors.emplace_back(projector);
+
+	return projector;
+}
+
+void CanvasCloneDock::AddProjectorMenuMonitors(QMenu *parent, QObject *target, const char *slot)
+{
+
+	QList<QScreen *> screens = QGuiApplication::screens();
+	for (int i = 0; i < screens.size(); i++) {
+		QScreen *screen = screens[i];
+		QRect screenGeometry = screen->geometry();
+		qreal ratio = screen->devicePixelRatio();
+		QString name = "";
+#if defined(_WIN32) && QT_VERSION < QT_VERSION_CHECK(6, 4, 0)
+		QTextStream fullname(&name);
+		fullname << GetMonitorName(screen->name());
+		fullname << " (";
+		fullname << (i + 1);
+		fullname << ")";
+#elif defined(__APPLE__) || defined(_WIN32)
+		name = screen->name();
+#else
+		name = screen->model().simplified();
+
+		if (name.length() > 1 && name.endsWith("-"))
+			name.chop(1);
+#endif
+		name = name.simplified();
+
+		if (name.length() == 0) {
+			name = QString("%1 %2")
+				       .arg(QString::fromUtf8(obs_frontend_get_locale_string("Display")))
+				       .arg(QString::number(i + 1));
+		}
+		QString str = QString("%1: %2x%3 @ %4,%5")
+				      .arg(name, QString::number(screenGeometry.width() * ratio),
+					   QString::number(screenGeometry.height() * ratio), QString::number(screenGeometry.x()),
+					   QString::number(screenGeometry.y()));
+
+		QAction *a = parent->addAction(str, target, slot);
+		a->setProperty("monitor", i);
+	}
+}
+
+void CanvasCloneDock::OpenPreviewProjector()
+{
+	int monitor = sender()->property("monitor").toInt();
+	OpenProjector(monitor);
 }

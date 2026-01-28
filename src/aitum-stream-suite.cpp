@@ -1656,7 +1656,12 @@ void obs_module_unload()
 	}
 }
 
-const char *obs_module_name(void)
+MODULE_EXPORT const char *obs_module_description(void)
+{
+	return obs_module_text("AitumStreamSuite");
+}
+
+MODULE_EXPORT const char *obs_module_name(void)
 {
 	return obs_module_text("AitumStreamSuite");
 }
