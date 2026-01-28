@@ -2,6 +2,7 @@
 #include "canvas-dock.hpp"
 #include <obs-module.h>
 #include <QGroupBox>
+#include <QGuiApplication>
 #include <QLabel>
 #include <QLayout>
 #include <QMenu>

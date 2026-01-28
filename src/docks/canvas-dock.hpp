@@ -284,17 +284,17 @@ public:
 	void reset_build_state();
 
 	void SetPanelVisible(const QString &panel_name, bool visible);
-	QList<obs_source_t *> GetTransitions() const { 
-		QList<obs_source_t*> transitionList;
-		for (const auto& t : transitions) {
+	QList<obs_source_t *> GetTransitions() const
+	{
+		QList<obs_source_t *> transitionList;
+		for (const auto &t : transitions) {
 			transitionList.append(t);
 		}
 		return transitionList;
 	}
 	void SetSelectedTransition(const QString &transition_name);
-	void AddTransition(const char *source_type, const char*name, obs_data_t *settings);
+	void AddTransition(const char *source_type, const char *name, obs_data_t *settings);
 	void RemoveTransition(const char *transition_name);
-
 };
 
 struct SelectedItemBounds {
