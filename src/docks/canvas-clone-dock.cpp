@@ -20,6 +20,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	  preview(new OBSQTDisplay(this)),
 	  settings(settings_)
 {
+	pthread_mutex_init(&replace_sources_mutex, nullptr);
 	obs_enter_graphics();
 
 	gs_render_start(true);
@@ -289,9 +290,12 @@ CanvasCloneDock::~CanvasCloneDock()
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
 	obs_leave_graphics();
+	pthread_mutex_lock(&replace_sources_mutex);
 	for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
 		obs_weak_source_release(it->second);
 	replace_sources.clear();
+	pthread_mutex_unlock(&replace_sources_mutex);
+	pthread_mutex_destroy(&replace_sources_mutex);
 }
 
 void CanvasCloneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
@@ -468,9 +472,12 @@ bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *
 	CanvasCloneDock *ccd = p->second;
 	bool *change_source = p->first;
 	obs_source_t *source = obs_sceneitem_get_source(item);
+	pthread_mutex_lock(&ccd->replace_sources_mutex);
 	if (ccd->replace_sources.find(source) != ccd->replace_sources.end()) {
+		pthread_mutex_unlock(&ccd->replace_sources_mutex);
 		*change_source = true;
 	} else {
+		pthread_mutex_unlock(&ccd->replace_sources_mutex);
 		obs_scene_t *scene = obs_scene_from_source(source);
 		if (!scene)
 			scene = obs_group_from_source(source);
@@ -486,13 +493,18 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 	if (!source)
 		return nullptr;
 
-	if (obs_obj_is_private(source)) {
+	const char *source_name = obs_source_get_name(source);
+
+	pthread_mutex_lock(&replace_sources_mutex);
+	if (obs_obj_is_private(source) && source_name) {
 		for (auto it : replace_sources) {
-			if (strcmp(obs_source_get_name(source), obs_source_get_name(it.first)) == 0) {
+			const char* replace_name = obs_source_get_name(it.first);
+			if (replace_name && strcmp(source_name, replace_name) == 0) {
 				obs_source_t *s = obs_weak_source_get_source(it.second);
 				if (s) {
 					source = s;
 					obs_source_release(s);
+					source_name = obs_source_get_name(source);
 					break;
 				}
 			}
@@ -504,17 +516,19 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			if (s) {
 				source = s;
 				obs_source_release(s);
+				source_name = obs_source_get_name(source);
 			}
 		}
 	}
+	pthread_mutex_unlock(&replace_sources_mutex);
 
 	obs_source_t *duplicate = nullptr;
 
 	enum obs_source_type source_type = obs_source_get_type(source);
 	if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
 		if ((current && !source) || (source && !current) ||
-		    (source && current && strcmp(obs_source_get_name(current), obs_source_get_name(source)) != 0)) {
-			duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
+		    (source && current && strcmp(obs_source_get_name(current), source_name) != 0)) {
+			duplicate = obs_source_duplicate(source, source_name, true);
 			obs_transition_set_size(duplicate, obs_source_get_width(source), obs_source_get_height(source));
 			obs_transition_set_alignment(duplicate, obs_transition_get_alignment(source));
 			obs_transition_set_scale_type(duplicate, obs_transition_get_scale_type(source));
@@ -556,12 +570,11 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			duplicate = obs_source_get_ref(source);
 		} else if (current && source &&
 			   ((!change_source && current == source) ||
-			    (current != source && strcmp(obs_source_get_name(current), obs_source_get_name(source)) == 0))) {
+			    (current != source && strcmp(obs_source_get_name(current), source_name) == 0))) {
 			duplicate = obs_source_get_ref(current);
 		} else {
-			//duplicate = obs_source_duplicate(source, obs_source_get_name(source), true);
-			duplicate = obs_scene_get_source(
-				obs_scene_duplicate(scene, obs_source_get_name(source), OBS_SCENE_DUP_PRIVATE_REFS));
+			//duplicate = obs_source_duplicate(source, source_name, true);
+			duplicate = obs_scene_get_source(obs_scene_duplicate(scene, source_name, OBS_SCENE_DUP_PRIVATE_REFS));
 			auto cx = obs_source_get_base_width(source);
 			auto cy = obs_source_get_base_height(source);
 			if (cx && cy &&
@@ -596,12 +609,14 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 					if (!obs_scene_find_source(scene, source_name)) {
 						//item not found in original scene
 						bool found = false;
+						pthread_mutex_lock(&ccd->replace_sources_mutex);
 						for (auto it = ccd->replace_sources.begin();
 						     !found && it != ccd->replace_sources.end(); it++) {
 							if (obs_weak_source_references_source(it->second, source) &&
 							    obs_scene_find_source(scene, obs_source_get_name(it->first)))
 								found = true;
 						}
+						pthread_mutex_unlock(&ccd->replace_sources_mutex);
 						if (!found)
 							obs_sceneitem_remove(item);
 					}
@@ -818,9 +833,11 @@ void CanvasCloneDock::LoadReplacements()
 {
 	auto clone_name = obs_data_get_string(settings, "clone");
 	auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
+	pthread_mutex_lock(&replace_sources_mutex);
 	for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
 		obs_weak_source_release(it->second);
 	replace_sources.clear();
+	pthread_mutex_unlock(&replace_sources_mutex);
 	obs_data_array_t *arr = obs_data_get_array(settings, "replace_sources");
 	size_t count = obs_data_array_count(arr);
 	for (size_t i = 0; i < count; i++) {
@@ -855,7 +872,9 @@ void CanvasCloneDock::LoadReplacements()
 		if (!dst)
 			dst = obs_get_source_by_name(dst_name);
 		if (src && dst && src != dst) {
+			pthread_mutex_lock(&replace_sources_mutex);
 			replace_sources[src] = obs_source_get_weak_source(dst);
+			pthread_mutex_unlock(&replace_sources_mutex);
 		}
 		obs_source_release(src);
 		obs_source_release(dst);

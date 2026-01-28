@@ -2,9 +2,10 @@
 #include "../utils/widgets/projector.hpp"
 #include "../utils/widgets/qt-display.hpp"
 #include <obs.h>
+#include <QComboBox>
 #include <QFrame>
 #include <QSplitter>
-#include <QComboBox>
+#include <util/threading.h>
 
 class CanvasCloneDock : public QFrame {
 	Q_OBJECT
@@ -24,6 +25,7 @@ private:
 	std::vector<OBSProjector *> projectors;
 
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
+	pthread_mutex_t replace_sources_mutex;
 
 	obs_source_t *DuplicateSource(obs_source_t *source, obs_source_t *current);
 	void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
