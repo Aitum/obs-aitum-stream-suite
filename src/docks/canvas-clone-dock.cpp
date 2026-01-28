@@ -1,3 +1,4 @@
+#include "../utils/icon.hpp"
 #include "canvas-clone-dock.hpp"
 #include "canvas-dock.hpp"
 #include <obs-module.h>
@@ -135,6 +136,14 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 		AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenPreviewProjector()));
 		menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Window")),
 			       [this] { OpenProjector(-1); });
+		menu.addAction(GetIconFromType(OBS_ICON_TYPE_IMAGE),
+			       QString::fromUtf8(obs_frontend_get_locale_string("Screenshot")), this, [this] {
+				       auto source = obs_canvas_get_channel(canvas, 0);
+				       if (source) {
+					       obs_frontend_take_source_screenshot(source);
+					       obs_source_release(source);
+				       }
+			       });
 		menu.exec(QCursor::pos());
 	});
 
