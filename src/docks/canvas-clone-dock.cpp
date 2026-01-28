@@ -486,11 +486,25 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 	if (!source)
 		return nullptr;
 
-	auto replace = replace_sources.find(source);
-	if (replace != replace_sources.end()) {
-		obs_source_t *s = obs_weak_source_get_source(replace->second);
-		if (s) {
-			return s;
+	if (obs_obj_is_private(source)) {
+		for (auto it : replace_sources) {
+			if (strcmp(obs_source_get_name(source), obs_source_get_name(it.first)) == 0) {
+				obs_source_t *s = obs_weak_source_get_source(it.second);
+				if (s) {
+					source = s;
+					obs_source_release(s);
+					break;
+				}
+			}
+		}
+	} else {
+		auto replace = replace_sources.find(source);
+		if (replace != replace_sources.end()) {
+			obs_source_t *s = obs_weak_source_get_source(replace->second);
+			if (s) {
+				source = s;
+				obs_source_release(s);
+			}
 		}
 	}
 
@@ -632,7 +646,6 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 		duplicate = obs_source_get_ref(source);
 	}
 
-	//obs_scene_duplicate();
 	return duplicate;
 }
 
