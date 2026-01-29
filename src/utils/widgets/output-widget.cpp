@@ -1146,3 +1146,12 @@ bool OutputWidget::IsRecord() const
 	const auto output_type = obs_data_get_string(settings, "type");
 	return (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0);
 }
+
+const char* OutputWidget::GetOutputType() const
+{
+	const auto output_type = obs_data_get_string(settings, "type");
+	if (output_type[0] == '\0')
+		return "stream";
+	else
+		return output_type;
+}

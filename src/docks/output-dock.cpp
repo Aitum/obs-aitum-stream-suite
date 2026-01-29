@@ -595,6 +595,7 @@ obs_data_array_t *OutputDock::GetOutputsArray()
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
 		auto data = obs_data_create();
 		obs_data_set_string(data, "name", (*it)->objectName().toUtf8().constData());
+		obs_data_set_string(data, "type", (*it)->GetOutputType());
 		obs_data_set_bool(data, "active", obs_output_active((*it)->GetOutput()));
 		obs_data_array_push_back(outputs2, data);
 		obs_data_release(data);

@@ -47,4 +47,5 @@ public:
 	void StopOutput();
 	bool IsStream() const;
 	bool IsRecord() const;
+	const char* GetOutputType() const;
 };
