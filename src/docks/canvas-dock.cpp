@@ -973,6 +973,8 @@ CanvasDock::~CanvasDock()
 	obs_data_release(settings);
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
+	gs_vertexbuffer_destroy(rectFill);
+	gs_vertexbuffer_destroy(circleFill);
 	obs_leave_graphics();
 	obs_canvas_release(canvas);
 
