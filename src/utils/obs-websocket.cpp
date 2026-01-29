@@ -256,7 +256,7 @@ void vendor_request_stop_all_outputs(obs_data_t *request_data, obs_data_t *respo
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StopAll");
+	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, false), Q_ARG(bool, false));
 	obs_data_set_bool(response_data, "success", true);
 }
 
@@ -272,6 +272,18 @@ void vendor_request_start_all_streams(obs_data_t *request_data, obs_data_t *resp
 	obs_data_set_bool(response_data, "success", true);
 }
 
+void vendor_request_stop_all_streams(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, true), Q_ARG(bool, false));
+	obs_data_set_bool(response_data, "success", true);
+}
+
 void vendor_request_start_all_recordings(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
@@ -281,6 +293,18 @@ void vendor_request_start_all_recordings(obs_data_t *request_data, obs_data_t *r
 		return;
 	}
 	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, false), Q_ARG(bool, true));
+	obs_data_set_bool(response_data, "success", true);
+}
+
+void vendor_request_stop_all_recordings(obs_data_t *request_data, obs_data_t *response_data, void *)
+{
+	UNUSED_PARAMETER(request_data);
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, false), Q_ARG(bool, true));
 	obs_data_set_bool(response_data, "success", true);
 }
 
@@ -795,7 +819,9 @@ void load_obs_websocket()
 	obs_websocket_vendor_register_request(vendor, "start_all_outputs", vendor_request_start_all_outputs, nullptr);
 	obs_websocket_vendor_register_request(vendor, "stop_all_outputs", vendor_request_stop_all_outputs, nullptr);
 	obs_websocket_vendor_register_request(vendor, "start_all_streams", vendor_request_start_all_streams, nullptr);
+	obs_websocket_vendor_register_request(vendor, "stop_all_streams", vendor_request_stop_all_streams, nullptr);
 	obs_websocket_vendor_register_request(vendor, "start_all_recordings", vendor_request_start_all_recordings, nullptr);
+	obs_websocket_vendor_register_request(vendor, "stop_all_recordings", vendor_request_stop_all_recordings, nullptr);
 	obs_websocket_vendor_register_request(vendor, "save_backtrack", vendor_request_save_backtrack, nullptr);
 
 	obs_websocket_vendor_register_request(vendor, "add_chapter", vendor_request_add_chapter, nullptr);

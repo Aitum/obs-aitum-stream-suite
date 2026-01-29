@@ -50,7 +50,7 @@ private:
 
 private slots:
 	void StartAll(bool streamOnly, bool recordOnly);
-	void StopAll();
+	void StopAll(bool streamOnly, bool recordOnly);
 	void StartNextOutput();
 
 public:

@@ -102,7 +102,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 #else
 		QIcon(":/res/images/media/media_stop.svg"),
 #endif
-		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] { StopAll(); });
+		QString::fromUtf8(obs_module_text("StopAllOutputs")), [this] { StopAll(false, false); });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("stopIcon")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-media-stop");
 
@@ -376,7 +376,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			if (!pressed)
 				return false;
 			auto dock = static_cast<OutputDock *>(data);
-			QMetaObject::invokeMethod(dock, [dock] { dock->StopAll(); });
+			QMetaObject::invokeMethod(dock, [dock] { dock->StopAll(false, false); });
 			return true;
 		},
 		this, this);
@@ -803,18 +803,18 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 	StartNextOutput();
 }
 
-void OutputDock::StopAll()
+void OutputDock::StopAll(bool streamOnly, bool recordOnly)
 {
 	outputsToStart.clear();
 	bool warnStream = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
 	bool warnRecord = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
-	if (warnStream && mainStreamButton && obs_frontend_streaming_active() && isVisible()) {
+	if (warnStream && mainStreamButton && !recordOnly && obs_frontend_streaming_active() && isVisible()) {
 		auto button = QMessageBox::question(this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
 						    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 		if (button == QMessageBox::No)
 			return;
-	} else if (warnRecord && mainRecordButton && obs_frontend_recording_active() && isVisible()) {
+	} else if (warnRecord && mainRecordButton && !streamOnly && obs_frontend_recording_active() && isVisible()) {
 		auto button = QMessageBox::question(this,
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
@@ -823,15 +823,19 @@ void OutputDock::StopAll()
 			return;
 	}
 
-	if (mainStreamButton && obs_frontend_streaming_active())
+	if (mainStreamButton && !recordOnly && obs_frontend_streaming_active())
 		obs_frontend_streaming_stop();
-	if (mainRecordButton && obs_frontend_recording_active())
+	if (mainRecordButton && !streamOnly && obs_frontend_recording_active())
 		obs_frontend_recording_stop();
-	if (mainBacktrackCheckboxButton && obs_frontend_replay_buffer_active())
+	if (mainBacktrackCheckboxButton && !streamOnly && obs_frontend_replay_buffer_active())
 		obs_frontend_replay_buffer_stop();
-	if (mainVirtualCamButton && obs_frontend_virtualcam_active())
+	if (mainVirtualCamButton && !streamOnly && !recordOnly && obs_frontend_virtualcam_active())
 		obs_frontend_stop_virtualcam();
 	for (auto &ow : outputWidgets) {
+		if (streamOnly && !ow->IsStream())
+			continue;
+		if (recordOnly && !ow->IsRecord())
+			continue;
 		ow->StopOutput();
 	}
 }
