@@ -132,6 +132,8 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 		getPlatformIconFromEndpoint(QString::fromUtf8("")).pixmap(outputPlatformIconSize, outputPlatformIconSize));
 
 	auto l2 = new QHBoxLayout;
+	l2->setContentsMargins(5, 0, 5, 0);
+	l2->setSpacing(0);
 
 	l2->addWidget(mainPlatformIconLabel);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("BuiltinStream"))), 1);
@@ -192,6 +194,8 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	mainLayout->addWidget(mainStreamGroup);
 
 	l2 = new QHBoxLayout;
+	l2->setContentsMargins(5, 0, 5, 0);
+	l2->setSpacing(0);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("BuiltinRecord"))), 1);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("MainCanvas"))), 1);
 	mainRecordButton = new QPushButton;
@@ -210,6 +214,8 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	mainLayout->addWidget(mainRecordGroup);
 
 	l2 = new QHBoxLayout;
+	l2->setContentsMargins(5, 0, 5, 0);
+	l2->setSpacing(0);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("BuiltinBacktrack"))), 1);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("MainCanvas"))), 1);
 
@@ -276,6 +282,8 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	mainLayout->addWidget(mainBacktrackGroup);
 
 	l2 = new QHBoxLayout;
+	l2->setContentsMargins(5, 0, 5, 0);
+	l2->setSpacing(0);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("BuiltinVirtualCamera"))), 1);
 	l2->addWidget(new QLabel(QString::fromUtf8(obs_module_text("MainCanvas"))), 1);
 	mainVirtualCamButton = new QPushButton;

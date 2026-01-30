@@ -23,6 +23,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 	setObjectName(name);
 
 	auto outputLayout = new QHBoxLayout;
+	outputLayout->setContentsMargins(5, 0, 5, 0);
+	outputLayout->setSpacing(0);
 
 	outputButton = new QPushButton;
 	outputButton->setMinimumHeight(30);
@@ -488,6 +490,8 @@ bool OutputWidget::StartOutput(bool automated)
 							     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 							     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
 				return false;
+			} else {
+				obs_encoder_get_ref(aenc);
 			}
 			aencs.push_back(aenc);
 		} else {
@@ -556,14 +560,18 @@ bool OutputWidget::StartOutput(bool automated)
 
 				for (size_t idx = 0; idx < MAX_OUTPUT_AUDIO_ENCODERS; idx++) {
 					auto aenc = main_output ? obs_output_get_audio_encoder(main_output, idx) : nullptr;
-					if (aenc)
+					if (aenc) {
+						obs_encoder_get_ref(aenc);
 						aencs.push_back(aenc);
+					}
 				}
 			} else {
 				main_output = obs_frontend_get_streaming_output();
 				auto aenc = main_output ? obs_output_get_audio_encoder(main_output, 0) : nullptr;
-				if (aenc)
+				if (aenc) {
+					obs_encoder_get_ref(aenc);
 					aencs.push_back(aenc);
+				}
 			}
 
 			obs_output_release(main_output);
@@ -595,6 +603,9 @@ bool OutputWidget::StartOutput(bool automated)
 		if (!automated)
 			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoVideoEncoder")),
 					     QString::fromUtf8(obs_module_text("NoVideoEncoder")));
+		for (size_t i = 0; i < aencs.size(); i++) {
+			obs_encoder_release(aencs[i]);
+		}
 		return false;
 	}
 	if (aencs.empty()) {
@@ -602,6 +613,9 @@ bool OutputWidget::StartOutput(bool automated)
 		if (!automated)
 			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("NoAudioEncoder")),
 					     QString::fromUtf8(obs_module_text("NoAudioEncoder")));
+		for (size_t i = 0; i < vencs.size(); i++) {
+			obs_encoder_release(vencs[i]);
+		}
 		return false;
 	}
 
@@ -723,10 +737,12 @@ bool OutputWidget::StartOutput(bool automated)
 
 	for (size_t i = 0; i < vencs.size(); i++) {
 		obs_output_set_video_encoder2(output, vencs[i], i);
+		obs_encoder_release(vencs[i]);
 	}
 
 	for (size_t i = 0; i < aencs.size(); i++) {
 		obs_output_set_audio_encoder(output, aencs[i], i);
+		obs_encoder_release(aencs[i]);
 	}
 
 	if (!obs_output_start(output)) {
@@ -779,8 +795,9 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 					QMessageBox::warning(this, QString::fromUtf8(obs_module_text("OtherOutputNotActive")),
 							     QString::fromUtf8(obs_module_text("OtherOutputNotActive")));
 				return nullptr;
+			} else {
+				obs_encoder_get_ref(venc);
 			}
-
 		} else {
 			auto venc_name = obs_data_get_string(settings, "video_encoder");
 			if (!venc_name || venc_name[0] == '\0') {
@@ -828,6 +845,8 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 									     QString::fromUtf8(obs_module_text(
 										     "MainOutputEncoderIndexNotFound")));
 						return nullptr;
+					} else {
+						obs_encoder_get_ref(venc);
 					}
 				} else {
 					//default encoder
@@ -876,6 +895,8 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 						obs_data_set_int(video_settings, "bitrate", 6000);
 						obs_encoder_update(venc, video_settings);
 						obs_data_release(video_settings);
+					} else {
+						obs_encoder_get_ref(venc);
 					}
 				}
 			} else {
@@ -955,6 +976,7 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 							     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
 				return nullptr;
 			}
+			obs_encoder_get_ref(venc);
 		} else if (!venc) {
 			auto videoEncoderIds = {"obs_nvenc_h264_tex", "jim_nvenc", "ffmpeg_nvenc", "obs_qsv11_v2",
 						"h264_texture_amf"};
