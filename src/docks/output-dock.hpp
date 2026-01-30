@@ -29,6 +29,10 @@ private:
 	QFrame *mainVirtualCamGroup = nullptr;
 	QString mainPlatformUrl;
 	bool exiting = false;
+	bool mainStreamEnabled = true;
+	bool mainRecordEnabled = true;
+	bool mainBacktrackEnabled = true;
+	bool mainVirtualCamEnabled = true;
 
 	QTimer videoCheckTimer;
 

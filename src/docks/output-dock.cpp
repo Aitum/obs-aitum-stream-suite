@@ -76,13 +76,13 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			QString::fromUtf8(obs_module_text("StartAllOutputs")), [this]() { StartAll(false, false); });
 		a2->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
 		a2->setProperty("class", "icon-media-play");
-		if (mainStreamButton || std::find_if(outputWidgets.begin(), outputWidgets.end(),
+		if (mainStreamEnabled || std::find_if(outputWidgets.begin(), outputWidgets.end(),
 						     [](OutputWidget *w) { return w->IsStream(); }) != outputWidgets.end()) {
 			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")),
 					    QString::fromUtf8(obs_module_text("StartAllStreams")),
 					    [this]() { StartAll(true, false); });
 		}
-		if (mainRecordButton || std::find_if(outputWidgets.begin(), outputWidgets.end(),
+		if (mainRecordEnabled || std::find_if(outputWidgets.begin(), outputWidgets.end(),
 						     [](OutputWidget *w) { return w->IsRecord(); }) != outputWidgets.end()) {
 			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/record.svg")),
 					    QString::fromUtf8(obs_module_text("StartAllRecordings")),
@@ -317,21 +317,21 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			}
 		}
 
-		if (mainStreamButton) {
+		if (mainStreamEnabled) {
 			auto active = obs_frontend_streaming_active();
 			if (mainStreamButton->isChecked() != active) {
 				mainStreamButton->setChecked(active);
 			}
 		}
 
-		if (mainRecordButton) {
+		if (mainRecordEnabled) {
 			auto active = obs_frontend_recording_active();
 			if (mainRecordButton->isChecked() != active) {
 				mainRecordButton->setChecked(active);
 			}
 		}
 
-		if (mainBacktrackCheckbox) {
+		if (mainBacktrackEnabled) {
 			auto enabled = obs_frontend_replay_buffer_active();
 			if (mainBacktrackCheckboxButton->isChecked() != enabled) {
 				mainBacktrackCheckboxButton->setChecked(enabled);
@@ -344,7 +344,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			}
 		}
 
-		if (mainVirtualCamButton) {
+		if (mainVirtualCamEnabled) {
 			auto active = obs_frontend_virtualcam_active();
 			if (mainVirtualCamButton->isChecked() != active) {
 				mainVirtualCamButton->setChecked(active);
@@ -431,22 +431,18 @@ extern obs_data_t *current_profile_config;
 
 void OutputDock::LoadSettings()
 {
-	auto enabled = obs_data_get_bool(current_profile_config, "main_stream_output_show");
-	if (enabled != mainStreamGroup->isVisible()) {
-		mainStreamGroup->setVisible(enabled);
-	}
-	enabled = obs_data_get_bool(current_profile_config, "main_record_output_show");
-	if (enabled != mainRecordGroup->isVisible()) {
-		mainRecordGroup->setVisible(enabled);
-	}
-	enabled = obs_data_get_bool(current_profile_config, "main_backtrack_output_show");
-	if (enabled != mainBacktrackGroup->isVisible()) {
-		mainBacktrackGroup->setVisible(enabled);
-	}
-	enabled = obs_data_get_bool(current_profile_config, "main_virtual_cam_output_show");
-	if (enabled != mainVirtualCamGroup->isVisible()) {
-		mainVirtualCamGroup->setVisible(enabled);
-	}
+	mainStreamEnabled = obs_data_get_bool(current_profile_config, "main_stream_output_show");
+	mainStreamGroup->setVisible(mainStreamEnabled);
+	
+	mainRecordEnabled = obs_data_get_bool(current_profile_config, "main_record_output_show");
+	mainRecordGroup->setVisible(mainRecordEnabled);
+	
+	mainBacktrackEnabled = obs_data_get_bool(current_profile_config, "main_backtrack_output_show");
+	mainBacktrackGroup->setVisible(mainBacktrackEnabled);
+	
+	mainVirtualCamEnabled = obs_data_get_bool(current_profile_config, "main_virtual_cam_output_show");
+	mainVirtualCamGroup->setVisible(mainVirtualCamEnabled);
+	
 	auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end();) {
 		bool found = false;
@@ -710,7 +706,7 @@ void OutputDock::frontend_event(enum obs_frontend_event event, void *private_dat
 void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 {
 	outputsToStart.clear();
-	if (mainStreamButton && !recordOnly) {
+	if (mainStreamEnabled && !recordOnly) {
 		bool warnBeforeStreamStart =
 			config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStartingStream");
 		if (warnBeforeStreamStart && isVisible()) {
@@ -733,7 +729,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			return true;
 		});
 	}
-	if (mainRecordButton && !streamOnly) {
+	if (mainRecordEnabled && !streamOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_recording_active()) {
 				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main recording, already active");
@@ -752,7 +748,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			return true;
 		});
 	}
-	if (mainBacktrackCheckboxButton && !streamOnly) {
+	if (mainBacktrackEnabled && !streamOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_replay_buffer_active()) {
 				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main replay buffer, already active");
@@ -771,7 +767,7 @@ void OutputDock::StartAll(bool streamOnly, bool recordOnly)
 			return true;
 		});
 	}
-	if (mainVirtualCamButton && !streamOnly && !recordOnly) {
+	if (mainVirtualCamEnabled && !streamOnly && !recordOnly) {
 		outputsToStart.push_back([this](std::function<void()> onStarted) {
 			if (obs_frontend_virtualcam_active()) {
 				blog(LOG_INFO, "[Aitum Stream Suite] Skipped starting main virtual camera, already active");
@@ -808,13 +804,13 @@ void OutputDock::StopAll(bool streamOnly, bool recordOnly)
 	outputsToStart.clear();
 	bool warnStream = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingStream");
 	bool warnRecord = config_get_bool(obs_frontend_get_user_config(), "BasicWindow", "WarnBeforeStoppingRecord");
-	if (warnStream && mainStreamButton && !recordOnly && obs_frontend_streaming_active() && isVisible()) {
+	if (warnStream && mainStreamEnabled && !recordOnly && obs_frontend_streaming_active() && isVisible()) {
 		auto button = QMessageBox::question(this, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Title")),
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStop.Text")),
 						    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 		if (button == QMessageBox::No)
 			return;
-	} else if (warnRecord && mainRecordButton && !streamOnly && obs_frontend_recording_active() && isVisible()) {
+	} else if (warnRecord && mainRecordEnabled && !streamOnly && obs_frontend_recording_active() && isVisible()) {
 		auto button = QMessageBox::question(this,
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Title")),
 						    QString::fromUtf8(obs_frontend_get_locale_string("ConfirmStopRecord.Text")),
@@ -823,13 +819,13 @@ void OutputDock::StopAll(bool streamOnly, bool recordOnly)
 			return;
 	}
 
-	if (mainStreamButton && !recordOnly && obs_frontend_streaming_active())
+	if (mainStreamEnabled && !recordOnly && obs_frontend_streaming_active())
 		obs_frontend_streaming_stop();
-	if (mainRecordButton && !streamOnly && obs_frontend_recording_active())
+	if (mainRecordEnabled && !streamOnly && obs_frontend_recording_active())
 		obs_frontend_recording_stop();
-	if (mainBacktrackCheckboxButton && !streamOnly && obs_frontend_replay_buffer_active())
+	if (mainBacktrackEnabled && !streamOnly && obs_frontend_replay_buffer_active())
 		obs_frontend_replay_buffer_stop();
-	if (mainVirtualCamButton && !streamOnly && !recordOnly && obs_frontend_virtualcam_active())
+	if (mainVirtualCamEnabled && !streamOnly && !recordOnly && obs_frontend_virtualcam_active())
 		obs_frontend_stop_virtualcam();
 	for (auto &ow : outputWidgets) {
 		if (streamOnly && !ow->IsStream())
