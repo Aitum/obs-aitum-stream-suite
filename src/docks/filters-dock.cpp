@@ -155,7 +155,30 @@ void FiltersDock::ShowFiltersContextMenu(QListWidgetItem *widget_item)
 		if (!f)
 			return;
 
-		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(f)));
+		auto s = obs_filter_get_parent(f);
+		if (!s)
+			return;
+
+		std::string name = obs_source_get_name(f);
+		int i = 2;
+		obs_source_t* existing = nullptr;
+		do {
+			obs_source_release(existing);
+			existing = obs_source_get_filter_by_name(s, name.c_str());
+			if (existing) {
+				name = obs_source_get_name(f);
+				name += " ";
+				name += std::to_string(i);
+			}
+		} while (existing);
+
+		OBSSourceAutoRelease df = obs_source_duplicate(f, name.c_str(), true);
+		if (!df)
+			return;
+
+		obs_source_filter_add(s, df);
+
+		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(df)));
 		properties_dock->parentWidget()->show();
 	});
 	menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Remove")),
