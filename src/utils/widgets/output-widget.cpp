@@ -1,16 +1,16 @@
 #include "output-widget.hpp"
-
+#include <obs-frontend-api.h>
+#include <obs-module.h>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QCheckBox>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
-#include <obs-module.h>
-#include <obs-frontend-api.h>
+#include <src/utils/obs-websocket-api.h>
 #include <util/config-file.h>
 #include <util/platform.h>
-#include <src/utils/obs-websocket-api.h>
 
 extern obs_data_t *current_profile_config;
 
@@ -621,8 +621,19 @@ bool OutputWidget::StartOutput(bool automated)
 
 	if (is_record) {
 		std::string filenameFormat = obs_data_get_string(settings, "filename");
-		if (filenameFormat.empty())
+		if (filenameFormat.empty()) {
 			filenameFormat = "%CCYY-%MM-%DD %hh-%mm-%ss";
+			filenameFormat += " ";
+			QString safeName = QString::fromUtf8(name);
+#ifdef __APPLE__
+			safeName.replace(QRegularExpression("[:]"), "");
+#elif defined(_WIN32)
+			safeName.replace(QRegularExpression("[<>:\"\\|\\?\\*]"), "");
+#else
+			// TODO: Add filtering for other platforms
+#endif
+			filenameFormat += safeName.toStdString();
+		}
 		auto format = obs_data_get_string(settings, "format");
 		if (format[0] == '\0')
 			format = "hybrid_mp4";

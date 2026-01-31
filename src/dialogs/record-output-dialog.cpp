@@ -34,10 +34,20 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 	formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
 	formLayout->setSpacing(12);
 
+	auto filenameFormatEdit = new QLineEdit;
+
 	auto nameField = new QLineEdit;
-	connect(nameField, &QLineEdit::textEdited, [this, nameField, confirmButton] {
+	connect(nameField, &QLineEdit::textEdited, [this, nameField, confirmButton, filenameFormatEdit] {
+		auto oldName = outputName;
 		outputName = nameField->text();
-		validateOutputs(confirmButton);
+		auto spec = QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer"))
+				    .split(QRegularExpression("\n"))
+				    .first();
+		if (filenameFormat.isEmpty() || filenameFormat == spec || filenameFormat == spec + " " + oldName) {
+			filenameFormatEdit->setText(spec + " " + outputName);
+		} else {
+			validateOutputs(confirmButton);
+		}
 	});
 	nameField->setText(QString::fromUtf8(obs_module_text(backtrack ? "BacktrackOutput" : "RecordOutput")));
 	outputName = nameField->text();
@@ -66,7 +76,6 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Simple.SavePath")),
 			   recordPathLayout);
 
-	auto filenameFormatEdit = new QLineEdit;
 	QStringList specList =
 		QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer")).split(QRegularExpression("\n"));
 	filenameFormatEdit->setText(specList.first());
@@ -202,11 +211,21 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
 	formLayout->setSpacing(12);
 
+	auto filenameFormatEdit = new QLineEdit;
+
 	auto nameField = new QLineEdit;
 	nameField->setText(outputName);
-	connect(nameField, &QLineEdit::textEdited, [this, nameField, confirmButton] {
+	connect(nameField, &QLineEdit::textEdited, [this, nameField, filenameFormatEdit, confirmButton] {
+		auto oldName = outputName;
 		outputName = nameField->text();
-		validateOutputs(confirmButton);
+		auto spec = QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer"))
+				    .split(QRegularExpression("\n"))
+				    .first();
+		if (filenameFormat.isEmpty() || filenameFormat == spec || filenameFormat == spec + " " + oldName) {
+			filenameFormatEdit->setText(spec + " " + outputName);
+		} else {
+			validateOutputs(confirmButton);
+		}
 	});
 	formLayout->addRow(QString::fromUtf8(obs_module_text("OutputName")), nameField);
 
@@ -234,7 +253,6 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Simple.SavePath")),
 			   recordPathLayout);
 
-	auto filenameFormatEdit = new QLineEdit;
 	filenameFormatEdit->setText(filenameFormat);
 	QStringList specList =
 		QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer")).split(QRegularExpression("\n"));
