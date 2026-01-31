@@ -44,10 +44,10 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 				    .split(QRegularExpression("\n"))
 				    .first();
 		if (filenameFormat.isEmpty() || filenameFormat == spec || filenameFormat == spec + " " + oldName) {
-			filenameFormatEdit->setText(spec + " " + outputName);
-		} else {
-			validateOutputs(confirmButton);
+			filenameFormat = spec + " " + outputName;
+			filenameFormatEdit->setText(filenameFormat);
 		}
+		validateOutputs(confirmButton);
 	});
 	nameField->setText(QString::fromUtf8(obs_module_text(backtrack ? "BacktrackOutput" : "RecordOutput")));
 	outputName = nameField->text();
@@ -78,7 +78,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 
 	QStringList specList =
 		QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer")).split(QRegularExpression("\n"));
-	filenameFormatEdit->setText(specList.first());
+	filenameFormatEdit->setText(specList.first() + " " + outputName);
 	QCompleter *specCompleter = new QCompleter(specList);
 	specCompleter->setCaseSensitivity(Qt::CaseSensitive);
 	specCompleter->setFilterMode(Qt::MatchContains);
@@ -222,10 +222,10 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 				    .split(QRegularExpression("\n"))
 				    .first();
 		if (filenameFormat.isEmpty() || filenameFormat == spec || filenameFormat == spec + " " + oldName) {
-			filenameFormatEdit->setText(spec + " " + outputName);
-		} else {
-			validateOutputs(confirmButton);
+			filenameFormat = spec + " " + outputName;
+			filenameFormatEdit->setText(filenameFormat);
 		}
+		validateOutputs(confirmButton);
 	});
 	formLayout->addRow(QString::fromUtf8(obs_module_text("OutputName")), nameField);
 
@@ -253,9 +253,13 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Simple.SavePath")),
 			   recordPathLayout);
 
-	filenameFormatEdit->setText(filenameFormat);
 	QStringList specList =
 		QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer")).split(QRegularExpression("\n"));
+	if (filenameFormat.isEmpty())
+		fileFormat = specList.first() + " " + outputName;
+
+	filenameFormatEdit->setText(filenameFormat);
+
 	QCompleter *specCompleter = new QCompleter(specList);
 	specCompleter->setCaseSensitivity(Qt::CaseSensitive);
 	specCompleter->setFilterMode(Qt::MatchContains);
