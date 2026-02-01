@@ -187,33 +187,33 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	if (canvas_name.empty())
 		canvas_name = "Clone";
 
-	canvas = obs_get_canvas_by_uuid(obs_data_get_string(settings, "uuid"));
-	if (canvas) {
-		if (obs_canvas_removed(canvas)) {
-			obs_canvas_release(canvas);
-			canvas = nullptr;
-		} else if (obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
-			obs_frontend_remove_canvas(canvas);
-			obs_canvas_remove(canvas);
-			obs_canvas_release(canvas);
-			canvas = nullptr;
-		} else {
-			std::string name = obs_canvas_get_name(canvas);
-			if (name != canvas_name) {
-				obs_canvas_set_name(canvas, canvas_name.c_str());
-			}
-		}
+	canvas = obs_get_canvas_by_name(canvas_name.c_str());
+	if (canvas && obs_canvas_removed(canvas)) {
+		obs_canvas_release(canvas);
+		canvas = nullptr;
+	} else if (canvas && obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
+		obs_frontend_remove_canvas(canvas);
+		obs_canvas_remove(canvas);
+		obs_canvas_release(canvas);
+		canvas = nullptr;
 	}
 	if (!canvas) {
-		canvas = obs_get_canvas_by_name(canvas_name.c_str());
-		if (canvas && obs_canvas_removed(canvas)) {
-			obs_canvas_release(canvas);
-			canvas = nullptr;
-		} else if (canvas && obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
-			obs_frontend_remove_canvas(canvas);
-			obs_canvas_remove(canvas);
-			obs_canvas_release(canvas);
-			canvas = nullptr;
+		canvas = obs_get_canvas_by_uuid(obs_data_get_string(settings, "uuid"));
+		if (canvas) {
+			if (obs_canvas_removed(canvas)) {
+				obs_canvas_release(canvas);
+				canvas = nullptr;
+			} else if (obs_canvas_get_flags(canvas) != (ACTIVATE | SCENE_REF | EPHEMERAL)) {
+				obs_frontend_remove_canvas(canvas);
+				obs_canvas_remove(canvas);
+				obs_canvas_release(canvas);
+				canvas = nullptr;
+			} else {
+				std::string name = obs_canvas_get_name(canvas);
+				if (name != canvas_name) {
+					obs_canvas_set_name(canvas, canvas_name.c_str());
+				}
+			}
 		}
 	}
 	if (canvas) {
