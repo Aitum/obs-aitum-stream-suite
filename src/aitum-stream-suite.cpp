@@ -303,9 +303,13 @@ void reset_live_dock_state()
 		canvas_dock->reset_live_state();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
-		left_docks.append(d);
-		left_dock_sizes.append(1);
+		if (left_docks.isEmpty()) {
+			main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+			left_docks.append(d);
+			left_dock_sizes.append(1);
+		} else {
+			main_window->tabifyDockWidget(left_docks.first(), d);
+		}
 	}
 
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
@@ -314,9 +318,13 @@ void reset_live_dock_state()
 		canvas_clone_dock->reset_live_state();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
-		left_docks.append(d);
-		left_dock_sizes.append(1);
+		if (left_docks.isEmpty()) {
+			main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+			left_docks.append(d);
+			left_dock_sizes.append(1);
+		} else {
+			main_window->tabifyDockWidget(left_docks.first(), d);
+		}
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
@@ -429,9 +437,13 @@ void reset_build_dock_state()
 		canvas_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
-		right_dock_sizes.append(1);
+		if (right_docks.isEmpty()) {
+			main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+			right_docks.append(d);
+			right_dock_sizes.append(1);
+		} else {
+			main_window->tabifyDockWidget(right_docks.first(), d);
+		}
 	}
 
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
@@ -440,9 +452,13 @@ void reset_build_dock_state()
 		canvas_clone_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, d);
-		right_docks.append(d);
-		right_dock_sizes.append(1);
+		if (right_docks.isEmpty()) {
+			main_window->addDockWidget(Qt::RightDockWidgetArea, d);
+			right_docks.append(d);
+			right_dock_sizes.append(1);
+		} else {
+			main_window->tabifyDockWidget(right_docks.first(), d);
+		}
 	}
 
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
@@ -1283,6 +1299,8 @@ bool obs_module_load(void)
 
 	modesTabBar = new QTabBar();
 	modesTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+	modesTabBar->setMovable(true);
+
 	toolbar = new TabToolBar(modesTabBar);
 	toolbar->setObjectName(QStringLiteral("AitumToolbar"));
 	main_window->addToolBar(toolbar);
