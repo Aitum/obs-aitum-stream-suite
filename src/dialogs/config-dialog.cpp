@@ -1461,7 +1461,7 @@ void OBSBasicSettings::SetCreateType(const char *create_type)
 	} else if (strcmp(create_type, "record") == 0) {
 		AddRecord(false);
 	} else if (strcmp(create_type, "backtrack") == 0) {
-		AddRecord(false);
+		AddRecord(true);
 	} else if (strcmp(create_type, "virtual_cam") == 0) {
 		AddVirtualCam();
 	}
