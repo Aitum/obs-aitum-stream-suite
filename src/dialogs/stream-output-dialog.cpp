@@ -384,6 +384,11 @@ StreamOutputDialog::StreamOutputDialog(QDialog *parent, QString name, QString se
 	show();
 }
 
+StreamOutputDialog::~StreamOutputDialog()
+{
+	obs_data_array_release(servicesData);
+}
+
 QWidget *StreamOutputDialog::WizardServicePage()
 {
 	auto page = new QWidget(this);
