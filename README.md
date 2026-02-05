@@ -1,4 +1,4 @@
-# Aitum Stream Suite for OBS Studio
+# Aitum Stream Suite plugin
 
 Plugin for [OBS Studio](https://github.com/obsproject/obs-studio) to add [![Aitum logo](media/aitum.png) Aitum](https://aitum.tv)
 
