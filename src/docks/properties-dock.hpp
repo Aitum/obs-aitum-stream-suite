@@ -11,12 +11,8 @@
 class PropertiesDock : public QFrame {
 	Q_OBJECT
 private:
-	QComboBox *canvasCombo = nullptr;
 	QLabel *sourceLabel = nullptr;
 
-	obs_weak_canvas_t *current_canvas = nullptr;
-	obs_weak_source_t *current_transition = nullptr;
-	obs_weak_source_t *current_scene = nullptr;
 	obs_weak_source_t *current_source = nullptr;
 	obs_weak_source_t *current_properties = nullptr;
 
@@ -30,7 +26,6 @@ private:
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
 
 	static void canvas_create(void *param, calldata_t *cd);
-	static void canvas_destroy(void *param, calldata_t *cd);
 	static void canvas_channel_change(void *param, calldata_t *cd);
 	static void transition_start(void *param, calldata_t *cd);
 	static void transition_stop(void *param, calldata_t *cd);
@@ -38,10 +33,11 @@ private:
 	static void scene_item_deselect(void *param, calldata_t *cd);
 	static void scene_item_remove(void *param, calldata_t *cd);
 	static void scene_item_add(void *param, calldata_t *cd);
+	static void scene_item_transform(void *param, calldata_t *cd);
+	static void scene_item_locked(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void properties_remove(void *param, calldata_t *cd);
 	static void update_properties(void *param, calldata_t *cd);
-	static void frontend_event(enum obs_frontend_event event, void *param);
 
 private slots:
 	void SceneChanged(OBSSource scene);

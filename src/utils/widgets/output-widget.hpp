@@ -4,6 +4,8 @@
 #include <QFrame>
 #include <QLabel>
 #include <QPushButton>
+#include <QTimer>
+#include <QDateTime>
 
 class OutputWidget : public QFrame {
 	Q_OBJECT
@@ -18,6 +20,9 @@ private:
 
 	std::function<void()> onStarted = nullptr;
 
+	QTimer activeTimer;
+	QDateTime startTime;
+
 	obs_hotkey_pair_id StartStopHotkey = OBS_INVALID_HOTKEY_PAIR_ID;
 	obs_hotkey_id extraHotkey = OBS_INVALID_HOTKEY_ID;
 	obs_hotkey_id splitHotkey = OBS_INVALID_HOTKEY_ID;
@@ -30,6 +35,7 @@ private:
 
 	static void output_stop(void *data, calldata_t *calldata);
 	static void output_start(void *data, calldata_t *calldata);
+	static void replay_saved(void *data, calldata_t *calldata);
 	static bool EncoderAvailable(const char *encoder);
 	static void ensure_directory(char *path);
 

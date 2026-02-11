@@ -95,9 +95,13 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			ovi.base_width = canvas_width;
 			ovi.output_height = canvas_height;
 			ovi.output_width = canvas_width;
-			obs_canvas_reset_video(canvas, &ovi);
-			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
-			     canvas_width, canvas_height);
+			if (obs_canvas_reset_video(canvas, &ovi)) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
+				     canvas_width, canvas_height);
+			} else {
+				blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s'",
+				     obs_canvas_get_name(canvas));
+			}
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
@@ -5254,8 +5258,12 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 			if (!window->canvas) {
 				window->canvas = obs_frontend_add_canvas(window->canvas_name.c_str(), &ovi, SCENE_REF);
 				blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s'", window->canvas_name.c_str());
+			} else if (obs_canvas_reset_video(window->canvas, &ovi)) {
+				blog(LOG_INFO, "[Aitum Stream Suite] Reset video on canvas '%s' to %ux%u",
+				     obs_canvas_get_name(window->canvas), ovi.base_width, ovi.base_height);
 			} else {
-				obs_canvas_reset_video(window->canvas, &ovi);
+				blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s'",
+				     obs_canvas_get_name(window->canvas));
 			}
 			auto sh = obs_canvas_get_signal_handler(window->canvas);
 			signal_handler_disconnect(sh, "source_add", source_add, window);
@@ -5337,9 +5345,12 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 		ovi.base_width = canvas_width;
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
-		obs_canvas_reset_video(canvas, &ovi);
-		blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas), canvas_width,
-		     canvas_height);
+		if (obs_canvas_reset_video(canvas, &ovi)) {
+			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
+			     canvas_width, canvas_height);
+		} else {
+			blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s'", obs_canvas_get_name(canvas));
+		}
 	}
 }
 

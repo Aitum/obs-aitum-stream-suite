@@ -1,5 +1,6 @@
 #include "filters-dock.hpp"
 #include "properties-dock.hpp"
+#include "transform-dock.hpp"
 #include <obs.h>
 #include <obs-module.h>
 #include <QCheckBox>
@@ -21,12 +22,12 @@
 #include <src/utils/widgets/double-slider.hpp>
 
 extern FiltersDock *filters_dock;
+extern TransformDock *transform_dock;
 
 PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 {
 	auto sh = obs_get_signal_handler();
 	signal_handler_connect(sh, "canvas_create", canvas_create, this);
-	signal_handler_connect(sh, "canvas_destroy", canvas_destroy, this);
 	auto ml = new QVBoxLayout;
 	setLayout(ml);
 
@@ -41,94 +42,52 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 	scrollWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	scrollWidget->setLayout(vl);
 	scrollArea->setWidget(scrollWidget);
-	auto hl = new QHBoxLayout;
-	vl->addLayout(hl);
 
-	canvasCombo = new QComboBox;
 	auto mc = obs_get_main_canvas();
-	current_canvas = obs_canvas_get_weak_canvas(mc);
-	canvasCombo->addItem(QString::fromUtf8(obs_canvas_get_name(mc)));
 	signal_handler_connect(obs_canvas_get_signal_handler(mc), "channel_change", canvas_channel_change, this);
 	obs_canvas_release(mc);
-	hl->addWidget(canvasCombo);
-
-	connect(canvasCombo, &QComboBox::currentTextChanged, [this] {
-		auto canvas = obs_get_canvas_by_name(canvasCombo->currentText().toUtf8().constData());
-		if (!canvas)
-			return;
-		if (obs_canvas_removed(canvas)) {
-			obs_canvas_release(canvas);
-			return;
-		}
-
-		if (current_canvas) {
-			auto prev_canvas = obs_weak_canvas_get_canvas(current_canvas);
-			if (prev_canvas == canvas) {
-				obs_canvas_release(prev_canvas);
-				obs_canvas_release(canvas);
-				return;
-			}
-			if (prev_canvas) {
-				signal_handler_disconnect(obs_canvas_get_signal_handler(prev_canvas), "channel_change",
-							  canvas_channel_change, this);
-				obs_canvas_release(prev_canvas);
-			}
-			obs_weak_canvas_release(current_canvas);
-		}
-		current_canvas = obs_canvas_get_weak_canvas(canvas);
-
-		signal_handler_connect(obs_canvas_get_signal_handler(canvas), "channel_change", canvas_channel_change, this);
-		auto source = obs_canvas_get_channel(canvas, 0);
-		if (source) {
-			auto source_type = obs_source_get_type(source);
-			if (source_type == OBS_SOURCE_TYPE_SCENE) {
-				QMetaObject::invokeMethod(this, "SceneChanged", Q_ARG(OBSSource, OBSSource(source)));
-			} else if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
-				QMetaObject::invokeMethod(this, "TransitionChanged", Q_ARG(OBSSource, OBSSource(source)));
-			}
-			obs_source_release(source);
-		}
-		obs_canvas_release(canvas);
-	});
 
 	sourceLabel = new QLabel(QString::fromUtf8(obs_module_text("NoSourceSelected")));
-	hl->addWidget(sourceLabel);
+	vl->addWidget(sourceLabel);
 
 	layout = new QFormLayout;
 	vl->addLayout(layout);
 	//QWidget *spacer = new QWidget();
 	//spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	//vl->addWidget(spacer);
-
-	obs_frontend_add_event_callback(frontend_event, this);
 }
 
 PropertiesDock::~PropertiesDock()
 {
+	if (current_source) {
+		auto prev_source = obs_weak_source_get_source(current_source);
+		if (prev_source) {
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", source_remove, this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", source_remove, this);
+			obs_source_release(prev_source);
+		}
+		obs_weak_source_release(current_source);
+	}
+	if (current_properties) {
+		auto prev_source = obs_weak_source_get_source(current_properties);
+		if (prev_source) {
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "update_properties",
+						  update_properties, this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", properties_remove, this);
+			signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", properties_remove, this);
+			obs_source_release(prev_source);
+		}
+		obs_weak_source_release(current_properties);
+	}
 	auto sh = obs_get_signal_handler();
 	signal_handler_disconnect(sh, "canvas_create", canvas_create, this);
-	signal_handler_disconnect(sh, "canvas_destroy", canvas_destroy, this);
-	obs_frontend_remove_event_callback(frontend_event, this);
 }
 
 void PropertiesDock::canvas_create(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
 	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
-	auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
-	QMetaObject::invokeMethod(this_, [canvas_name, this_] { this_->canvasCombo->addItem(canvas_name); });
-}
-
-void PropertiesDock::canvas_destroy(void *param, calldata_t *cd)
-{
-	auto this_ = static_cast<PropertiesDock *>(param);
-	auto canvas = (obs_canvas_t *)calldata_ptr(cd, "canvas");
-	auto canvas_name = QString::fromUtf8(obs_canvas_get_name(canvas));
-	QMetaObject::invokeMethod(this_, [canvas_name, this_] {
-		auto idx = this_->canvasCombo->findText(canvas_name);
-		if (idx >= 0)
-			this_->canvasCombo->removeItem(idx);
-	});
+	signal_handler_connect(obs_canvas_get_signal_handler(canvas), "channel_change", canvas_channel_change, this_);
 }
 
 void PropertiesDock::canvas_channel_change(void *param, calldata_t *cd)
@@ -162,6 +121,7 @@ void PropertiesDock::scene_item_select(void *param, calldata_t *cd)
 				  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
 	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection,
 				  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
+	QMetaObject::invokeMethod(transform_dock, "setItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, OBSSceneItem(item)));
 }
 
 void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
@@ -174,18 +134,14 @@ void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 		QMetaObject::invokeMethod(filters_dock, "SourceDeselected", Qt::QueuedConnection,
 					  Q_ARG(OBSSource, obs_sceneitem_get_source(item)));
 	}
+	QMetaObject::invokeMethod(transform_dock, "unsetItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, item));
 }
 
 void PropertiesDock::scene_item_remove(void *param, calldata_t *cd)
 {
 	UNUSED_PARAMETER(param);
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
-	if (obs_sceneitem_is_group(item)) {
-		auto group = obs_sceneitem_get_source(item);
-		auto gsh = obs_source_get_signal_handler(group);
-		signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
-		signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
-	}
+	QMetaObject::invokeMethod(transform_dock, "unsetItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, item));
 }
 
 void PropertiesDock::scene_item_add(void *param, calldata_t *cd)
@@ -195,54 +151,35 @@ void PropertiesDock::scene_item_add(void *param, calldata_t *cd)
 	if (obs_sceneitem_is_group(item)) {
 		auto group = obs_sceneitem_get_source(item);
 		auto gsh = obs_source_get_signal_handler(group);
+		signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
+		signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
+		signal_handler_disconnect(gsh, "item_transform", scene_item_transform, param);
+		signal_handler_disconnect(gsh, "item_locked", scene_item_locked, param);
 		signal_handler_connect(gsh, "item_select", scene_item_select, param);
 		signal_handler_connect(gsh, "item_deselect", scene_item_deselect, param);
+		signal_handler_connect(gsh, "item_transform", scene_item_transform, param);
+		signal_handler_connect(gsh, "item_locked", scene_item_locked, param);
 	}
 }
 
 void PropertiesDock::SceneChanged(OBSSource scene)
 {
-	if (current_scene) {
-		if (obs_weak_source_references_source(current_scene, scene))
-			return;
-		auto prev_scene = obs_weak_source_get_source(current_scene);
-		if (prev_scene) {
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_select", scene_item_select,
-						  this);
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_deselect", scene_item_deselect,
-						  this);
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_remove", scene_item_remove,
-						  this);
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_scene), "item_add", scene_item_add, this);
-
-			obs_scene_enum_items(
-				obs_scene_from_source(prev_scene),
-				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
-					UNUSED_PARAMETER(scene);
-					if (!obs_sceneitem_is_group(item))
-						return true;
-					auto group = obs_sceneitem_get_source(item);
-					auto gsh = obs_source_get_signal_handler(group);
-					signal_handler_disconnect(gsh, "item_select", scene_item_select, param);
-					signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, param);
-					return true;
-				},
-				this);
-			obs_source_release(prev_scene);
-		}
-
-		obs_weak_source_release(current_scene);
-	}
-	if (!scene || obs_source_removed(scene)) {
-		current_scene = nullptr;
+	if (!scene || obs_source_removed(scene))
 		return;
-	}
-	current_scene = obs_source_get_weak_source(scene);
-	signal_handler_connect(obs_source_get_signal_handler(scene), "item_select", scene_item_select, this);
-	signal_handler_connect(obs_source_get_signal_handler(scene), "item_deselect", scene_item_deselect, this);
-	signal_handler_connect(obs_source_get_signal_handler(scene), "item_remove", scene_item_remove, this);
-	signal_handler_connect(obs_source_get_signal_handler(scene), "item_add", scene_item_add, this);
-	QMetaObject::invokeMethod(this, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(nullptr)));
+	auto ssh = obs_source_get_signal_handler(scene);
+	signal_handler_disconnect(ssh, "item_select", scene_item_select, this);
+	signal_handler_disconnect(ssh, "item_deselect", scene_item_deselect, this);
+	signal_handler_disconnect(ssh, "item_remove", scene_item_remove, this);
+	signal_handler_disconnect(ssh, "item_add", scene_item_add, this);
+	signal_handler_disconnect(ssh, "item_transform", scene_item_transform, this);
+	signal_handler_disconnect(ssh, "item_locked", scene_item_locked, this);
+	signal_handler_connect(ssh, "item_select", scene_item_select, this);
+	signal_handler_connect(ssh, "item_deselect", scene_item_deselect, this);
+	signal_handler_connect(ssh, "item_remove", scene_item_remove, this);
+	signal_handler_connect(ssh, "item_add", scene_item_add, this);
+	signal_handler_connect(ssh, "item_transform", scene_item_transform, this);
+	signal_handler_connect(ssh, "item_locked", scene_item_locked, this);
+	QMetaObject::invokeMethod(this, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(scene)));
 	QMetaObject::invokeMethod(filters_dock, "SourceChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(scene)));
 	obs_scene_enum_items(
 		obs_scene_from_source(scene),
@@ -252,14 +189,22 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 			if (obs_sceneitem_is_group(item)) {
 				auto group = obs_sceneitem_get_source(item);
 				auto gsh = obs_source_get_signal_handler(group);
+				signal_handler_disconnect(gsh, "item_select", scene_item_select, this_);
+				signal_handler_disconnect(gsh, "item_deselect", scene_item_deselect, this_);
+				signal_handler_disconnect(gsh, "item_transform", scene_item_transform, this_);
+				signal_handler_disconnect(gsh, "item_locked", scene_item_locked, this_);
 				signal_handler_connect(gsh, "item_select", scene_item_select, this_);
 				signal_handler_connect(gsh, "item_deselect", scene_item_deselect, this_);
+				signal_handler_connect(gsh, "item_transform", scene_item_transform, this_);
+				signal_handler_connect(gsh, "item_locked", scene_item_locked, this_);
 				return true;
 			}
 			if (!obs_sceneitem_selected(item))
 				return true;
 			QMetaObject::invokeMethod(this_, "SourceChanged", Qt::QueuedConnection,
 						  Q_ARG(OBSSource, OBSSource(obs_sceneitem_get_source(item))));
+			QMetaObject::invokeMethod(transform_dock, "setItem", Qt::QueuedConnection,
+						  Q_ARG(OBSSceneItem, OBSSceneItem(item)));
 			return true;
 		},
 		this);
@@ -267,43 +212,24 @@ void PropertiesDock::SceneChanged(OBSSource scene)
 
 void PropertiesDock::TransitionChanged(OBSSource transition)
 {
-	if (current_transition) {
-		if (obs_weak_source_references_source(current_transition, transition)) {
-			auto active_source = obs_transition_get_active_source(transition);
-			if (active_source) {
-				if (obs_source_get_type(active_source) == OBS_SOURCE_TYPE_SCENE) {
-					QMetaObject::invokeMethod(this, "SceneChanged", Q_ARG(OBSSource, OBSSource(active_source)));
-				}
-				obs_source_release(active_source);
-			}
-			return;
-		}
-
-		auto prev_transition = obs_weak_source_get_source(current_transition);
-		if (prev_transition) {
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_start",
-						  transition_start, this);
-			signal_handler_disconnect(obs_source_get_signal_handler(prev_transition), "transition_stop",
-						  transition_stop, this);
-			obs_source_release(prev_transition);
-		}
-
-		obs_weak_source_release(current_transition);
-	}
-	if (!transition || obs_source_removed(transition)) {
-		current_transition = nullptr;
+	if (!transition || obs_source_removed(transition))
 		return;
-	}
-	current_transition = obs_source_get_weak_source(transition);
+
 	auto active_source = obs_transition_get_active_source(transition);
 	if (active_source) {
 		if (obs_source_get_type(active_source) == OBS_SOURCE_TYPE_SCENE) {
 			QMetaObject::invokeMethod(this, "SceneChanged", Q_ARG(OBSSource, OBSSource(active_source)));
+		} else if (obs_source_get_type(active_source) == OBS_SOURCE_TYPE_TRANSITION) {
+			QMetaObject::invokeMethod(this, "TransitionChanged", Qt::QueuedConnection,
+						  Q_ARG(OBSSource, OBSSource(active_source)));
 		}
 		obs_source_release(active_source);
 	}
-	signal_handler_connect(obs_source_get_signal_handler(transition), "transition_start", transition_start, this);
-	signal_handler_connect(obs_source_get_signal_handler(transition), "transition_stop", transition_stop, this);
+	auto tsh = obs_source_get_signal_handler(transition);
+	signal_handler_disconnect(tsh, "transition_start", transition_start, this);
+	signal_handler_disconnect(tsh, "transition_stop", transition_stop, this);
+	signal_handler_connect(tsh, "transition_start", transition_start, this);
+	signal_handler_connect(tsh, "transition_stop", transition_stop, this);
 }
 
 void PropertiesDock::transition_start(void *param, calldata_t *cd)
@@ -345,13 +271,11 @@ void PropertiesDock::SourceChanged(OBSSource source)
 		obs_weak_source_release(current_source);
 	}
 	if (!source) {
-		sourceLabel->setText(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 		current_source = nullptr;
 		LoadProperties(nullptr);
 		return;
 	}
 	current_source = obs_source_get_weak_source(source);
-	sourceLabel->setText(QString::fromUtf8(obs_source_get_name(source)));
 
 	signal_handler_connect(obs_source_get_signal_handler(source), "remove", source_remove, this);
 	signal_handler_connect(obs_source_get_signal_handler(source), "destroy", source_remove, this);
@@ -385,10 +309,23 @@ void PropertiesDock::LoadProperties(OBSSource source)
 		properties = nullptr;
 	}
 	if (!source) {
+		sourceLabel->setText(QString::fromUtf8(obs_module_text("NoSourceSelected")));
 		current_properties = nullptr;
 		return;
 	}
 	current_properties = obs_source_get_weak_source(source);
+
+	if (obs_source_get_type(source) == OBS_SOURCE_TYPE_FILTER) {
+		auto parent = obs_filter_get_parent(source);
+		if (parent) {
+			sourceLabel->setText(QString::fromUtf8(obs_source_get_name(parent)) + QString::fromUtf8(" → ") +
+					     QString::fromUtf8(obs_source_get_name(source)));
+		} else {
+			sourceLabel->setText(QString::fromUtf8(obs_source_get_name(source)));
+		}
+	} else {
+		sourceLabel->setText(QString::fromUtf8(obs_source_get_name(source)));
+	}
 
 	properties = obs_source_properties(source);
 	if (!properties)
@@ -1051,31 +988,19 @@ void PropertiesDock::RefreshProperties(obs_properties_t *properties, QFormLayout
 	}
 }
 
-void PropertiesDock::frontend_event(enum obs_frontend_event event, void *param)
+void PropertiesDock::scene_item_transform(void *param, calldata_t *cd)
 {
-	if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED || event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
-		auto this_ = static_cast<PropertiesDock *>(param);
-		if (this_->current_canvas) {
-			auto canvas = obs_weak_canvas_get_canvas(this_->current_canvas);
-			if (canvas) {
-				auto source = obs_canvas_get_channel(canvas, 0);
-				if (source) {
-					auto source_type = obs_source_get_type(source);
-					if (source_type == OBS_SOURCE_TYPE_SCENE) {
-						QMetaObject::invokeMethod(this_, "SceneChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
-					} else if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
-						QMetaObject::invokeMethod(this_, "TransitionChanged", Qt::QueuedConnection, Q_ARG(OBSSource, OBSSource(source)));
-					}
-					obs_source_release(source);
-				}
-				obs_canvas_release(canvas);
-			}
-		}
-	} else if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN || event == OBS_FRONTEND_EVENT_EXIT) {
-		auto this_ = static_cast<PropertiesDock *>(param);
-		if (this_->current_canvas) {
-			obs_weak_canvas_release(this_->current_canvas);
-			this_->current_canvas = nullptr;
-		}
-	}
+	UNUSED_PARAMETER(param);
+	//auto this_ = static_cast<PropertiesDock *>(param);
+	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
+	QMetaObject::invokeMethod(transform_dock, "sceneItemTransform", Qt::QueuedConnection,
+				  Q_ARG(OBSSceneItem, OBSSceneItem(item)));
+}
+
+void PropertiesDock::scene_item_locked(void *param, calldata_t *cd)
+{
+	UNUSED_PARAMETER(param);
+	//auto this_ = static_cast<PropertiesDock *>(param);
+	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
+	QMetaObject::invokeMethod(transform_dock, "sceneItemLocked", Qt::QueuedConnection, Q_ARG(OBSSceneItem, OBSSceneItem(item)));
 }

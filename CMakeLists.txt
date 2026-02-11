@@ -80,7 +80,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/docks/output-dock.cpp
   src/docks/output-dock.hpp
   src/docks/properties-dock.cpp
-  src/docks/properties-dock.hpp)
+  src/docks/properties-dock.hpp
+  src/docks/transform-dock.cpp
+  src/docks/transform-dock.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/config-dialog.cpp
@@ -98,6 +100,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/file-download.c
   src/utils/icon.cpp
   src/utils/obs-websocket.cpp
+  src/utils/widgets/accessible-alignment-cell.cpp
+  src/utils/widgets/accessible-alignment-selector.cpp
+  src/utils/widgets/alignment-selector.cpp
   src/utils/widgets/capture-widget.cpp
   src/utils/widgets/double-slider.cpp
   src/utils/widgets/hotkey-edit.cpp
@@ -116,6 +121,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/event-filter.hpp
   src/utils/file-download.h
   src/utils/icon.hpp
+  src/utils/widgets/accessible-alignment-cell.hpp
+  src/utils/widgets/accessible-alignment-selector.hpp
+  src/utils/widgets/alignment-selector.hpp
   src/utils/widgets/capture-widget.hpp
   src/utils/widgets/double-slider.hpp
   src/utils/widgets/hotkey-edit.hpp

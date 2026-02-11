@@ -8,6 +8,7 @@
 #include "docks/live-scenes-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
+#include "docks/transform-dock.hpp"
 #include "utils/file-download.h"
 #include "utils/icon.hpp"
 #include "utils/obs-websocket-api.h"
@@ -43,6 +44,7 @@ OBSBasicSettings *configDialog = nullptr;
 OutputDock *output_dock = nullptr;
 PropertiesDock *properties_dock = nullptr;
 FiltersDock *filters_dock = nullptr;
+TransformDock *transform_dock = nullptr;
 LiveScenesDock *live_scenes_dock = nullptr;
 CanvasDock *component_dock = nullptr;
 
@@ -290,6 +292,10 @@ void reset_live_dock_state()
 	if (d)
 		d->setVisible(false);
 
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteTransform"));
+	if (d)
+		d->setVisible(false);
+
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
 	if (d)
 		d->setVisible(false);
@@ -391,6 +397,15 @@ void reset_build_dock_state()
 	QList<int> bottom_dock_sizes;
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::BottomDockWidgetArea, d);
+		bottom_docks.append(d);
+		bottom_dock_sizes.append(2);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteTransform"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -1023,6 +1038,12 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		obs_frontend_source_list_free(&transitions);
 
 		load_current_profile_config();
+		auto scene = obs_frontend_get_current_scene();
+		if (scene) {
+			QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+						  Q_ARG(OBSSource, OBSSource(scene)));
+			obs_source_release(scene);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		DestroyPanelCookieManager();
 		load_browser_panels();
@@ -1096,6 +1117,13 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			}
 			obs_frontend_source_list_free(&transitions);
 			load_current_profile_config();
+
+			auto scene = obs_frontend_get_current_scene();
+			if (scene) {
+				QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+							  Q_ARG(OBSSource, OBSSource(scene)));
+				obs_source_release(scene);
+			}
 		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING) {
 		scene_collection_changing = true;
@@ -1528,6 +1556,8 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteProperties", obs_module_text("AitumStreamSuiteProperties"), properties_dock);
 	filters_dock = new FiltersDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteFilters", obs_module_text("AitumStreamSuiteFilters"), filters_dock);
+	transform_dock = new TransformDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteTransform", obs_module_text("AitumStreamSuiteTransform"), transform_dock);
 	live_scenes_dock = new LiveScenesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteLiveScenes", obs_module_text("AitumStreamSuiteLiveScenes"), live_scenes_dock);
 	auto capture_dock = new CaptureDock(main_window);
@@ -1659,6 +1689,19 @@ void obs_module_unload()
 		obs_data_release(current_profile_config);
 		current_profile_config = nullptr;
 	}
+
+	obs_frontend_remove_dock("AitumStreamSuiteOutput");
+	obs_frontend_remove_dock("AitumStreamSuiteProperties");
+	obs_frontend_remove_dock("AitumStreamSuiteFilters");
+	obs_frontend_remove_dock("AitumStreamSuiteTransform");
+	obs_frontend_remove_dock("AitumStreamSuiteLiveScenes");
+	obs_frontend_remove_dock("AitumStreamSuiteCapture");
+
+	obs_frontend_remove_dock("AitumStreamSuiteChat");
+	obs_frontend_remove_dock("AitumStreamSuiteActivity");
+	obs_frontend_remove_dock("AitumStreamSuiteInfo");
+	obs_frontend_remove_dock("AitumStreamSuitePortal");
+
 	if (output_dock) {
 		delete output_dock;
 	}

@@ -894,7 +894,18 @@ void CanvasCloneDock::source_remove(void *param, calldata_t *cd)
 {
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	auto this_ = (CanvasCloneDock *)param;
+	pthread_mutex_lock(&this_->replace_sources_mutex);
+	for (auto it = this_->replace_sources.begin(); it != this_->replace_sources.end();) {
+		if (it->first == source || obs_weak_source_references_source(it->second, source)) {
+			obs_weak_source_release(it->second);
+			it = this_->replace_sources.erase(it);
+		} else {
+			++it;
+		}
+	}
+	pthread_mutex_unlock(&this_->replace_sources_mutex);
 	this_->RemoveSource(QString::fromUtf8(obs_source_get_name(source)));
+	
 }
 
 void CanvasCloneDock::source_rename(void *param, calldata_t *cd)
@@ -915,6 +926,7 @@ void CanvasCloneDock::RemoveSource(QString source_name)
 		if (index >= 0)
 			it->second->removeItem(index);
 	}
+	
 }
 
 void CanvasCloneDock::SaveSettings(bool closing, QString mode)

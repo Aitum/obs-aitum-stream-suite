@@ -3,6 +3,7 @@
 #include <obs-module.h>
 #include <QCheckBox>
 #include <QHBoxLayout>
+#include <QTime>
 #include <QLabel>
 #include <QMessageBox>
 #include <QRegularExpression>
@@ -123,7 +124,7 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		extraButton->setCheckable(true);
 		extraButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
 		extraButton->setStyleSheet(QString::fromUtf8(
-			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}"));
+			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{min-width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}"));
 		extraButton->setToolTip(QString::fromUtf8(obs_module_text("SaveBacktrack")));
 
 		connect(extraButton, &QPushButton::clicked, [this] {
@@ -268,6 +269,11 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 	obs_hotkey_pair_load(StartStopHotkey, start_hotkey, stop_hotkey);
 	obs_data_array_release(start_hotkey);
 	obs_data_array_release(stop_hotkey);
+
+	connect(&activeTimer, &QTimer::timeout, this, [this] {
+		auto t = QTime::fromMSecsSinceStartOfDay(startTime.msecsTo(QDateTime::currentDateTime()));
+		(extraButton ? extraButton : outputButton)->setText(t.toString(t.hour() ? "hh:mm:ss" : "mm:ss"));
+	});
 }
 
 OutputWidget::~OutputWidget()
@@ -304,6 +310,13 @@ void OutputWidget::output_start(void *data, calldata_t *calldata)
 	if (this_->outputButton->isChecked())
 		return;
 	QMetaObject::invokeMethod(this_->outputButton, [this_] { this_->outputButton->setChecked(true); }, Qt::QueuedConnection);
+}
+
+void OutputWidget::replay_saved(void *data, calldata_t *calldata)
+{
+	UNUSED_PARAMETER(calldata);
+	auto this_ = (OutputWidget *)data;
+	QMetaObject::invokeMethod(this_->extraButton, [this_] { this_->startTime = QDateTime::currentDateTime(); });
 }
 
 extern obs_websocket_vendor vendor;
@@ -743,8 +756,12 @@ bool OutputWidget::StartOutput(bool automated)
 	signal_handler_t *signal = obs_output_get_signal_handler(output);
 	signal_handler_disconnect(signal, "start", output_start, this);
 	signal_handler_disconnect(signal, "stop", output_stop, this);
+	if (extraButton)
+		signal_handler_disconnect(signal, "saved", replay_saved, this);
 	signal_handler_connect(signal, "start", output_start, this);
 	signal_handler_connect(signal, "stop", output_stop, this);
+	if (extraButton)
+		signal_handler_connect(signal, "saved", replay_saved, this);
 
 	for (size_t i = 0; i < vencs.size(); i++) {
 		obs_output_set_video_encoder2(output, vencs[i], i);
@@ -1032,7 +1049,19 @@ void OutputWidget::CheckActive()
 {
 	bool active = obs_output_active(output);
 	if (outputButton->isChecked() != active)
-		this->outputButton->setChecked(active);
+		outputButton->setChecked(active);
+	if (activeTimer.isActive() != active) {
+		if (active) {
+			startTime = QDateTime::currentDateTime();
+			activeTimer.start();
+		} else {
+			activeTimer.stop();
+			if (extraButton)
+				extraButton->setText("");
+			else
+				outputButton->setText("");
+		}
+	}
 }
 
 void OutputWidget::SaveSettings()
