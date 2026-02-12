@@ -456,6 +456,7 @@ void vendor_request_get_docks(obs_data_t *request_data, obs_data_t *response_dat
 			for (auto &dock : docks) {
 				auto di = obs_data_create();
 				obs_data_set_string(di, "name", dock->objectName().toUtf8().constData());
+				obs_data_set_string(di, "title", dock->windowTitle().toUtf8().constData());
 				obs_data_set_bool(di, "visible", dock->isVisible());
 				obs_data_set_bool(di, "floating", dock->isFloating());
 				obs_data_array_push_back(da, di);

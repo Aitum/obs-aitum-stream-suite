@@ -671,7 +671,9 @@ void load_canvas()
 				ccd->UpdateSettings(t);
 			} else {
 				ccd = new CanvasCloneDock(t, main_window);
-				if (obs_frontend_add_dock_by_id(name, name, ccd)) {
+				std::string title = "🧬 ";
+				title += name;
+				if (obs_frontend_add_dock_by_id(name, title.c_str(), ccd)) {
 					canvas_clone_docks.push_back(ccd);
 					if (!obs_data_get_bool(t, "has_loaded")) {
 						ccd->parentWidget()->show();
@@ -718,7 +720,9 @@ void load_canvas()
 				cd->UpdateSettings(t);
 			} else {
 				cd = new CanvasDock(t, main_window);
-				if (obs_frontend_add_dock_by_id(name, name, cd)) {
+				std::string title = "🖼️ ";
+				title += name;
+				if (obs_frontend_add_dock_by_id(name, title.c_str(), cd)) {
 					canvas_docks.push_back(cd);
 					if (!obs_data_get_bool(t, "has_loaded")) {
 						cd->parentWidget()->show();
@@ -841,8 +845,9 @@ void load_current_profile_config()
 			[](obs_data_t *data, void *param) {
 				UNUSED_PARAMETER(param);
 				auto empty_dock = new QFrame;
-				if (obs_frontend_add_dock_by_id(obs_data_get_string(data, "name"),
-								obs_data_get_string(data, "name"), empty_dock)) {
+				std::string title = "⬜ ";
+				title += obs_data_get_string(data, "name");
+				if (obs_frontend_add_dock_by_id(obs_data_get_string(data, "name"), title.c_str(), empty_dock)) {
 					empty_docks.push_back(empty_dock);
 				} else {
 					delete empty_dock;
@@ -1443,7 +1448,9 @@ bool obs_module_load(void)
 			if (NameDialog::AskForName(main_window, QString::fromUtf8(obs_module_text("EmptyDockName")), name)) {
 				//break;
 				auto empty_dock = new QFrame;
-				if (obs_frontend_add_dock_by_id(name.c_str(), name.c_str(), empty_dock)) {
+				std::string title = "⬜ ";
+				title += name;
+				if (obs_frontend_add_dock_by_id(name.c_str(), title.c_str(), empty_dock)) {
 					empty_dock->parentWidget()->show();
 					auto ed = obs_data_get_array(current_profile_config, "empty_docks");
 					if (!ed) {
