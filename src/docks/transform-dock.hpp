@@ -6,6 +6,7 @@
 #include <QFrame>
 #include <QCheckBox>
 #include <QLabel>
+#include <QAction>
 
 class TransformDock : public QFrame {
 	Q_OBJECT
@@ -33,6 +34,11 @@ private:
 	QSpinBox *cropRight;
 	QSpinBox *cropTop;
 	QSpinBox *cropBottom;
+
+	QAction *pasteAction = nullptr;
+
+	struct obs_transform_info copiedTransformInfo;
+	struct obs_sceneitem_crop copiedCropInfo;
 
 	static int alignToIndex(uint32_t align);
 	static vec2 getAlignmentConversion(uint32_t alignment);

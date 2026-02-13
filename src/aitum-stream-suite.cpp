@@ -1167,20 +1167,6 @@ protected:
 	virtual void resizeEvent(QResizeEvent *event) override;
 };
 
-QIcon generateEmojiQIcon(QString emoji)
-{
-	QPixmap pixmap(32, 32);
-	pixmap.fill(Qt::transparent);
-
-	QPainter painter(&pixmap);
-	QFont font = painter.font();
-	font.setPixelSize(32);
-	painter.setFont(font);
-	painter.drawText(pixmap.rect(), Qt::AlignCenter, emoji);
-
-	return QIcon(pixmap);
-}
-
 QWidget *aitumSettingsWidget = nullptr;
 
 bool obs_data_array_equal(obs_data_array_t *a, obs_data_array_t *b)
@@ -1501,7 +1487,8 @@ bool obs_module_load(void)
 	QObject::connect(aitumSettingsAction, &QAction::triggered, [] { open_config_dialog(0, nullptr); });
 
 	// Contribute Button
-	auto contributeButton = toolbar->addAction(generateEmojiQIcon("❤️"), QString::fromUtf8(obs_module_text("Donate")));
+	auto contributeButton = toolbar->addAction(generateEmojiQIcon("❤️", toolbar->palette().color(QPalette::Text)),
+						   QString::fromUtf8(obs_module_text("Donate")));
 	contributeButton->setProperty("themeID", "icon-aitum-donate");
 	contributeButton->setProperty("class", "icon-aitum-donate");
 	toolbar->widgetForAction(contributeButton)->setProperty("themeID", "icon-aitum-donate");

@@ -1,6 +1,7 @@
 #include "icon.hpp"
 
 #include<QMainWindow>
+#include <QPainter>
 #include <obs-frontend-api.h>
 
 QIcon GetSceneIcon()
@@ -86,4 +87,18 @@ QIcon create2StateIcon(QString fileOn, QString fileOff)
 	QIcon icon = QIcon(fileOff);
 	icon.addFile(fileOn, QSize(), QIcon::Normal, QIcon::On);
 	return icon;
+}
+
+QIcon generateEmojiQIcon(QString ch, QColor color)
+{
+	QPixmap pixmap(32, 32);
+	pixmap.fill(Qt::transparent);
+
+	QPainter painter(&pixmap);
+	QFont font = painter.font();
+	font.setPixelSize(32);
+	painter.setFont(font);
+	painter.setPen(color);
+	painter.drawText(pixmap.rect(), Qt::AlignCenter, ch);
+	return QIcon(pixmap);
 }

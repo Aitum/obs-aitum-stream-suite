@@ -1,10 +1,12 @@
-#include "transform-dock.hpp"
+#include "../utils/icon.hpp"
 #include "../utils/widgets/locked-checkbox.hpp"
 #include "../utils/widgets/visibility-checkbox.hpp"
+#include "transform-dock.hpp"
 #include <graphics/matrix4.h>
 #include <obs-frontend-api.h>
 #include <QCoreApplication>
 #include <QScrollArea>
+#include <QToolBar>
 #include <QVBoxLayout>
 
 TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
@@ -46,6 +48,454 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 	//titleLayout->addWidget(new LockedCheckBox(this), 0, Qt::AlignRight);
 
 	verticalLayout_3->addLayout(titleLayout);
+
+	auto toolbar = new QToolBar;
+
+	toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::EditCopy),
+			   QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.CopyTransform")),
+			   [this] {
+				   if (!item)
+					   return;
+				   obs_sceneitem_get_info2(item, &copiedTransformInfo);
+				   obs_sceneitem_get_crop(item, &copiedCropInfo);
+				   pasteAction->setEnabled(true);
+			   });
+	pasteAction = toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::EditPaste),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.PasteTransform")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			obs_sceneitem_defer_update_begin(item);
+			obs_sceneitem_set_info2(item, &copiedTransformInfo);
+			obs_sceneitem_set_crop(item, &copiedCropInfo);
+			obs_sceneitem_defer_update_end(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Paste"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+	pasteAction->setEnabled(false);
+	toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::SystemReboot),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.ResetTransform")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			struct obs_transform_info transformInfo = {};
+			struct obs_sceneitem_crop cropInfo = {};
+			vec2_set(&transformInfo.pos, 0.0f, 0.0f);
+			vec2_set(&transformInfo.scale, 1.0f, 1.0f);
+			transformInfo.rot = 0.0f;
+			transformInfo.alignment = OBS_ALIGN_TOP | OBS_ALIGN_LEFT;
+			transformInfo.bounds_type = OBS_BOUNDS_NONE;
+			transformInfo.bounds_alignment = OBS_ALIGN_CENTER;
+			transformInfo.crop_to_bounds = false;
+			vec2_set(&transformInfo.bounds, 0.0f, 0.0f);
+
+			obs_sceneitem_defer_update_begin(item);
+			obs_sceneitem_set_info2(item, &transformInfo);
+			obs_sceneitem_set_crop(item, &cropInfo);
+			obs_sceneitem_defer_update_end(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Reset"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		}); //QIcon::ThemeIcon::ViewRestore
+	toolbar->addSeparator();
+	toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::ObjectRotateLeft),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CCW")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			float rot = 90 + obs_sceneitem_get_rot(item);
+			if (rot >= 360.0f)
+				rot -= 360.0f;
+			else if (rot <= -360.0f)
+				rot += 360.0f;
+			obs_sceneitem_set_rot(item, rot);
+
+			obs_sceneitem_force_update_transform(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Rotate"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		}); // QIcon::ThemeIcon::ViewRestore
+	toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::ObjectRotateRight),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CW")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			float rot = -90 + obs_sceneitem_get_rot(item);
+			if (rot >= 360.0f)
+				rot -= 360.0f;
+			else if (rot <= -360.0f)
+				rot += 360.0f;
+			obs_sceneitem_set_rot(item, rot);
+
+			obs_sceneitem_force_update_transform(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Rotate"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		}); // QIcon::ThemeIcon::ViewRefresh
+	toolbar->addAction(
+		QIcon::fromTheme(QIcon::ThemeIcon::ViewRefresh),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate180")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			float rot = 180 + obs_sceneitem_get_rot(item);
+			if (rot >= 360.0f)
+				rot -= 360.0f;
+			else if (rot <= -360.0f)
+				rot += 360.0f;
+			obs_sceneitem_set_rot(item, rot);
+
+			obs_sceneitem_force_update_transform(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Rotate"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+	toolbar->addSeparator();
+	auto c = this->palette().color(QPalette::Text);
+	toolbar->addAction(
+		generateEmojiQIcon(QString::fromUtf8("⇄"), c),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipHorizontal")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			vec2 mul;
+			vec2_set(&mul, -1.0f, 1.0f);
+
+			vec2 scale;
+			obs_sceneitem_get_scale(item, &scale);
+			vec2_mul(&scale, &scale, &mul);
+
+			obs_sceneitem_set_scale(item, &scale);
+
+			obs_sceneitem_force_update_transform(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.HFlip"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+	toolbar->addAction(
+		generateEmojiQIcon(QString::fromUtf8("⇅"), c),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipVertical")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			vec2 mul;
+			vec2_set(&mul, 1.0f, -1.0f);
+
+			vec2 scale;
+			obs_sceneitem_get_scale(item, &scale);
+			vec2_mul(&scale, &scale, &mul);
+
+			obs_sceneitem_set_scale(item, &scale);
+
+			obs_sceneitem_force_update_transform(item);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.VFlip"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+
+	toolbar->addSeparator();
+	toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ZoomFitBest),
+			   QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FitToScreen")), [this] {
+				   if (!item)
+					   return;
+
+				   auto scene = obs_sceneitem_get_scene(item);
+				   OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+				   obs_video_info ovi;
+				   obs_get_video_info(&ovi);
+
+				   obs_transform_info itemInfo;
+				   vec2_set(&itemInfo.pos, 0.0f, 0.0f);
+				   vec2_set(&itemInfo.scale, 1.0f, 1.0f);
+				   itemInfo.alignment = OBS_ALIGN_LEFT | OBS_ALIGN_TOP;
+				   itemInfo.rot = 0.0f;
+
+				   vec2_set(&itemInfo.bounds, float(ovi.base_width), float(ovi.base_height));
+				   itemInfo.bounds_type = OBS_BOUNDS_SCALE_INNER;
+				   itemInfo.bounds_alignment = OBS_ALIGN_CENTER;
+				   itemInfo.crop_to_bounds = obs_sceneitem_get_bounds_crop(item);
+
+				   obs_sceneitem_set_info2(item, &itemInfo);
+
+				   			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+				   auto undoName =
+					   QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.FitToScreen"))
+						   .arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+				   obs_frontend_add_undo_redo_action(
+					   undoName.toUtf8().constData(),
+					   [](const char *data) { obs_scene_load_transform_states(data); },
+					   [](const char *data) { obs_scene_load_transform_states(data); },
+					   obs_data_get_json(wrapper), obs_data_get_json(rwrapper), false);
+			   });
+	toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ViewFullscreen),
+			   QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.StretchToScreen")),
+		[this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			obs_video_info ovi;
+			obs_get_video_info(&ovi);
+
+			obs_transform_info itemInfo;
+			vec2_set(&itemInfo.pos, 0.0f, 0.0f);
+			vec2_set(&itemInfo.scale, 1.0f, 1.0f);
+			itemInfo.alignment = OBS_ALIGN_LEFT | OBS_ALIGN_TOP;
+			itemInfo.rot = 0.0f;
+
+			vec2_set(&itemInfo.bounds, float(ovi.base_width), float(ovi.base_height));
+			itemInfo.bounds_type = OBS_BOUNDS_STRETCH;
+			itemInfo.bounds_alignment = OBS_ALIGN_CENTER;
+			itemInfo.crop_to_bounds = obs_sceneitem_get_bounds_crop(item);
+
+			obs_sceneitem_set_info2(item, &itemInfo);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.StretchToScreen"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+	toolbar->addAction(generateEmojiQIcon(QString::fromUtf8("✥"), c),
+			   QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.CenterToScreen")),
+			   [this] {
+				   if (!item)
+					   return;
+
+				   auto scene = obs_sceneitem_get_scene(item);
+				   OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+				   matrix4 boxTransform;
+				   obs_sceneitem_get_box_transform(item, &boxTransform);
+
+				   vec3 tl, br;
+
+				   vec3_set(&tl, M_INFINITE, M_INFINITE, 0.0f);
+				   vec3_set(&br, -M_INFINITE, -M_INFINITE, 0.0f);
+
+				   auto GetMinPos = [&](float x, float y) {
+					   vec3 pos;
+					   vec3_set(&pos, x, y, 0.0f);
+					   vec3_transform(&pos, &pos, &boxTransform);
+					   vec3_min(&tl, &tl, &pos);
+					   vec3_max(&br, &br, &pos);
+				   };
+
+				   GetMinPos(0.0f, 0.0f);
+				   GetMinPos(1.0f, 0.0f);
+				   GetMinPos(0.0f, 1.0f);
+				   GetMinPos(1.0f, 1.0f);
+
+				   vec3 center;
+				   center.x = (br.x + tl.x) / 2.0f;
+				   center.y = (tl.y + br.y) / 2.0f;
+				   center.z = 0.0f;
+
+				   vec3 screenCenter;
+				   vec3_set(&screenCenter, float(obs_source_get_width(obs_scene_get_source(scene))),
+					    float(obs_source_get_height(obs_scene_get_source(scene))), 0.0f);
+
+				   vec3_mulf(&screenCenter, &screenCenter, 0.5f);
+
+				   vec3 offset;
+				   vec3_sub(&offset, &screenCenter, &center);
+
+				   vec2 pos;
+				   obs_sceneitem_get_pos(item, &pos);
+				   pos.x += offset.x;
+				   pos.y += offset.y;
+				   obs_sceneitem_set_pos(item, &pos);
+
+				   OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+				   auto undoName =
+					   QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Center"))
+						   .arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+				   obs_frontend_add_undo_redo_action(
+					   undoName.toUtf8().constData(),
+					   [](const char *data) { obs_scene_load_transform_states(data); },
+					   [](const char *data) { obs_scene_load_transform_states(data); },
+					   obs_data_get_json(wrapper), obs_data_get_json(rwrapper), false);
+			   });
+	toolbar->addAction(generateEmojiQIcon(QString::fromUtf8("⬍"), c),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.VerticalCenter")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			matrix4 boxTransform;
+			obs_sceneitem_get_box_transform(item, &boxTransform);
+
+			vec3 tl, br;
+
+			vec3_set(&tl, M_INFINITE, M_INFINITE, 0.0f);
+			vec3_set(&br, -M_INFINITE, -M_INFINITE, 0.0f);
+
+			auto GetMinPos = [&](float x, float y) {
+				vec3 pos;
+				vec3_set(&pos, x, y, 0.0f);
+				vec3_transform(&pos, &pos, &boxTransform);
+				vec3_min(&tl, &tl, &pos);
+				vec3_max(&br, &br, &pos);
+			};
+
+			GetMinPos(0.0f, 0.0f);
+			GetMinPos(1.0f, 0.0f);
+			GetMinPos(0.0f, 1.0f);
+			GetMinPos(1.0f, 1.0f);
+
+			vec3 center;
+			center.x = (br.x + tl.x) / 2.0f;
+			center.y = (tl.y + br.y) / 2.0f;
+			center.z = 0.0f;
+
+			vec3 screenCenter;
+			vec3_set(&screenCenter, float(obs_source_get_width(obs_scene_get_source(scene))),
+				 float(obs_source_get_height(obs_scene_get_source(scene))), 0.0f);
+
+			vec3_mulf(&screenCenter, &screenCenter, 0.5f);
+
+			vec3 offset;
+			vec3_sub(&offset, &screenCenter, &center);
+
+			vec2 pos;
+			obs_sceneitem_get_pos(item, &pos);
+			pos.y += offset.y;
+			obs_sceneitem_set_pos(item, &pos);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.VCenter"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+	toolbar->addAction(generateEmojiQIcon(QString::fromUtf8("⬌"), c),
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.HorizontalCenter")), [this] {
+			if (!item)
+				return;
+
+			auto scene = obs_sceneitem_get_scene(item);
+			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
+
+			matrix4 boxTransform;
+			obs_sceneitem_get_box_transform(item, &boxTransform);
+
+			vec3 tl, br;
+
+			vec3_set(&tl, M_INFINITE, M_INFINITE, 0.0f);
+			vec3_set(&br, -M_INFINITE, -M_INFINITE, 0.0f);
+
+			auto GetMinPos = [&](float x, float y) {
+				vec3 pos;
+				vec3_set(&pos, x, y, 0.0f);
+				vec3_transform(&pos, &pos, &boxTransform);
+				vec3_min(&tl, &tl, &pos);
+				vec3_max(&br, &br, &pos);
+			};
+
+			GetMinPos(0.0f, 0.0f);
+			GetMinPos(1.0f, 0.0f);
+			GetMinPos(0.0f, 1.0f);
+			GetMinPos(1.0f, 1.0f);
+
+			vec3 center;
+			center.x = (br.x + tl.x) / 2.0f;
+			center.y = (tl.y + br.y) / 2.0f;
+			center.z = 0.0f;
+
+			vec3 screenCenter;
+			vec3_set(&screenCenter, float(obs_source_get_width(obs_scene_get_source(scene))),
+				 float(obs_source_get_height(obs_scene_get_source(scene))), 0.0f);
+
+			vec3_mulf(&screenCenter, &screenCenter, 0.5f);
+
+			vec3 offset;
+			vec3_sub(&offset, &screenCenter, &center);
+
+			vec2 pos;
+			obs_sceneitem_get_pos(item, &pos);
+			pos.x += offset.x;
+			obs_sceneitem_set_pos(item, &pos);
+
+			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.VCenter"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(
+				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
+				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
+				obs_data_get_json(rwrapper), false);
+		});
+
+	verticalLayout_3->addWidget(toolbar);
 
 	auto transformSettings = new QFrame(this);
 	transformSettings->setObjectName("transformSettings");
@@ -484,6 +934,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 #else
 	connect(cropToBounds, &QCheckBox::stateChanged, [this]() { onControlChanged(); });
 #endif
+	setEnabled(false);
 }
 
 TransformDock::~TransformDock() {}
@@ -517,7 +968,8 @@ void TransformDock::setItem(OBSSceneItem newItem)
 	setEnabled(enable);
 }
 
-void TransformDock::unsetItem(OBSSceneItem unsetItem) {
+void TransformDock::unsetItem(OBSSceneItem unsetItem)
+{
 	if (item != unsetItem)
 		return;
 	setItem(nullptr);
