@@ -1,17 +1,20 @@
 #include "../utils/icon.hpp"
 #include "../utils/widgets/locked-checkbox.hpp"
 #include "../utils/widgets/visibility-checkbox.hpp"
+#include "properties-dock.hpp"
 #include "transform-dock.hpp"
 #include <graphics/matrix4.h>
 #include <obs-frontend-api.h>
 #include <QCoreApplication>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QToolBar>
 #include <QVBoxLayout>
 
+extern PropertiesDock *properties_dock;
+
 TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 {
-
 	setObjectName("outerFrame");
 	setFrameShape(QFrame::NoFrame);
 	setFrameShadow(QFrame::Plain);
@@ -39,6 +42,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 	scrollWidget->setLayout(verticalLayout_3);
 
 	sourceLabel = new QLabel(this);
+	sourceLabel->setProperty("class", QVariant(QCoreApplication::translate("OBSBasicTransform", "subtitle", nullptr)));
 
 	auto titleLayout = new QHBoxLayout;
 	titleLayout->setContentsMargins(0, 0, 0, 0);
@@ -63,6 +67,34 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 				return;
 			obs_sceneitem_get_info2(item, &copiedTransformInfo);
 			obs_sceneitem_get_crop(item, &copiedCropInfo);
+			auto transition = obs_sceneitem_get_transition(item, true);
+			if (transition) {
+				copiedShowTransition = obs_source_get_id(transition);
+				auto settings = obs_source_get_settings(transition);
+				auto copySettings = obs_data_create();
+				obs_data_apply(copySettings, settings);
+				obs_data_release(settings);
+				copiedShowTransitionSettings = copySettings;
+				obs_data_release(copySettings);
+				copiedShowTransitionDuration = obs_sceneitem_get_transition_duration(item, true);
+			} else {
+				copiedShowTransition = "";
+				copiedShowTransitionSettings = nullptr;
+			}
+			transition = obs_sceneitem_get_transition(item, false);
+			if (transition) {
+				copiedHideTransition = obs_source_get_id(transition);
+				auto settings = obs_source_get_settings(transition);
+				auto copySettings = obs_data_create();
+				obs_data_apply(copySettings, settings);
+				obs_data_release(settings);
+				copiedHideTransitionSettings = copySettings;
+				obs_data_release(copySettings);
+				copiedHideTransitionDuration = obs_sceneitem_get_transition_duration(item, false);
+			} else {
+				copiedHideTransition = "";
+				copiedHideTransitionSettings = nullptr;
+			}
 			pasteAction->setEnabled(true);
 		});
 	pasteAction = toolbar->addAction(
@@ -82,6 +114,32 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 			obs_sceneitem_set_info2(item, &copiedTransformInfo);
 			obs_sceneitem_set_crop(item, &copiedCropInfo);
 			obs_sceneitem_defer_update_end(item);
+
+			if (copiedShowTransition.empty()) {
+				obs_sceneitem_set_transition(item, true, nullptr);
+			} else {
+				std::string name = obs_source_get_name(obs_sceneitem_get_source(item));
+				name += " ";
+				name += "ShowTransition";
+				auto transition = obs_source_create_private(copiedShowTransition.c_str(), name.c_str(), nullptr);
+				obs_source_update(transition, copiedShowTransitionSettings);
+				obs_sceneitem_set_transition(item, true, transition);
+				obs_source_release(transition);
+				obs_sceneitem_set_transition_duration(item, true, copiedShowTransitionDuration);
+			}
+
+			if (copiedHideTransition.empty()) {
+				obs_sceneitem_set_transition(item, false, nullptr);
+			} else {
+				std::string name = obs_source_get_name(obs_sceneitem_get_source(item));
+				name += " ";
+				name += "HideTransition";
+				auto transition = obs_source_create_private(copiedHideTransition.c_str(), name.c_str(), nullptr);
+				obs_source_update(transition, copiedHideTransitionSettings);
+				obs_sceneitem_set_transition(item, false, transition);
+				obs_source_release(transition);
+				obs_sceneitem_set_transition_duration(item, false, copiedHideTransitionDuration);
+			}
 
 			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
 			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Paste"))
@@ -931,6 +989,148 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	verticalLayout_3->addWidget(cropSettings);
 
+	auto transitionSettings = new QFrame(this);
+	auto transitionGridLayout = new QGridLayout(transitionSettings);
+	transitionGridLayout->setHorizontalSpacing(8);
+	transitionGridLayout->setVerticalSpacing(2);
+	transitionGridLayout->setContentsMargins(0, 0, 0, 0);
+
+	auto transitionLabel = new QLabel(transitionSettings);
+	transitionLabel->setProperty("class", QVariant(QCoreApplication::translate("OBSBasicTransform", "subtitle", nullptr)));
+	transitionLabel->setText(QString::fromUtf8(obs_frontend_get_locale_string("Transition")));
+	transitionGridLayout->addWidget(transitionLabel, 0, 0, 1, 2);
+
+	auto transitionDurationLabel = new QLabel(transitionSettings);
+	transitionDurationLabel->setText(QString::fromUtf8(obs_frontend_get_locale_string("Basic.TransitionDuration")));
+	transitionGridLayout->addWidget(transitionDurationLabel, 0, 3, 1, 1);
+
+	auto showTransitionLabel = new QLabel(transitionSettings);
+	showTransitionLabel->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+	showTransitionLabel->setText(QString::fromUtf8(obs_frontend_get_locale_string("Show")));
+	transitionGridLayout->addWidget(showTransitionLabel, 1, 0, 1, 1);
+
+	showTransition = new QComboBox(transitionSettings);
+	showTransition->setMinimumSize(QSize(150, 0));
+	connect(showTransition, &QComboBox::currentIndexChanged, [this]() {
+		if (!item || ignoreItemChange)
+			return;
+		auto d = showTransition->currentData();
+		if (!d.isValid() || d.isNull() || d.toString().isEmpty()) {
+			obs_sceneitem_set_transition(item, true, nullptr);
+			return;
+		}
+		auto id = d.toString();
+		auto transition = obs_sceneitem_get_transition(item, true);
+		if (transition && id == obs_source_get_id(transition))
+			return;
+
+		std::string name = obs_source_get_name(obs_sceneitem_get_source(item));
+		name += " ";
+		name += "ShowTransition";
+		transition = obs_source_create_private(id.toUtf8().constData(), name.c_str(), nullptr);
+		obs_sceneitem_set_transition(item, true, transition);
+		obs_source_release(transition);
+	});
+	transitionGridLayout->addWidget(showTransition, 1, 1);
+
+	auto showTransitionProps = new QPushButton(transitionSettings);
+	showTransitionProps->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
+	showTransitionProps->setIcon(QIcon(":/settings/images/settings/general.svg"));
+	showTransitionProps->setProperty("themeID", "propertiesIconSmall");
+	showTransitionProps->setProperty("class", "icon-gear");
+	showTransitionProps->setProperty("toolButton", true);
+	showTransitionProps->setFlat(false);
+	connect(showTransitionProps, &QPushButton::clicked, [this] {
+		if (!item)
+			return;
+		auto transition = obs_sceneitem_get_transition(item, true);
+		if (!transition || !obs_source_configurable(transition))
+			return;
+
+		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection,
+					  Q_ARG(OBSSource, OBSSource(transition)));
+		properties_dock->parentWidget()->show();
+	});
+	transitionGridLayout->addWidget(showTransitionProps, 1, 2, 1, 1);
+
+	showTransitionDuration = new QSpinBox(transitionSettings);
+	showTransitionDuration->setMinimum(50);
+	showTransitionDuration->setSuffix(" ms");
+	showTransitionDuration->setMaximum(20000);
+	showTransitionDuration->setSingleStep(50);
+	connect(showTransitionDuration, &QSpinBox::valueChanged, [this]() {
+		if (!item || ignoreItemChange)
+			return;
+		obs_sceneitem_set_transition_duration(item, true, showTransitionDuration->value());
+	});
+	transitionGridLayout->addWidget(showTransitionDuration, 1, 3, 1, 1);
+
+	auto hideTransitionLabel = new QLabel(transitionSettings);
+	hideTransitionLabel->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+	hideTransitionLabel->setText(QString::fromUtf8(obs_frontend_get_locale_string("Hide")));
+	transitionGridLayout->addWidget(hideTransitionLabel, 2, 0, 1, 1);
+
+	hideTransition = new QComboBox(transitionSettings);
+	hideTransition->setMinimumSize(QSize(150, 0));
+	connect(hideTransition, &QComboBox::currentIndexChanged, [this]() {
+		if (!item || ignoreItemChange)
+			return;
+		auto d = hideTransition->currentData();
+		if (!d.isValid() || d.isNull() || d.toString().isEmpty()) {
+			obs_sceneitem_set_transition(item, false, nullptr);
+			return;
+		}
+		auto id = d.toString();
+		auto transition = obs_sceneitem_get_transition(item, false);
+		if (transition && id == obs_source_get_id(transition))
+			return;
+
+		std::string name = obs_source_get_name(obs_sceneitem_get_source(item));
+		name += " ";
+		name += "HideTransition";
+		transition = obs_source_create_private(id.toUtf8().constData(), name.c_str(), nullptr);
+		obs_sceneitem_set_transition(item, false, transition);
+		obs_source_release(transition);
+	});
+	transitionGridLayout->addWidget(hideTransition, 2, 1, 1, 1);
+
+	auto hideTransitionProps = new QPushButton(transitionSettings);
+	hideTransitionProps->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
+	hideTransitionProps->setIcon(QIcon(":/settings/images/settings/general.svg"));
+	hideTransitionProps->setProperty("themeID", "propertiesIconSmall");
+	hideTransitionProps->setProperty("class", "icon-gear");
+	hideTransitionProps->setProperty("toolButton", true);
+	hideTransitionProps->setFlat(false);
+	connect(hideTransitionProps, &QPushButton::clicked, [this] {
+		if (!item)
+			return;
+		auto transition = obs_sceneitem_get_transition(item, false);
+		if (!transition || !obs_source_configurable(transition))
+			return;
+
+		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection,
+					  Q_ARG(OBSSource, OBSSource(transition)));
+		properties_dock->parentWidget()->show();
+	});
+	transitionGridLayout->addWidget(hideTransitionProps, 2, 2, 1, 1);
+
+	hideTransitionDuration = new QSpinBox(transitionSettings);
+	hideTransitionDuration->setMinimum(50);
+	hideTransitionDuration->setSuffix(" ms");
+	hideTransitionDuration->setMaximum(20000);
+	hideTransitionDuration->setSingleStep(50);
+	connect(hideTransitionDuration, &QSpinBox::valueChanged, [this]() {
+		if (!item || ignoreItemChange)
+			return;
+		obs_sceneitem_set_transition_duration(item, false, hideTransitionDuration->value());
+	});
+	transitionGridLayout->addWidget(hideTransitionDuration, 2, 3, 1, 1);
+
+	auto horizontalSpacer_5 = new QSpacerItem(0, 10, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
+
+	transitionGridLayout->addItem(horizontalSpacer_5, 0, 4, 3, 1);
+
+	verticalLayout_3->addWidget(transitionSettings);
 	setTabOrder(positionX, positionY);
 	setTabOrder(positionY, sizeX);
 	setTabOrder(sizeX, sizeY);
@@ -965,6 +1165,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 #else
 	connect(cropToBounds, &QCheckBox::stateChanged, [this]() { onControlChanged(); });
 #endif
+
 	setEnabled(false);
 }
 
@@ -990,7 +1191,21 @@ void TransformDock::setItem(OBSSceneItem newItem)
 		} else {
 			sourceLabel->setText(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(item))));
 		}
+		showTransition->blockSignals(true);
+		hideTransition->blockSignals(true);
+		showTransition->clear();
+		hideTransition->clear();
+		showTransition->addItem(QString::fromUtf8(obs_frontend_get_locale_string("None")), QString::fromUtf8(""));
+		hideTransition->addItem(QString::fromUtf8(obs_frontend_get_locale_string("None")), QString::fromUtf8(""));
+		size_t idx = 0;
+		const char *id;
+		while (obs_enum_transition_types(idx++, &id)) {
+			showTransition->addItem(QString::fromUtf8(obs_source_get_display_name(id)), QString::fromUtf8(id));
+			hideTransition->addItem(QString::fromUtf8(obs_source_get_display_name(id)), QString::fromUtf8(id));
+		}
 		refreshControls();
+		showTransition->blockSignals(false);
+		hideTransition->blockSignals(false);
 	} else {
 		sourceLabel->setText("");
 	}
@@ -1047,10 +1262,24 @@ void TransformDock::refreshControls()
 	cropRight->setValue(int(crop.right));
 	cropTop->setValue(int(crop.top));
 	cropBottom->setValue(int(crop.bottom));
-	ignoreItemChange = false;
 
-	std::string name = obs_source_get_name(source);
-	//setWindowTitle(QTStr("Basic.TransformWindow.Title").arg(name.c_str()));
+	auto transition = obs_sceneitem_get_transition(item, true);
+	if (transition) {
+		showTransition->setCurrentText(obs_source_get_display_name(obs_source_get_id(transition)));
+		showTransitionDuration->setValue(obs_sceneitem_get_transition_duration(item, true));
+	} else {
+		showTransition->setCurrentIndex(0);
+	}
+
+	transition = obs_sceneitem_get_transition(item, false);
+	if (transition) {
+		hideTransition->setCurrentText(obs_source_get_display_name(obs_source_get_id(transition)));
+		hideTransitionDuration->setValue(obs_sceneitem_get_transition_duration(item, false));
+	} else {
+		hideTransition->setCurrentIndex(0);
+	}
+
+	ignoreItemChange = false;
 }
 
 static const uint32_t indexToAlign[] = {OBS_ALIGN_TOP | OBS_ALIGN_LEFT,

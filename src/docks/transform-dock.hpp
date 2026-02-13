@@ -35,10 +35,21 @@ private:
 	QSpinBox *cropTop;
 	QSpinBox *cropBottom;
 
+	QComboBox *showTransition;
+	QSpinBox *showTransitionDuration;
+	QComboBox *hideTransition;
+	QSpinBox *hideTransitionDuration;
+
 	QAction *pasteAction = nullptr;
 
 	struct obs_transform_info copiedTransformInfo;
 	struct obs_sceneitem_crop copiedCropInfo;
+	std::string copiedShowTransition;
+	OBSData copiedShowTransitionSettings;
+	int copiedShowTransitionDuration;
+	std::string copiedHideTransition;
+	OBSData copiedHideTransitionSettings;
+	int copiedHideTransitionDuration;
 
 	static int alignToIndex(uint32_t align);
 	static vec2 getAlignmentConversion(uint32_t alignment);
