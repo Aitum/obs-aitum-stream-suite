@@ -68,101 +68,103 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		return true;
 
 	auto d = obs_data_create_from_json((const char *)file->buffer.array);
-	if (d) {
-		auto data_obj = obs_data_get_obj(d, "data");
-		obs_data_release(d);
-		if (data_obj) {
-			auto version = obs_data_get_string(data_obj, "version");
-			int major;
-			int minor;
-			int patch;
-			if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-				auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
-				if (sv >
-				    MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
-					newer_version_available = QString::fromUtf8(version);
-					QMetaObject::invokeMethod(aitumSettingsWidget, [] {
-						aitumSettingsWidget->setStyleSheet(
-							QString::fromUtf8("background: rgb(192,128,0);"));
-					});
-				}
-			}
+	if (!d) {
+		if (version_download_info) {
+			download_info_destroy(version_download_info);
+			version_download_info = nullptr;
+		}
+		return true;
+	}
 
-			obs_data_array_t *blocks = obs_data_get_array(data_obj, "partnerBlocks");
-			if (obs_data_array_count(blocks) > 0) {
-				time_t current_time = time(nullptr);
-				auto partnerBlockTime =
-					(time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
-				if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
-					QMetaObject::invokeMethod(toolbar, [blocks] {
-						auto before = studioModeAction;
-						size_t count = obs_data_array_count(blocks);
-						for (size_t i = 0; i < count; i++) {
-							obs_data_t *block = obs_data_array_item(blocks, i);
-							auto block_type = obs_data_get_string(block, "type");
-							if (strcmp(block_type, "LINK") == 0) {
-								auto button = new QPushButton(
-									QString::fromUtf8(obs_data_get_string(block, "label")));
-								button->setStyleSheet(
-									QString::fromUtf8(obs_data_get_string(block, "qss")));
-								auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
-								button->connect(button, &QPushButton::clicked,
-										[url] { QDesktopServices::openUrl(QUrl(url)); });
-								partnerBlockActions.append(toolbar->insertWidget(before, button));
-							} else if (strcmp(block_type, "IMAGE") == 0) {
-								auto image_data =
-									QString::fromUtf8(obs_data_get_string(block, "data"));
-								if (image_data.startsWith("data:image/")) {
-									auto pos = image_data.indexOf(";");
-									auto format = image_data.mid(11, pos - 11);
-									QImage image;
-									if (image.loadFromData(
-										    QByteArray::fromBase64(image_data.mid(pos + 7)
-														   .toUtf8()
-														   .constData()),
-										    format.toUtf8().constData())) {
-										auto label = new AspectRatioPixmapLabel;
-										label->setPixmap(QPixmap::fromImage(image));
-										label->setAlignment(Qt::AlignCenter);
-										label->setStyleSheet(QString::fromUtf8(
-											obs_data_get_string(block, "qss")));
-										partnerBlockActions.append(
-											toolbar->insertWidget(before, label));
-									}
-								}
-							} else if (strcmp(block_type, "LABEL") == 0) {
-								auto label = new QLabel(
-									QString::fromUtf8(obs_data_get_string(block, "label")));
-								label->setOpenExternalLinks(true);
+	auto data_obj = obs_data_get_obj(d, "data");
+	obs_data_release(d);
+	if (!data_obj) {
+		if (version_download_info) {
+			download_info_destroy(version_download_info);
+			version_download_info = nullptr;
+		}
+		return true;
+	}
+
+	auto version = obs_data_get_string(data_obj, "version");
+	int major;
+	int minor;
+	int patch;
+	if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
+		auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
+		if (sv > MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
+			newer_version_available = QString::fromUtf8(version);
+			QMetaObject::invokeMethod(aitumSettingsWidget, [] {
+				aitumSettingsWidget->setStyleSheet(QString::fromUtf8("background: rgb(192,128,0);"));
+			});
+		}
+	}
+
+	obs_data_array_t *blocks = obs_data_get_array(data_obj, "partnerBlocks");
+	if (obs_data_array_count(blocks) > 0) {
+		time_t current_time = time(nullptr);
+		auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
+		if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
+			QMetaObject::invokeMethod(toolbar, [blocks] {
+				auto before = studioModeAction;
+				size_t count = obs_data_array_count(blocks);
+				for (size_t i = 0; i < count; i++) {
+					obs_data_t *block = obs_data_array_item(blocks, i);
+					auto block_type = obs_data_get_string(block, "type");
+					if (strcmp(block_type, "LINK") == 0) {
+						auto button =
+							new QPushButton(QString::fromUtf8(obs_data_get_string(block, "label")));
+						button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+						auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
+						button->connect(button, &QPushButton::clicked,
+								[url] { QDesktopServices::openUrl(QUrl(url)); });
+						partnerBlockActions.append(toolbar->insertWidget(before, button));
+					} else if (strcmp(block_type, "IMAGE") == 0) {
+						auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
+						if (image_data.startsWith("data:image/")) {
+							auto pos = image_data.indexOf(";");
+							auto format = image_data.mid(11, pos - 11);
+							QImage image;
+							if (image.loadFromData(QByteArray::fromBase64(
+										       image_data.mid(pos + 7).toUtf8().constData()),
+									       format.toUtf8().constData())) {
+								auto label = new AspectRatioPixmapLabel;
+								label->setPixmap(QPixmap::fromImage(image));
+								label->setAlignment(Qt::AlignCenter);
 								label->setStyleSheet(
 									QString::fromUtf8(obs_data_get_string(block, "qss")));
 								partnerBlockActions.append(toolbar->insertWidget(before, label));
 							}
-							obs_data_release(block);
 						}
-						auto close = new QAction("x");
-						close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
-						close->connect(close, &QAction::triggered, [] {
-							foreach(auto &a, partnerBlockActions)
-							{
-								toolbar->removeAction(a);
-							}
-							partnerBlockActions.clear();
-							config_set_int(obs_frontend_get_user_config(), "Aitum", "partner_block",
-								       (int64_t)time(nullptr));
-						});
-						toolbar->insertAction(before, close);
-						partnerBlockActions.append(close);
-						QWidget *spacer = new QWidget();
-						spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-						partnerBlockActions.append(toolbar->insertWidget(before, spacer));
-					});
+					} else if (strcmp(block_type, "LABEL") == 0) {
+						auto label = new QLabel(QString::fromUtf8(obs_data_get_string(block, "label")));
+						label->setOpenExternalLinks(true);
+						label->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+						partnerBlockActions.append(toolbar->insertWidget(before, label));
+					}
+					obs_data_release(block);
 				}
-			}
-			obs_data_array_release(blocks);
-			obs_data_release(data_obj);
+				auto close = new QAction("x");
+				close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
+				close->connect(close, &QAction::triggered, [] {
+					foreach(auto &a, partnerBlockActions)
+					{
+						toolbar->removeAction(a);
+					}
+					partnerBlockActions.clear();
+					config_set_int(obs_frontend_get_user_config(), "Aitum", "partner_block",
+						       (int64_t)time(nullptr));
+				});
+				toolbar->insertAction(before, close);
+				partnerBlockActions.append(close);
+				QWidget *spacer = new QWidget();
+				spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+				partnerBlockActions.append(toolbar->insertWidget(before, spacer));
+			});
 		}
 	}
+	obs_data_array_release(blocks);
+	obs_data_release(data_obj);
 
 	if (version_download_info) {
 		download_info_destroy(version_download_info);
@@ -891,8 +893,21 @@ void load_current_profile_config()
 			new_output = obs_data_create();
 			obs_data_set_bool(new_output, "enabled", true);
 			obs_data_set_string(new_output, "type", "backtrack");
+
+			config_t *config = obs_frontend_get_profile_config();
+			const char *mode = config_get_string(config, "Output", "Mode");
+			const char* path = nullptr;
+			if (mode && strcmp(mode, "Advanced") == 0)
+				path = config_get_string(config, "AdvOut", "RecFilePath");
+			if (!path || path[0] == '\0')
+				path = config_get_string(config, "SimpleOutput", "FilePath");
+			if (path)
+				obs_data_set_string(new_output, "path", path);
+			obs_data_set_string(new_output, "filename", "%CCYY-%MM-%DD %hh-%mm-%ss Vertical Backtrack");
+			obs_data_set_string(new_output, "format", "hybrid_mp4");
 			obs_data_set_string(new_output, "name", "Vertical Backtrack");
 			obs_data_set_string(new_output, "canvas", canvas_name);
+			obs_data_set_int(new_output, "max_time_sec", 10);
 			obs_data_array_push_back(outputs2, new_output);
 			obs_data_release(new_output);
 		}
