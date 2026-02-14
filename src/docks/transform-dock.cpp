@@ -30,16 +30,17 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 	scrollArea->setFrameShape(QFrame::NoFrame);
 	ml->addWidget(scrollArea);
 
-	auto scrollWidget = new QWidget;
-	scrollWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	transformWidget = new QWidget;
+	transformWidget->setEnabled(false);
+	transformWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-	scrollArea->setWidget(scrollWidget);
+	scrollArea->setWidget(transformWidget);
 
-	auto verticalLayout_3 = new QVBoxLayout(this);
+	auto verticalLayout_3 = new QVBoxLayout(transformWidget);
 	verticalLayout_3->setSpacing(0);
 	verticalLayout_3->setObjectName("verticalLayout_3");
 	verticalLayout_3->setContentsMargins(0, 0, 0, 0);
-	scrollWidget->setLayout(verticalLayout_3);
+	transformWidget->setLayout(verticalLayout_3);
 
 	sourceLabel = new QLabel(this);
 	sourceLabel->setProperty("class", QVariant(QCoreApplication::translate("OBSBasicTransform", "subtitle", nullptr)));
@@ -55,6 +56,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	auto c = this->palette().color(QPalette::Text);
 	auto toolbar = new QToolBar;
+	toolbar->setObjectName("transformToolBar");
 
 	toolbar->addAction(
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
@@ -1165,8 +1167,6 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 #else
 	connect(cropToBounds, &QCheckBox::stateChanged, [this]() { onControlChanged(); });
 #endif
-
-	setEnabled(false);
 }
 
 TransformDock::~TransformDock() {}
@@ -1211,7 +1211,7 @@ void TransformDock::setItem(OBSSceneItem newItem)
 	}
 
 	bool enable = !!item && !obs_sceneitem_locked(item);
-	setEnabled(enable);
+	transformWidget->setEnabled(enable);
 }
 
 void TransformDock::unsetItem(OBSSceneItem unsetItem)
@@ -1318,7 +1318,7 @@ void TransformDock::sceneItemLocked(OBSSceneItem lockedItem)
 {
 	if (item != lockedItem)
 		return;
-	setEnabled(!obs_sceneitem_locked(item));
+	transformWidget->setEnabled(!obs_sceneitem_locked(item));
 }
 
 void TransformDock::onAlignChanged(int index)

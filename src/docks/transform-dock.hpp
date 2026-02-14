@@ -17,6 +17,8 @@ private:
 	bool ignoreTransformSignal = false;
 	bool ignoreItemChange = false;
 
+	QWidget *transformWidget;
+
 	QLabel *sourceLabel;
 	QDoubleSpinBox* positionX;
 	QDoubleSpinBox* positionY;
