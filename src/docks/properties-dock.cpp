@@ -47,8 +47,15 @@ PropertiesDock::PropertiesDock(QWidget *parent) : QFrame(parent)
 	signal_handler_connect(obs_canvas_get_signal_handler(mc), "channel_change", canvas_channel_change, this);
 	obs_canvas_release(mc);
 
+	auto hl = new QHBoxLayout();
+	hl->setContentsMargins(0, 0, 0, 0);
 	sourceLabel = new QLabel(QString::fromUtf8(obs_module_text("NoSourceSelected")));
-	vl->addWidget(sourceLabel);
+	hl->addWidget(sourceLabel);
+
+	sourceTypeLabel = new QLabel();
+	sourceTypeLabel->setAlignment(Qt::AlignRight);
+	hl->addWidget(sourceTypeLabel, Qt::AlignRight);
+	vl->addLayout(hl);
 
 	layout = new QFormLayout;
 	vl->addLayout(layout);
@@ -310,6 +317,7 @@ void PropertiesDock::LoadProperties(OBSSource source)
 	}
 	if (!source) {
 		sourceLabel->setText(QString::fromUtf8(obs_module_text("NoSourceSelected")));
+		sourceTypeLabel->setText("");
 		current_properties = nullptr;
 		return;
 	}
@@ -326,6 +334,7 @@ void PropertiesDock::LoadProperties(OBSSource source)
 	} else {
 		sourceLabel->setText(QString::fromUtf8(obs_source_get_name(source)));
 	}
+	sourceTypeLabel->setText(QString::fromUtf8(obs_source_get_display_name(obs_source_get_id(source))));
 
 	properties = obs_source_properties(source);
 	if (!properties)

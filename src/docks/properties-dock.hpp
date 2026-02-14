@@ -12,6 +12,7 @@ class PropertiesDock : public QFrame {
 	Q_OBJECT
 private:
 	QLabel *sourceLabel = nullptr;
+	QLabel *sourceTypeLabel = nullptr;
 
 	obs_weak_source_t *current_source = nullptr;
 	obs_weak_source_t *current_properties = nullptr;
