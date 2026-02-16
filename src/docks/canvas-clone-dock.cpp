@@ -498,7 +498,7 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 	pthread_mutex_lock(&replace_sources_mutex);
 	if (obs_obj_is_private(source) && source_name) {
 		for (auto it : replace_sources) {
-			const char* replace_name = obs_source_get_name(it.first);
+			const char *replace_name = obs_source_get_name(it.first);
 			if (replace_name && strcmp(source_name, replace_name) == 0) {
 				obs_source_t *s = obs_weak_source_get_source(it.second);
 				if (s) {
@@ -528,7 +528,28 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 	if (source_type == OBS_SOURCE_TYPE_TRANSITION) {
 		if ((current && !source) || (source && !current) ||
 		    (source && current && strcmp(obs_source_get_name(current), source_name) != 0)) {
-			duplicate = obs_source_duplicate(source, source_name, true);
+			for (auto cached : transition_cache) {
+				if (strcmp(obs_source_get_name(cached), source_name) != 0)
+					continue;
+				duplicate = obs_source_get_ref(cached);
+				if (!duplicate)
+					continue;
+				OBSDataAutoRelease origSettings = obs_source_get_settings(source);
+				OBSDataAutoRelease dupSettings = obs_source_get_settings(duplicate);
+				std::string origSettingsJson = obs_data_get_json(origSettings);
+				std::string dupSettingsJson = obs_data_get_json(dupSettings);
+				if (origSettingsJson != dupSettingsJson) {
+					obs_source_update(duplicate, origSettings);
+				}
+				break;
+			}
+			if (!duplicate) {
+				duplicate = obs_source_duplicate(source, source_name, true);
+				transition_cache.push_back(duplicate);
+				if (transition_cache.size() > 25)
+					transition_cache.pop_front();
+			}
+
 			obs_transition_set_size(duplicate, obs_source_get_width(source), obs_source_get_height(source));
 			obs_transition_set_alignment(duplicate, obs_transition_get_alignment(source));
 			obs_transition_set_scale_type(duplicate, obs_transition_get_scale_type(source));
@@ -573,8 +594,20 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			    (current != source && strcmp(obs_source_get_name(current), source_name) == 0))) {
 			duplicate = obs_source_get_ref(current);
 		} else {
-			//duplicate = obs_source_duplicate(source, source_name, true);
-			duplicate = obs_scene_get_source(obs_scene_duplicate(scene, source_name, OBS_SCENE_DUP_PRIVATE_REFS));
+			for (auto cached : scene_cache) {
+				if (strcmp(obs_source_get_name(cached), source_name) == 0) {
+					duplicate = obs_source_get_ref(cached);
+					break;
+				}
+			}
+			if (!duplicate) {
+				//duplicate = obs_source_duplicate(source, source_name, true);
+				duplicate =
+					obs_scene_get_source(obs_scene_duplicate(scene, source_name, OBS_SCENE_DUP_PRIVATE_REFS));
+				scene_cache.push_back(duplicate);
+				if (scene_cache.size() > 50)
+					scene_cache.pop_front();
+			}
 			auto cx = obs_source_get_base_width(source);
 			auto cy = obs_source_get_base_height(source);
 			if (cx && cy &&
@@ -905,7 +938,6 @@ void CanvasCloneDock::source_remove(void *param, calldata_t *cd)
 	}
 	pthread_mutex_unlock(&this_->replace_sources_mutex);
 	this_->RemoveSource(QString::fromUtf8(obs_source_get_name(source)));
-	
 }
 
 void CanvasCloneDock::source_rename(void *param, calldata_t *cd)
@@ -926,7 +958,6 @@ void CanvasCloneDock::RemoveSource(QString source_name)
 		if (index >= 0)
 			it->second->removeItem(index);
 	}
-	
 }
 
 void CanvasCloneDock::SaveSettings(bool closing, QString mode)

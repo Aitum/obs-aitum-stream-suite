@@ -23,6 +23,8 @@ private:
 	float scrollX = 0.5f;
 	float scrollY = 0.5f;
 	std::vector<OBSProjector *> projectors;
+	std::list<OBSSource> transition_cache;
+	std::list<OBSSource> scene_cache;
 
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
 	pthread_mutex_t replace_sources_mutex;
