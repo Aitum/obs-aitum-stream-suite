@@ -15,6 +15,12 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+bool isTwitchServer(QString outputServer) {
+	return outputServer.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
+	       outputServer.contains(QString::fromUtf8(".contribute.live-video.net")) ||
+	       outputServer.contains(QString::fromUtf8(".twitch.tv"));
+}
+
 // Reset output values, e.g. when user hits the back button
 void StreamOutputDialog::resetOutputs()
 {
@@ -356,9 +362,7 @@ StreamOutputDialog::StreamOutputDialog(QDialog *parent, QString name, QString se
 	auto layout = new QVBoxLayout();
 
 	// Add the appropriate page to the layout based upon the server url
-	if (outputServer.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
-	    outputServer.contains(QString::fromUtf8(".contribute.live-video.net")) ||
-	    outputServer.contains(QString::fromUtf8(".twitch.tv"))) { // twitch
+	if (isTwitchServer(outputServer)) { // twitch
 		layout->addWidget(WizardInfoTwitch(true));
 	} else if (outputServer.contains(QString::fromUtf8(".youtube.com"))) { // youtube
 		layout->addWidget(WizardInfoYouTube(true));

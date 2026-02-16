@@ -39,6 +39,8 @@
 #endif
 #include "name-dialog.hpp"
 
+extern bool isTwitchServer(QString outputServer);
+
 template<typename T> std::string to_string_with_precision(const T a_value, const int n = 6)
 {
 	std::ostringstream out;
@@ -873,8 +875,7 @@ void OBSBasicSettings::AddUnmanagedCanvas(std::string name)
 
 	canvas_title_layout->addWidget(new QLabel(QString::fromStdString(name)), 1, Qt::AlignLeft);
 
-	canvas_title_layout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("UnmanagedCanvas"))), 1,
-				       Qt::AlignLeft);
+	canvas_title_layout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("UnmanagedCanvas"))), 1, Qt::AlignLeft);
 
 	// Remove button
 	auto removeButton =
@@ -1626,9 +1627,9 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				break;
 			}
 		} else {
-			auto outputDialog = new StreamOutputDialog(this, obs_data_get_string(settings, "name"),
-								   obs_data_get_string(settings, "stream_server"),
-								   obs_data_get_string(settings, "stream_key"), otherNames);
+			auto outputDialog = new StreamOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
+								   QString::fromUtf8(obs_data_get_string(settings, "stream_server")),
+								   QString::fromUtf8(obs_data_get_string(settings, "stream_key")), otherNames);
 
 			outputDialog->setWindowModality(Qt::WindowModal);
 			outputDialog->setModal(true);
@@ -1937,6 +1938,14 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	auto audioEncoder = new QComboBox;
 	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
 	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+		QComboBox *vodTrack = nullptr;
+		if (config_get_bool(obs_frontend_get_user_config(), "General", "EnableCustomServerVodTrack") ||
+		    isTwitchServer(QString::fromUtf8(obs_data_get_string(settings, "stream_server")))) {
+			obs_data_set_default_int(settings, "vod_track", -1);
+			vodTrack = new QComboBox;
+			vodTrack->addItem(QString::fromUtf8(obs_frontend_get_locale_string("None")));
+		}
+
 		auto audioTrack = new QComboBox;
 		for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
 			auto trackConfigName = QString::fromUtf8("Track") + QString::number(i + 1) + QString::fromUtf8("Name");
@@ -1951,6 +1960,8 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			if (trackName.isEmpty())
 				trackName = QString::number(i + 1);
 			audioTrack->addItem(trackName);
+			if (vodTrack)
+				vodTrack->addItem(trackName);
 		}
 		audioTrack->setCurrentIndex((int)obs_data_get_int(settings, "audio_track"));
 		connect(audioTrack, &QComboBox::currentIndexChanged, [audioTrack, settings] {
@@ -1958,6 +1969,16 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				obs_data_set_int(settings, "audio_track", audioTrack->currentIndex());
 		});
 		audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioTrack")), audioTrack);
+		if (vodTrack) {
+			vodTrack->setCurrentIndex((int)obs_data_get_int(settings, "vod_track") + 1);
+			connect(vodTrack, &QComboBox::currentIndexChanged, [vodTrack, settings] {
+				if (vodTrack->currentIndex() >= 0)
+					obs_data_set_int(settings, "vod_track", vodTrack->currentIndex() -1);
+			});
+			audioPageLayout->addRow(QString::fromUtf8(obs_module_text("VodTrack")), vodTrack);
+		} else {
+			obs_data_set_int(settings, "vod_track", -1);
+		}
 	} else {
 		auto at = obs_data_get_int(settings, "audio_tracks");
 		std::vector<QCheckBox *> audioTracks;

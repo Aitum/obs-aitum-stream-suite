@@ -55,14 +55,12 @@ QIcon GetIconFromType(enum obs_icon_type icon_type)
 	}
 }
 
-
+extern bool isTwitchServer(QString outputServer);
 
 QIcon getPlatformIconFromEndpoint(QString endpoint)
 {
 
-	if (endpoint.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
-	    endpoint.contains(QString::fromUtf8(".contribute.live-video.net")) ||
-	    endpoint.contains(QString::fromUtf8(".twitch.tv"))) { // twitch
+	if (isTwitchServer(endpoint)) { // twitch
 		return QIcon(":/aitum/media/twitch.png");
 	} else if (endpoint.contains(QString::fromUtf8(".youtube.com"))) { // youtube
 		return QIcon(":/aitum/media/youtube.png");
@@ -97,6 +95,7 @@ QIcon generateEmojiQIcon(QString ch, QColor color)
 	QPainter painter(&pixmap);
 	QFont font = painter.font();
 	font.setPixelSize(32);
+	font.setBold(true);
 	painter.setFont(font);
 	painter.setPen(color);
 	painter.drawText(pixmap.rect(), Qt::AlignCenter, ch);
