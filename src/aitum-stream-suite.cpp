@@ -896,7 +896,7 @@ void load_current_profile_config()
 
 			config_t *config = obs_frontend_get_profile_config();
 			const char *mode = config_get_string(config, "Output", "Mode");
-			const char* path = nullptr;
+			const char *path = nullptr;
 			if (mode && strcmp(mode, "Advanced") == 0)
 				path = config_get_string(config, "AdvOut", "RecFilePath");
 			if (!path || path[0] == '\0')

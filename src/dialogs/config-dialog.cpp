@@ -1627,9 +1627,10 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				break;
 			}
 		} else {
-			auto outputDialog = new StreamOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
-								   QString::fromUtf8(obs_data_get_string(settings, "stream_server")),
-								   QString::fromUtf8(obs_data_get_string(settings, "stream_key")), otherNames);
+			auto outputDialog =
+				new StreamOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
+						       QString::fromUtf8(obs_data_get_string(settings, "stream_server")),
+						       QString::fromUtf8(obs_data_get_string(settings, "stream_key")), otherNames);
 
 			outputDialog->setWindowModality(Qt::WindowModal);
 			outputDialog->setModal(true);
@@ -1664,7 +1665,10 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	canvasSubLayout->setContentsMargins(0, 0, 0, 0);
 	canvasSubLayout->addWidget(canvasCombo);
 	QToolButton *add = nullptr;
-	if (strcmp(output_type, "record") == 0) {
+	auto streamServer = QString::fromUtf8(obs_data_get_string(settings, "stream_server"));
+	if ((strcmp(output_type, "record") == 0) ||
+	    ((output_type[0] == '\0' || strcmp(output_type, "stream") == 0) &&
+	     (streamServer.startsWith("srt://", Qt::CaseInsensitive) || streamServer.startsWith("rist://", Qt::CaseInsensitive)))) {
 		add = new QToolButton;
 		add->setProperty("themeID", "addIconSmall");
 		add->setProperty("class", "icon-plus");
@@ -1937,10 +1941,11 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	auto audioEncoder = new QComboBox;
 	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
-	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+	if ((output_type[0] == '\0' || strcmp(output_type, "stream") == 0) &&
+	    !streamServer.startsWith("srt://", Qt::CaseInsensitive) && !streamServer.startsWith("rist://", Qt::CaseInsensitive)) {
 		QComboBox *vodTrack = nullptr;
 		if (config_get_bool(obs_frontend_get_user_config(), "General", "EnableCustomServerVodTrack") ||
-		    isTwitchServer(QString::fromUtf8(obs_data_get_string(settings, "stream_server")))) {
+		    isTwitchServer(streamServer)) {
 			obs_data_set_default_int(settings, "vod_track", -1);
 			vodTrack = new QComboBox;
 			vodTrack->addItem(QString::fromUtf8(obs_frontend_get_locale_string("None")));
@@ -1973,7 +1978,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			vodTrack->setCurrentIndex((int)obs_data_get_int(settings, "vod_track") + 1);
 			connect(vodTrack, &QComboBox::currentIndexChanged, [vodTrack, settings] {
 				if (vodTrack->currentIndex() >= 0)
-					obs_data_set_int(settings, "vod_track", vodTrack->currentIndex() -1);
+					obs_data_set_int(settings, "vod_track", vodTrack->currentIndex() - 1);
 			});
 			audioPageLayout->addRow(QString::fromUtf8(obs_module_text("VodTrack")), vodTrack);
 		} else {

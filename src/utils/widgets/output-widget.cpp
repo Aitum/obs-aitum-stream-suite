@@ -509,7 +509,9 @@ bool OutputWidget::StartOutput(bool automated)
 			}
 			aencs.push_back(aenc);
 		} else {
-			if (is_record) {
+			auto streamServer = QString::fromUtf8(obs_data_get_string(settings, "stream_server"));
+			if (is_record || streamServer.startsWith("srt://", Qt::CaseInsensitive) ||
+			    streamServer.startsWith("rist://", Qt::CaseInsensitive)) {
 				auto tracks = obs_data_get_int(settings, "audio_tracks");
 				if (!tracks)
 					tracks = 1;
@@ -554,10 +556,9 @@ bool OutputWidget::StartOutput(bool automated)
 
 				obs_data_set_default_int(settings, "vod_track", -1);
 				auto vod_track = obs_data_get_int(settings, "vod_track");
-				if (vod_track >= 0 && vod_track != audio_track && (config_get_bool(obs_frontend_get_user_config(), "General",
-							     "EnableCustomServerVodTrack") ||
-				     isTwitchServer(
-					     QString::fromUtf8(obs_data_get_string(settings, "stream_server"))))) {
+				if (vod_track >= 0 && vod_track != audio_track &&
+				    (config_get_bool(obs_frontend_get_user_config(), "General", "EnableCustomServerVodTrack") ||
+				     isTwitchServer(streamServer))) {
 					if (aes) {
 						s = obs_data_create();
 						obs_data_apply(s, aes);
@@ -565,7 +566,7 @@ bool OutputWidget::StartOutput(bool automated)
 					audio_encoder_name = "Aitum Stream Suite VOD Audio ";
 					audio_encoder_name += name;
 					aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s, vod_track,
-									     nullptr);
+									nullptr);
 					obs_data_release(s);
 					obs_encoder_set_audio(aenc, obs_get_audio());
 					aencs.push_back(aenc);

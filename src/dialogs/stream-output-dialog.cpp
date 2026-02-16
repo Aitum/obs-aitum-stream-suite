@@ -15,7 +15,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-bool isTwitchServer(QString outputServer) {
+bool isTwitchServer(QString outputServer)
+{
 	return outputServer.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
 	       outputServer.contains(QString::fromUtf8(".contribute.live-video.net")) ||
 	       outputServer.contains(QString::fromUtf8(".twitch.tv"));
