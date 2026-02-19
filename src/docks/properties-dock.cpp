@@ -993,6 +993,11 @@ void PropertiesDock::RefreshProperties(obs_properties_t *properties, QFormLayout
 					widget->setVisible(visible);
 			}
 		}
+		if (obs_property_get_type(property) == OBS_PROPERTY_GROUP) {
+			obs_properties_t *content = obs_property_group_content(property);
+			if (content)
+				RefreshProperties(content, static_cast<QFormLayout *>(static_cast<QGroupBox *>(it->second)->layout()));
+		}
 		obs_property_next(&property);
 	}
 }
