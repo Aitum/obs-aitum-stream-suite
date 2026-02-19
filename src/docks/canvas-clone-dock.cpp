@@ -1002,7 +1002,13 @@ void CanvasCloneDock::reset_live_state()
 
 void CanvasCloneDock::reset_build_state()
 {
-	canvas_split->setSizes({1, 1});
+	auto w = width();
+	auto h = height();
+	if (w > h) {
+		canvas_split->setSizes({w * 2 / 3, w / 3});
+	} else {
+		canvas_split->setSizes({h * 2 / 3, h / 3});
+	}
 }
 
 void CanvasCloneDock::SetPanelVisible(const QString &panel_name, bool visible)

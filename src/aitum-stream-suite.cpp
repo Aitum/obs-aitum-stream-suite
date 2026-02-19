@@ -308,7 +308,6 @@ void reset_live_dock_state()
 	foreach(auto &canvas_dock, canvas_docks)
 	{
 		d = (QDockWidget *)canvas_dock->parentWidget();
-		canvas_dock->reset_live_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		if (left_docks.isEmpty()) {
@@ -318,12 +317,12 @@ void reset_live_dock_state()
 		} else {
 			main_window->tabifyDockWidget(left_docks.first(), d);
 		}
+		canvas_dock->reset_live_state();
 	}
 
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
 	{
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
-		canvas_clone_dock->reset_live_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		if (left_docks.isEmpty()) {
@@ -333,6 +332,7 @@ void reset_live_dock_state()
 		} else {
 			main_window->tabifyDockWidget(left_docks.first(), d);
 		}
+		canvas_clone_dock->reset_live_state();
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
@@ -451,7 +451,6 @@ void reset_build_dock_state()
 	foreach(auto &canvas_dock, canvas_docks)
 	{
 		d = (QDockWidget *)canvas_dock->parentWidget();
-		canvas_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		if (right_docks.isEmpty()) {
@@ -461,12 +460,12 @@ void reset_build_dock_state()
 		} else {
 			main_window->tabifyDockWidget(right_docks.first(), d);
 		}
+		canvas_dock->reset_build_state();
 	}
 
 	foreach(auto &canvas_clone_dock, canvas_clone_docks)
 	{
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
-		canvas_clone_dock->reset_build_state();
 		d->setVisible(true);
 		d->setFloating(false);
 		if (right_docks.isEmpty()) {
@@ -476,6 +475,7 @@ void reset_build_dock_state()
 		} else {
 			main_window->tabifyDockWidget(right_docks.first(), d);
 		}
+		canvas_clone_dock->reset_build_state();
 	}
 
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
@@ -592,7 +592,129 @@ void load_outputs()
 		Qt::QueuedConnection);
 }
 
-void load_canvas()
+void reset_canvas_dock_state(QString name)
+{
+	QDockWidget *d = nullptr;
+	for (const auto &it : canvas_docks) {
+		if (it->parentWidget()->objectName() == name) {
+			d = (QDockWidget *)it->parentWidget();
+			it->reset_build_state();
+			break;
+		}
+	}
+	for (const auto &it : canvas_clone_docks) {
+		if (it->parentWidget()->objectName() == name) {
+			d = (QDockWidget *)it->parentWidget();
+			it->reset_build_state();
+			break;
+		}
+	}
+	if (!d)
+		return;
+
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
+	QMetaObject::invokeMethod(main_window, "on_sideDocks_toggled", Q_ARG(bool, true));
+
+	d->setVisible(true);
+	d->setFloating(false);
+	main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+	main_window->resizeDocks({d}, {main_window->width() / 2}, Qt::Horizontal);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("mixerDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("SceneNotesDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("transitionsDock"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteLiveScenes"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteChat"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteActivity"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteInfo"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOutput"));
+	if (d)
+		d->setVisible(false);
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteFilters"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
+	}
+
+	QList<QDockWidget *> top_docks;
+	QList<int> top_dock_sizes;
+	QList<int> top_dock_sizes2;
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+		top_docks.append(d);
+		top_dock_sizes.append(2);
+		top_dock_sizes2.append(800);
+	}
+
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteTransform"));
+	if (d) {
+		d->setVisible(true);
+		d->setFloating(false);
+		main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+		top_docks.append(d);
+		top_dock_sizes.append(2);
+		top_dock_sizes2.append(800);
+	}
+
+	main_window->resizeDocks(top_docks, top_dock_sizes, Qt::Horizontal);
+	main_window->resizeDocks(top_docks, top_dock_sizes2, Qt::Vertical);
+}
+
+void create_new_dock_mode(const char *name)
+{
+	QString qname = QString::fromUtf8(name);
+	for (int i = 0; i < modesTabBar->count(); i++) {
+		if (modesTabBar->tabText(i) == qname)
+			return;
+	}
+
+	auto index = modesTabBar->addTab(qname);
+	modesTabBar->setCurrentIndex(index);
+	reset_canvas_dock_state(name);
+	save_dock_state(qname);
+}
+
+void load_canvas(bool check_new_canvas)
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
@@ -644,6 +766,7 @@ void load_canvas()
 			for (const auto &it : canvas_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					check_new_canvas = false;
 					break;
 				}
 			}
@@ -655,6 +778,7 @@ void load_canvas()
 					    strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) != 0) {
 						// canvas name changed, remove old dock and create a new one
 						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+						check_new_canvas = false;
 					} else {
 						ccd = it;
 					}
@@ -662,6 +786,7 @@ void load_canvas()
 				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) == 0) {
 					if (obs_canvas_removed(it->GetCanvas())) {
 						obs_frontend_remove_dock(name);
+						check_new_canvas = false;
 						break;
 					}
 					obs_data_set_string(t, "uuid", cuuid);
@@ -681,6 +806,8 @@ void load_canvas()
 						ccd->parentWidget()->show();
 						obs_data_set_bool(t, "has_loaded", true);
 					}
+					if (check_new_canvas)
+						create_new_dock_mode(name);
 				} else {
 					delete ccd;
 				}
@@ -692,6 +819,7 @@ void load_canvas()
 			for (const auto &it : canvas_clone_docks) {
 				if (strcmp(obs_canvas_get_uuid(it->GetCanvas()), uuid) == 0) {
 					obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+					check_new_canvas = false;
 					break;
 				}
 			}
@@ -703,6 +831,7 @@ void load_canvas()
 					    strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) != 0) {
 						// canvas name changed, remove old dock and create a new one
 						obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
+						check_new_canvas = false;
 					} else {
 						cd = it;
 					}
@@ -710,6 +839,7 @@ void load_canvas()
 				} else if (strcmp(it->parentWidget()->objectName().toUtf8().constData(), name) == 0) {
 					if (obs_canvas_removed(it->GetCanvas())) {
 						obs_frontend_remove_dock(name);
+						check_new_canvas = false;
 						break;
 					}
 					obs_data_set_string(t, "uuid", cuuid);
@@ -730,6 +860,8 @@ void load_canvas()
 						cd->parentWidget()->show();
 						obs_data_set_bool(t, "has_loaded", true);
 					}
+					if (check_new_canvas)
+						create_new_dock_mode(name);
 				} else {
 					delete cd;
 				}
@@ -910,6 +1042,14 @@ void load_current_profile_config()
 			obs_data_set_int(new_output, "max_time_sec", 10);
 			obs_data_array_push_back(outputs2, new_output);
 			obs_data_release(new_output);
+
+			new_output = obs_data_create();
+			obs_data_set_bool(new_output, "enabled", true);
+			obs_data_set_string(new_output, "type", "virtual_cam");
+			obs_data_set_string(new_output, "name", "Vertical Virtual Camera");
+			obs_data_set_string(new_output, "canvas", canvas_name);
+			obs_data_array_push_back(outputs2, new_output);
+			obs_data_release(new_output);
 		}
 		obs_data_array_release(outputs2);
 	} else {
@@ -979,7 +1119,7 @@ void load_current_profile_config()
 		}
 	}
 	obs_data_item_release(&dsm);
-	load_canvas();
+	load_canvas(false);
 
 	load_outputs();
 
@@ -1232,6 +1372,7 @@ void open_config_dialog(int tab, const char *create_type)
 	if (configDialog->exec() == QDialog::Accepted) {
 		bool canvas_changed = false;
 		bool outputs_changed = false;
+		bool check_new_canvas = false;
 		if (current_profile_config) {
 			auto show = obs_data_get_bool(settings, "main_stream_output_show");
 			if (show != obs_data_get_bool(current_profile_config, "main_stream_output_show")) {
@@ -1265,6 +1406,7 @@ void open_config_dialog(int tab, const char *create_type)
 			b = obs_data_get_array(settings, "outputs");
 			if (!obs_data_array_equal(a, b)) {
 				outputs_changed = true;
+				check_new_canvas = true;
 				obs_data_set_array(current_profile_config, "outputs", b);
 			}
 			obs_data_array_release(a);
@@ -1280,7 +1422,7 @@ void open_config_dialog(int tab, const char *create_type)
 
 		save_current_profile_config(true);
 		if (canvas_changed) {
-			load_canvas();
+			load_canvas(check_new_canvas);
 			if (vendor)
 				obs_websocket_vendor_emit_event(vendor, "canvas_changed", nullptr);
 		}
@@ -1412,6 +1554,27 @@ bool obs_module_load(void)
 				}
 			});
 		} else {
+			bool found = false;
+			for (auto it : canvas_docks) {
+				if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
+					found = true;
+					break;
+				}
+			}
+			for (auto it : canvas_clone_docks) {
+				if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
+					found = true;
+					break;
+				}
+			}
+			if (found) {
+				menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [] {
+					auto index = modesTabBar->currentIndex();
+					if (index < 0)
+						return;
+					reset_canvas_dock_state(modesTabBar->tabText(index));
+				});
+			}
 			menu.addAction(QString::fromUtf8(obs_module_text("Remove")), [] {
 				auto index = modesTabBar->currentIndex();
 				if (index < 0)

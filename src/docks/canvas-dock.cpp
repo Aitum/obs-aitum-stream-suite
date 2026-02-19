@@ -5357,13 +5357,26 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 void CanvasDock::reset_live_state()
 {
 	panel_split->setSizes({1, 0, 0});
-	canvas_split->setSizes({1, 1});
+	auto w = width();
+	auto h = height();
+	if (w > h) {
+		canvas_split->setSizes({w * 2 / 3, w / 3});
+	} else {
+		canvas_split->setSizes({h * 2 / 3, h / 3});
+	}
 }
 
 void CanvasDock::reset_build_state()
 {
-	canvas_split->setSizes({1, 1});
-	panel_split->setSizes({1, 1, 1});
+	auto w = width();
+	auto h = height();
+	if (w > h) {
+		canvas_split->setSizes({w * 2 / 3, w / 3});
+		panel_split->setSizes({1, 1, 1});
+	} else {
+		canvas_split->setSizes({h * 2 / 3, h / 3});
+		panel_split->setSizes({1, 1, 1});
+	}
 }
 
 void CanvasDock::LogScenes()
