@@ -347,6 +347,8 @@ void reset_live_dock_state()
 	main_window->resizeDocks(left_docks, left_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
+
+	save_dock_state(QString::fromStdString("Live"));
 }
 
 void reset_build_dock_state()
@@ -480,6 +482,8 @@ void reset_build_dock_state()
 
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
+
+	save_dock_state(QString::fromStdString("Build"));
 }
 
 void reset_design_dock_state()
@@ -531,10 +535,13 @@ void reset_design_dock_state()
 		d->setVisible(true);
 		d->setFloating(false);
 	}
+
+	save_dock_state(QString::fromStdString("Design"));
 }
 
-std::vector<std::tuple<std::string, void (*)(void), QString>> fixed_tabs = {{"Live", reset_live_dock_state, QString::fromUtf8("📡")},
-										{"Build", reset_build_dock_state, QString::fromUtf8("🔨")}};
+std::vector<std::tuple<std::string, void (*)(void), QString>> fixed_tabs = {
+	{"Live", reset_live_dock_state, QString::fromUtf8("📡")},
+	{"Build", reset_build_dock_state, QString::fromUtf8("🔨")}};
 //,{"Design", reset_design_dock_state, QString::fromUtf8("🎨")}};
 
 static bool scene_collection_changing = false;
@@ -556,7 +563,7 @@ void load_dock_state(QString mode)
 			auto name = std::get<0>(*it);
 			auto translated = obs_module_text(name.c_str());
 			if ((translated && mode == translated) || mode == QString::fromStdString(name)) {
-				std::get<1>(*it)();
+				std::get<1> (*it)();
 				return;
 			}
 		}
