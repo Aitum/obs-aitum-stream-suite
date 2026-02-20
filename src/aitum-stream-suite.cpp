@@ -533,9 +533,9 @@ void reset_design_dock_state()
 	}
 }
 
-std::vector<std::pair<std::string, void (*)(void)>> fixed_tabs = {{"Live", reset_live_dock_state},
-								  {"Build", reset_build_dock_state}};
-//,{"Design", reset_design_dock_state}};
+std::vector<std::tuple<std::string, void (*)(void), QString>> fixed_tabs = {{"Live", reset_live_dock_state, QString::fromUtf8("📡")},
+										{"Build", reset_build_dock_state, QString::fromUtf8("🔨")}};
+//,{"Design", reset_design_dock_state, QString::fromUtf8("🎨")}};
 
 static bool scene_collection_changing = false;
 
@@ -553,9 +553,10 @@ void load_dock_state(QString mode)
 	}
 	if (state.empty()) {
 		for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
-			auto translated = obs_module_text(it->first.c_str());
-			if ((translated && mode == translated) || mode == QString::fromStdString(it->first)) {
-				it->second();
+			auto name = std::get<0>(*it);
+			auto translated = obs_module_text(name.c_str());
+			if ((translated && mode == translated) || mode == QString::fromStdString(name)) {
+				std::get<1>(*it)();
 				return;
 			}
 		}
@@ -1485,8 +1486,9 @@ bool obs_module_load(void)
 	//tb->setAllowedAreas(Qt::ToolBarArea::TopToolBarArea);
 
 	for (auto it : fixed_tabs) {
-		auto index = modesTabBar->addTab(QString::fromUtf8(obs_module_text(it.first.c_str())));
-		modesTabBar->setTabData(index, QString::fromUtf8(it.first.c_str()));
+		auto index = modesTabBar->addTab(QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
+		modesTabBar->setTabData(index, QString::fromUtf8(std::get<0>(it).c_str()));
+		modesTabBar->setTabIcon(index, generateEmojiQIcon(std::get<2>(it), modesTabBar->palette().color(QPalette::Text)));
 	}
 	toolbar->addWidget(modesTabBar);
 	auto addModeAction =
@@ -1549,8 +1551,8 @@ bool obs_module_load(void)
 			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 				menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [d] {
 					for (auto it : fixed_tabs) {
-						if (it.first == d.toString().toUtf8().constData()) {
-							it.second();
+						if (std::get<0>(it) == d.toString().toUtf8().constData()) {
+							std::get<1>(it)();
 							return;
 						}
 					}
