@@ -1541,47 +1541,50 @@ bool obs_module_load(void)
 	});
 
 	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
+		int tab = modesTabBar->tabAt(QCursor::pos() - modesTabBar->mapToGlobal(QPoint(0, 0)));
 		QMenu menu;
 		auto index = modesTabBar->currentIndex();
-		auto d = modesTabBar->tabData(index);
-		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-			menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [d] {
-				for (auto it : fixed_tabs) {
-					if (it.first == d.toString().toUtf8().constData()) {
-						it.second();
-						return;
+		if (tab == index) {
+			auto d = modesTabBar->tabData(index);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [d] {
+					for (auto it : fixed_tabs) {
+						if (it.first == d.toString().toUtf8().constData()) {
+							it.second();
+							return;
+						}
+					}
+				});
+			} else {
+				bool found = false;
+				for (auto it : canvas_docks) {
+					if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
+						found = true;
+						break;
 					}
 				}
-			});
-		} else {
-			bool found = false;
-			for (auto it : canvas_docks) {
-				if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
-					found = true;
-					break;
+				for (auto it : canvas_clone_docks) {
+					if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
+						found = true;
+						break;
+					}
 				}
-			}
-			for (auto it : canvas_clone_docks) {
-				if (it->parentWidget()->objectName() == modesTabBar->tabText(index)) {
-					found = true;
-					break;
+				if (found) {
+					menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [] {
+						auto index = modesTabBar->currentIndex();
+						if (index < 0)
+							return;
+						reset_canvas_dock_state(modesTabBar->tabText(index));
+					});
 				}
-			}
-			if (found) {
-				menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [] {
+				menu.addAction(QString::fromUtf8(obs_module_text("Remove")), [] {
 					auto index = modesTabBar->currentIndex();
 					if (index < 0)
 						return;
-					reset_canvas_dock_state(modesTabBar->tabText(index));
+					modesTabBar->removeTab(index);
+					save_current_profile_config(true);
 				});
 			}
-			menu.addAction(QString::fromUtf8(obs_module_text("Remove")), [] {
-				auto index = modesTabBar->currentIndex();
-				if (index < 0)
-					return;
-				modesTabBar->removeTab(index);
-				save_current_profile_config(true);
-			});
 		}
 		auto a = menu.addAction(QString::fromUtf8(obs_module_text("DockModeAutoSave")), [] {
 			if (!current_profile_config)
@@ -1591,20 +1594,22 @@ bool obs_module_load(void)
 		});
 		a->setCheckable(true);
 		a->setChecked(current_profile_config ? !obs_data_get_bool(current_profile_config, "dock_mode_manual_save") : true);
-		menu.addAction(QString::fromUtf8(obs_module_text("DockModeSave")), [] {
-			auto index = modesTabBar->currentIndex();
-			if (index < 0)
-				return;
-			QString tn;
-			auto d = modesTabBar->tabData(index);
-			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-				tn = d.toString();
-			} else {
-				tn = modesTabBar->tabText(index);
-			}
-			save_dock_state(tn);
-			save_current_profile_config(true);
-		});
+		if (tab == index) {
+			menu.addAction(QString::fromUtf8(obs_module_text("DockModeSave")), [] {
+				auto index = modesTabBar->currentIndex();
+				if (index < 0)
+					return;
+				QString tn;
+				auto d = modesTabBar->tabData(index);
+				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+					tn = d.toString();
+				} else {
+					tn = modesTabBar->tabText(index);
+				}
+				save_dock_state(tn);
+				save_current_profile_config(true);
+			});
+		}
 		menu.addSeparator();
 		menu.addAction(QString::fromUtf8(obs_module_text("AddEmptyDock")), [] {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
