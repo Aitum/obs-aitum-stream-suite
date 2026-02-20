@@ -1544,7 +1544,7 @@ bool obs_module_load(void)
 		int tab = modesTabBar->tabAt(QCursor::pos() - modesTabBar->mapToGlobal(QPoint(0, 0)));
 		QMenu menu;
 		auto index = modesTabBar->currentIndex();
-		if (tab == index) {
+		if (tab == index || tab == -1) {
 			auto d = modesTabBar->tabData(index);
 			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 				menu.addAction(QString::fromUtf8(obs_module_text("Reset")), [d] {
@@ -1594,7 +1594,7 @@ bool obs_module_load(void)
 		});
 		a->setCheckable(true);
 		a->setChecked(current_profile_config ? !obs_data_get_bool(current_profile_config, "dock_mode_manual_save") : true);
-		if (tab == index) {
+		if (tab == index || tab == -1) {
 			menu.addAction(QString::fromUtf8(obs_module_text("DockModeSave")), [] {
 				auto index = modesTabBar->currentIndex();
 				if (index < 0)
@@ -1657,7 +1657,11 @@ bool obs_module_load(void)
 				});
 			}
 		}
-		menu.exec(QCursor::pos());
+		if (tab >= 0) {
+			menu.exec(QCursor::pos());
+		} else {
+			menu.exec(modesTabBar->mapToGlobal(modesTabBar->tabRect(index).center()));
+		}
 	});
 
 	auto aitumSettingsAction = toolbar->addAction(QString::fromUtf8(obs_module_text("Settings")));
