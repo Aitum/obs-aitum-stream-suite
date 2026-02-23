@@ -640,7 +640,7 @@ void CanvasDock::LoadUI()
 				auto tr = frontend_transitions.sources.array[i];
 				const char *name = obs_source_get_name(tr);
 				auto action = subMenu->addAction(QString::fromUtf8(name));
-				if (!obs_is_source_configurable(obs_source_get_unversioned_id(tr))) {
+				if (!obs_is_source_configurable(obs_source_get_id(tr))) {
 					action->setEnabled(false);
 				}
 				for (auto t : transitions) {
@@ -733,7 +733,7 @@ void CanvasDock::LoadUI()
 			auto n = transition->currentText().toUtf8();
 			for (auto it = transitions.begin(); it != transitions.end(); ++it) {
 				if (strcmp(n.constData(), obs_source_get_name(it->Get())) == 0) {
-					if (!obs_is_source_configurable(obs_source_get_unversioned_id(it->Get())))
+					if (!obs_is_source_configurable(obs_source_get_id(it->Get())))
 						return;
 					transitions.erase(it);
 					break;
@@ -816,7 +816,7 @@ void CanvasDock::LoadUI()
 			if (!t)
 				return;
 			SwapTransition(t);
-			bool config = obs_is_source_configurable(obs_source_get_unversioned_id(t));
+			bool config = obs_is_source_configurable(obs_source_get_id(t));
 			removeButton->setEnabled(config);
 			propsButton->setEnabled(config);
 		});
@@ -1051,7 +1051,7 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 
 	obs_data_array_t *transition_array = obs_data_array_create();
 	for (auto transition : transitions) {
-		const char *id = obs_source_get_unversioned_id(transition);
+		const char *id = obs_source_get_id(transition);
 		if (!obs_is_source_configurable(id))
 			continue;
 		obs_data_t *transition_data = obs_save_source(transition);
@@ -1376,7 +1376,8 @@ obs_source_t *CanvasDock::CreateLabel(float pixelRatio, int i)
 	struct dstr name;
 	dstr_init(&name);
 	dstr_printf(&name, "Aitum Stream Suite Preview spacing label %d", i);
-	OBSSource txtSource = obs_source_create_private(text_source_id, name.array, settings);
+	auto v_id = obs_get_latest_input_type_id(text_source_id);
+	OBSSource txtSource = obs_source_create_private(v_id, name.array, settings);
 	dstr_free(&name);
 	return txtSource;
 }
@@ -5142,7 +5143,7 @@ void CanvasDock::AddSourceFromAction()
 			while ((s = obs_get_source_by_name(text.toUtf8().constData()))) {
 				text = QString("%1 %2").arg(placeHolderText).arg(i++);
 			}
-			created_source = obs_source_create(id, text.toUtf8().constData(), nullptr, nullptr);
+			created_source = obs_source_create(v_id, text.toUtf8().constData(), nullptr, nullptr);
 		}
 		obs_scene_add(scene, created_source);
 		if (obs_source_configurable(created_source)) {
@@ -5693,7 +5694,7 @@ void CanvasDock::RemoveTransition(const char *transition_name)
 {
 	for (auto it = transitions.begin(); it != transitions.end(); ++it) {
 		if (strcmp(transition_name, obs_source_get_name(it->Get())) == 0) {
-			if (!obs_is_source_configurable(obs_source_get_unversioned_id(it->Get())))
+			if (!obs_is_source_configurable(obs_source_get_id(it->Get())))
 				return;
 			transitions.erase(it);
 			break;
