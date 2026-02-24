@@ -33,6 +33,10 @@ private:
 	bool mainRecordEnabled = true;
 	bool mainBacktrackEnabled = true;
 	bool mainVirtualCamEnabled = true;
+	QDateTime mainStreamStartTime;
+	QDateTime mainRecordStartTime;
+	QDateTime mainBacktrackStartTime;
+	QDateTime mainVirtualCamStartTime;
 
 	QTimer videoCheckTimer;
 

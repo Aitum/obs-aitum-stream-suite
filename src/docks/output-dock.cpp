@@ -77,13 +77,13 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 		a2->setProperty("themeID", QVariant(QString::fromUtf8("playIcon")));
 		a2->setProperty("class", "icon-media-play");
 		if (mainStreamEnabled || std::find_if(outputWidgets.begin(), outputWidgets.end(),
-						     [](OutputWidget *w) { return w->IsStream(); }) != outputWidgets.end()) {
+						      [](OutputWidget *w) { return w->IsStream(); }) != outputWidgets.end()) {
 			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/stream.svg")),
 					    QString::fromUtf8(obs_module_text("StartAllStreams")),
 					    [this]() { StartAll(true, false); });
 		}
 		if (mainRecordEnabled || std::find_if(outputWidgets.begin(), outputWidgets.end(),
-						     [](OutputWidget *w) { return w->IsRecord(); }) != outputWidgets.end()) {
+						      [](OutputWidget *w) { return w->IsRecord(); }) != outputWidgets.end()) {
 			startMenu.addAction(QIcon(QString::fromUtf8(":/aitum/media/record.svg")),
 					    QString::fromUtf8(obs_module_text("StartAllRecordings")),
 					    [this]() { StartAll(false, true); });
@@ -237,13 +237,14 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 	mainBacktrackButton->setMinimumHeight(30);
 	mainBacktrackButton->setIcon(create2StateIcon(":/aitum/media/backtrack_on.svg", ":/aitum/media/backtrack_off.svg"));
 	mainBacktrackButton->setStyleSheet(
-		"QPushButton:checked{background: rgb(26,87,255);} QPushButton{width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}");
+		"QPushButton:checked{background: rgb(26,87,255);} QPushButton{min-width: 32px; padding-left: 0px; padding-right: 0px; border-top-left-radius: 0; border-bottom-left-radius: 0;}");
 	mainBacktrackButton->setCheckable(true);
 	mainBacktrackButton->setChecked(false);
 	QObject::connect(mainBacktrackButton, &QPushButton::clicked, [this] {
 		if (obs_frontend_replay_buffer_active()) {
 			obs_frontend_replay_buffer_save();
 			mainBacktrackButton->setChecked(true);
+			mainBacktrackStartTime = QDateTime::currentDateTime();
 		} else {
 			mainBacktrackButton->setChecked(false);
 		}
@@ -329,6 +330,11 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto active = obs_frontend_streaming_active();
 			if (mainStreamButton->isChecked() != active) {
 				mainStreamButton->setChecked(active);
+				if (!active) 
+					mainStreamButton->setText("");
+			} else if (active) {
+				auto t = QTime::fromMSecsSinceStartOfDay(mainStreamStartTime.msecsTo(QDateTime::currentDateTime()));
+				mainStreamButton->setText(t.toString(t.hour() ? "hh:mm:ss" : "mm:ss"));
 			}
 		}
 
@@ -336,6 +342,11 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto active = obs_frontend_recording_active();
 			if (mainRecordButton->isChecked() != active) {
 				mainRecordButton->setChecked(active);
+				if (!active)
+					mainRecordButton->setText("");
+			} else if (active) {
+				auto t = QTime::fromMSecsSinceStartOfDay(mainRecordStartTime.msecsTo(QDateTime::currentDateTime()));
+				mainRecordButton->setText(t.toString(t.hour() ? "hh:mm:ss" : "mm:ss"));
 			}
 		}
 
@@ -343,6 +354,12 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto enabled = obs_frontend_replay_buffer_active();
 			if (mainBacktrackCheckboxButton->isChecked() != enabled) {
 				mainBacktrackCheckboxButton->setChecked(enabled);
+				if (!enabled) 
+					mainBacktrackButton->setText("");
+			} else if (enabled) {
+				auto t = QTime::fromMSecsSinceStartOfDay(
+					mainBacktrackStartTime.msecsTo(QDateTime::currentDateTime()));
+				mainBacktrackButton->setText(t.toString(t.hour() ? "hh:mm:ss" : "mm:ss"));
 			}
 			if (mainBacktrackCheckbox->isChecked() != enabled) {
 				mainBacktrackCheckbox->setChecked(enabled);
@@ -356,6 +373,12 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto active = obs_frontend_virtualcam_active();
 			if (mainVirtualCamButton->isChecked() != active) {
 				mainVirtualCamButton->setChecked(active);
+				if (!active)
+					mainVirtualCamButton->setText("");
+			} else if (active) {
+				auto t = QTime::fromMSecsSinceStartOfDay(
+					mainVirtualCamStartTime.msecsTo(QDateTime::currentDateTime()));
+				mainVirtualCamButton->setText(t.toString(t.hour() ? "hh:mm:ss" : "mm:ss"));
 			}
 		}
 
@@ -441,16 +464,16 @@ void OutputDock::LoadSettings()
 {
 	mainStreamEnabled = obs_data_get_bool(current_profile_config, "main_stream_output_show");
 	mainStreamGroup->setVisible(mainStreamEnabled);
-	
+
 	mainRecordEnabled = obs_data_get_bool(current_profile_config, "main_record_output_show");
 	mainRecordGroup->setVisible(mainRecordEnabled);
-	
+
 	mainBacktrackEnabled = obs_data_get_bool(current_profile_config, "main_backtrack_output_show");
 	mainBacktrackGroup->setVisible(mainBacktrackEnabled);
-	
+
 	mainVirtualCamEnabled = obs_data_get_bool(current_profile_config, "main_virtual_cam_output_show");
 	mainVirtualCamGroup->setVisible(mainVirtualCamEnabled);
-	
+
 	auto outputs2 = obs_data_get_array(current_profile_config, "outputs");
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end();) {
 		bool found = false;
@@ -538,8 +561,13 @@ void OutputDock::SaveSettings()
 void OutputDock::UpdateMainStreamStatus(bool active)
 {
 	mainStreamButton->setChecked(active);
-	if (!active)
+	if (active) {
+		mainStreamStartTime = QDateTime::currentDateTime();
+		mainStreamButton->setText("00:00");
+	} else {
+		mainStreamButton->setText("");
 		return;
+	}
 	if (!current_profile_config)
 		return;
 	struct obs_video_info ovi = {0};
@@ -579,6 +607,12 @@ void OutputDock::UpdateMainStreamStatus(bool active)
 void OutputDock::UpdateMainRecordingStatus(bool active)
 {
 	mainRecordButton->setChecked(active);
+	if (active) {
+		mainRecordStartTime = QDateTime::currentDateTime();
+		mainRecordButton->setText("00:00");
+	} else {
+		mainRecordButton->setText("");
+	}
 }
 
 void OutputDock::UpdateMainBacktrackStatus(bool active)
@@ -586,11 +620,23 @@ void OutputDock::UpdateMainBacktrackStatus(bool active)
 	mainBacktrackCheckboxButton->setChecked(active);
 	mainBacktrackCheckbox->setChecked(active);
 	mainBacktrackButton->setChecked(active);
+	if (active) {
+		mainBacktrackStartTime = QDateTime::currentDateTime();
+		mainBacktrackButton->setText("00:00");
+	} else {
+		mainBacktrackButton->setText("");
+	}
 }
 
 void OutputDock::UpdateMainVirtualCameraStatus(bool active)
 {
 	mainVirtualCamButton->setChecked(active);
+	if (active) {
+		mainVirtualCamStartTime = QDateTime::currentDateTime();
+		mainVirtualCamButton->setText("00:00");
+	} else {
+		mainVirtualCamButton->setText("");
+	}
 }
 
 obs_data_array_t *OutputDock::GetOutputsArray()
