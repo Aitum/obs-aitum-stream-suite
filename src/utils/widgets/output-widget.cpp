@@ -101,6 +101,48 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		obs_hotkey_load(chapterHotkey, chapter_hotkey);
 		obs_data_array_release(chapter_hotkey);
 
+		std::string pauseName = "AitumStreamSuitePause";
+		pauseName += nameChars;
+		std::string unpauseName = "AitumStreamSuiteUnpause";
+		unpauseName += nameChars;
+
+		std::string pauseDescription = obs_frontend_get_locale_string("Basic.Main.PauseRecording");
+		pauseDescription = pauseDescription + " " + nameChars;
+		std::string unpauseDescription = obs_frontend_get_locale_string("Basic.Main.UnpauseRecording");
+		unpauseDescription = unpauseDescription + " " + nameChars;
+
+		PauseHotkey = obs_hotkey_pair_register_frontend(pauseName.c_str(), pauseDescription.c_str(),
+								 unpauseName.c_str(), unpauseDescription.c_str(),
+			[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+				UNUSED_PARAMETER(id);
+				UNUSED_PARAMETER(hotkey);
+				if (!pressed)
+					return false;
+				auto this_ = (OutputWidget *)data;
+				if (this_->output && !obs_output_paused(this_->output)) {
+					return obs_output_pause(this_->output, true);
+				}
+				return false;
+			},
+			[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
+				UNUSED_PARAMETER(id);
+				UNUSED_PARAMETER(hotkey);
+				if (!pressed)
+					return false;
+				auto this_ = (OutputWidget *)data;
+				if (this_->output && obs_output_paused(this_->output)) {
+					return obs_output_pause(this_->output, false);
+				}
+				return false;
+			},
+			this, this);
+
+		auto pause_hotkey = obs_data_get_array(settings, "pause_hotkey");
+		auto unpause_hotkey = obs_data_get_array(settings, "unpause_hotkey");
+		obs_hotkey_pair_load(PauseHotkey, pause_hotkey, unpause_hotkey);
+		obs_data_array_release(pause_hotkey);
+		obs_data_array_release(unpause_hotkey);
+
 	} else if (strcmp(output_type, "backtrack") == 0) {
 		outputButton->setStyleSheet(QString::fromUtf8(
 			"QPushButton:checked{background: rgb(26,87,255);} QPushButton{ border-top-right-radius: 0; border-bottom-right-radius: 0; width: 32px; padding-left: 0px; padding-right: 0px;}"));
@@ -281,6 +323,8 @@ OutputWidget::~OutputWidget()
 {
 	if (StartStopHotkey != OBS_INVALID_HOTKEY_PAIR_ID)
 		obs_hotkey_pair_unregister(StartStopHotkey);
+	if (PauseHotkey != OBS_INVALID_HOTKEY_PAIR_ID)
+		obs_hotkey_pair_unregister(PauseHotkey);
 	if (extraHotkey != OBS_INVALID_HOTKEY_ID)
 		obs_hotkey_unregister(extraHotkey);
 	if (splitHotkey != OBS_INVALID_HOTKEY_ID)
@@ -1095,6 +1139,15 @@ void OutputWidget::SaveSettings()
 		obs_data_set_array(settings, "stop_hotkey", stop_hotkey);
 		obs_data_array_release(start_hotkey);
 		obs_data_array_release(stop_hotkey);
+	}
+	if (PauseHotkey != OBS_INVALID_HOTKEY_PAIR_ID) {
+		obs_data_array_t *pause_hotkey = nullptr;
+		obs_data_array_t *unpause_hotkey = nullptr;
+		obs_hotkey_pair_save(PauseHotkey, &pause_hotkey, &unpause_hotkey);
+		obs_data_set_array(settings, "pause_hotkey", pause_hotkey);
+		obs_data_set_array(settings, "unpause_hotkey", unpause_hotkey);
+		obs_data_array_release(pause_hotkey);
+		obs_data_array_release(unpause_hotkey);
 	}
 	if (extraHotkey != OBS_INVALID_HOTKEY_ID) {
 		obs_data_array_t *extra_hotkey = obs_hotkey_save(extraHotkey);

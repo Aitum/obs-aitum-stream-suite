@@ -1724,6 +1724,41 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			}
 		}
 
+		std::string pauseName = "AitumStreamSuitePause";
+		pauseName += obs_data_get_string(settings, "name");
+		OBSHotkeyWidget *pauseHotkeyWidget = nullptr;
+		hotkey = GetHotkeyByName(pauseName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			pauseHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.PauseRecording")));
+			pauseHotkeyWidget->label = label;
+			hotkeyLayout->addRow(label, pauseHotkeyWidget);
+			hotkeys.push_back(pauseHotkeyWidget);
+		}
+
+		std::string unpauseName = "AitumStreamSuiteUnpause";
+		unpauseName += obs_data_get_string(settings, "name");
+		hotkey = GetHotkeyByName(unpauseName.c_str());
+		if (hotkey) {
+			auto id = obs_hotkey_get_id(hotkey);
+			std::vector<obs_key_combination_t> combos = GetCombosForHotkey(id);
+			auto hn = obs_hotkey_get_name(hotkey);
+			auto unpauseHotkeyWidget = new OBSHotkeyWidget(this, id, hn, combos);
+			auto label = new OBSHotkeyLabel;
+			label->setText(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.UnpauseRecording")));
+			unpauseHotkeyWidget->label = label;
+			hotkeyLayout->addRow(label, unpauseHotkeyWidget);
+			hotkeys.push_back(unpauseHotkeyWidget);
+			if (pauseHotkeyWidget) {
+				unpauseHotkeyWidget->label->pairPartner = pauseHotkeyWidget->label;
+				pauseHotkeyWidget->label->pairPartner = unpauseHotkeyWidget->label;
+			}
+		}
+
 		std::string ebName = "AitumStreamSuiteSaveBacktrack";
 		ebName += obs_data_get_string(settings, "name");
 		hotkey = GetHotkeyByName(ebName.c_str());
