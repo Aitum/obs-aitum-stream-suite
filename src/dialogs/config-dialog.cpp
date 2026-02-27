@@ -751,7 +751,6 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		replace_sources = obs_data_array_create();
 		obs_data_set_array(settings, "replace_sources", replace_sources);
 	}
-
 	for (int i = 0; i < 5; i++) {
 		obs_data_t *item = obs_data_array_item(replace_sources, i);
 		if (!item) {
@@ -760,51 +759,21 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		}
 		auto sourceCombo = new QComboBox;
 		sourceCombo->setEditable(true);
-		obs_enum_all_sources(
-			[](void *param, obs_source_t *source) {
-				if (obs_obj_is_private(source))
-					return true;
-				auto combo = (QComboBox *)param;
-
-				auto name = QString::fromUtf8(obs_source_get_name(source));
-				int index = 0;
-				while (index < combo->count() && combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
-					index++;
-				combo->insertItem(index, name);
-
-				return true;
-			},
-			sourceCombo);
 		sourceCombo->insertItem(0, "");
-		sourceCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(item, "source")));
 		connect(sourceCombo, &QComboBox::editTextChanged, [this, sourceCombo, item] {
 			auto text = sourceCombo->currentText().trimmed();
 			obs_data_set_string(item, "source", text.toUtf8().constData());
 		});
+		sourceCombos.push_back(std::make_pair(sourceCombo,QString::fromUtf8(obs_data_get_string(item, "source"))));
 
 		auto replaceCombo = new QComboBox;
 		replaceCombo->setEditable(true);
-		obs_enum_all_sources(
-			[](void *param, obs_source_t *source) {
-				if (obs_obj_is_private(source))
-					return true;
-				auto combo = (QComboBox *)param;
-
-				auto name = QString::fromUtf8(obs_source_get_name(source));
-				int index = 0;
-				while (index < combo->count() && combo->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
-					index++;
-				combo->insertItem(index, name);
-
-				return true;
-			},
-			replaceCombo);
 		replaceCombo->insertItem(0, "");
-		replaceCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(item, "replacement")));
 		connect(replaceCombo, &QComboBox::editTextChanged, [this, replaceCombo, item] {
 			auto text = replaceCombo->currentText().trimmed();
 			obs_data_set_string(item, "replacement", text.toUtf8().constData());
 		});
+		sourceCombos.push_back(std::make_pair(replaceCombo,QString::fromUtf8(obs_data_get_string(item, "replacement"))));
 		replaceLayout->addWidget(sourceCombo, i + 1, 0);
 		replaceLayout->addWidget(replaceCombo, i + 1, 1);
 
@@ -990,6 +959,37 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 			obs_data_array_release(outputs2);
 		},
 		this);
+
+	LoadSourceCombos();
+}
+
+void OBSBasicSettings::LoadSourceCombos() {
+	if (sourceCombos.empty())
+		return;
+	for (auto it : sourceCombos) {
+		it.first->blockSignals(true);
+	}
+	obs_enum_all_sources(
+		[](void *param, obs_source_t *source) {
+			if (obs_obj_is_private(source))
+				return true;
+			auto this_ = (OBSBasicSettings *)param;
+			auto name = QString::fromUtf8(obs_source_get_name(source));
+			int index = 0;
+			auto fc = this_->sourceCombos.front().first;
+			while (index < fc->count() && fc->itemText(index).compare(name, Qt::CaseInsensitive) < 0)
+				index++;
+			for (auto it : this_->sourceCombos)
+				it.first->insertItem(index, name);
+
+			return true;
+		},
+		this);
+	for (auto it : sourceCombos) {
+		it.first->setCurrentText(it.second);
+		it.first->blockSignals(false);
+	}
+	sourceCombos.clear();
 }
 
 void OBSBasicSettings::AddProperty(obs_properties_t *properties, obs_property_t *property, obs_data_t *settings,
@@ -1442,6 +1442,7 @@ void OBSBasicSettings::AddCanvas()
 	obs_data_set_bool(s, "expanded", true);
 	obs_data_array_push_back(canvases, s);
 	AddCanvas(canvasLayout, s, canvases);
+	LoadSourceCombos();
 	obs_data_release(s);
 
 	obs_data_array_release(canvases);
@@ -1967,6 +1968,61 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	obs_data_array_release(video_encoders);
 
+	QFrame *customDelayGroup = nullptr;
+	QCheckBox *customDelayCheckBox = nullptr;
+	bool customDelay = false;
+	if (output_type[0] == '\0' || strcmp(output_type, "stream") == 0) {
+
+		customDelay = obs_data_get_bool(settings, "custom_delay");
+
+		customDelayGroup = new QFrame;
+		customDelayGroup->setContentsMargins(0, 4, 0, 0);
+		customDelayGroup->setVisible(customDelay && expanded);
+
+		customDelayCheckBox = new QCheckBox(QString::fromUtf8(obs_module_text("CustomDelay")));
+		customDelayCheckBox->setCheckable(true);
+		customDelayCheckBox->setChecked(customDelay);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+		connect(customDelayCheckBox, &QCheckBox::checkStateChanged, [customDelayCheckBox, customDelayGroup, settings] {
+#else
+		connect(customDelayCheckBox, &QCheckBox::stateChanged, [customDelayCheckBox, customDelayGroup, settings] {
+#endif
+			const bool is_custom_delay = customDelayCheckBox->isChecked();
+			const bool expanded = obs_data_get_bool(settings, "expanded");
+			customDelayGroup->setVisible(is_custom_delay && expanded);
+			obs_data_set_bool(settings, "custom_delay", is_custom_delay);
+		});
+
+		auto customDelayLayout = new QFormLayout;
+		customDelayGroup->setLayout(customDelayLayout);
+
+		auto streamDelaySec = new QSpinBox;
+		streamDelaySec->setObjectName("streamDelaySec");
+		streamDelaySec->setSuffix(QString::fromUtf8(" s"));
+		streamDelaySec->setMinimum(0);
+		streamDelaySec->setMaximum(1800);
+
+		streamDelaySec->setValue((int)obs_data_get_int(settings, "delay_sec"));
+		connect(streamDelaySec, &QSpinBox::valueChanged,
+			[streamDelaySec, settings] { obs_data_set_int(settings, "delay_sec", streamDelaySec->value()); });
+
+		customDelayLayout->addRow(
+			QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.StreamDelay.Duration")),
+			streamDelaySec);
+
+		auto streamDelayPreserve = new QCheckBox(
+			QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.StreamDelay.Preserve")));
+		streamDelayPreserve->setChecked(obs_data_get_bool(settings, "delay_preserve"));
+		connect(streamDelayPreserve, &QCheckBox::toggled, [streamDelayPreserve, settings] {
+			obs_data_set_bool(settings, "delay_preserve", streamDelayPreserve->isChecked());
+		});
+
+		customDelayLayout->addRow(QString::fromUtf8(""), streamDelayPreserve);
+
+		outputLayout->addWidget(customDelayCheckBox);
+		outputLayout->addRow(customDelayGroup);
+	}
+
 	auto audioPage = new QWidget;
 	audioPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	//	audioPage->setStyleSheet(pageStyle);
@@ -2146,13 +2202,17 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	});
 
 	connect(streaming_title, &QToolButton::toggled,
-		[advancedGroup, advancedButton, streaming_title, settings, canvasLayout, outputLayout, hotkeyGroup](bool checked) {
-			const bool advanced = obs_data_get_bool(settings, "advanced");
+		[advancedGroup, advancedButton, streaming_title, settings, canvasLayout, outputLayout, hotkeyGroup,
+		 customDelayCheckBox, customDelayGroup](bool checked) {
 			advancedButton->setVisible(checked);
+			if (customDelayCheckBox)
+				customDelayCheckBox->setVisible(checked);
 			outputLayout->setRowVisible(canvasLayout, checked);
 			if (hotkeyGroup)
 				outputLayout->setRowVisible(hotkeyGroup, checked);
-			advancedGroup->setVisible(checked && advanced);
+			advancedGroup->setVisible(checked && obs_data_get_bool(settings, "advanced"));
+			if (customDelayGroup)
+				customDelayGroup->setVisible(checked && obs_data_get_bool(settings, "custom_delay"));
 			obs_data_set_bool(settings, "expanded", checked);
 			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
 		});
@@ -2161,9 +2221,15 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		streaming_title->setArrowType(Qt::ArrowType::DownArrow);
 		if (!advanced)
 			advancedGroup->setVisible(false);
+		if (!customDelay && customDelayGroup)
+			customDelayGroup->setVisible(false);
 	} else {
 		advancedButton->setVisible(false);
 		advancedGroup->setVisible(false);
+		if (customDelayCheckBox)
+			customDelayCheckBox->setVisible(false);
+		if (customDelayGroup)
+			customDelayGroup->setVisible(false);
 	}
 
 	advancedTabWidget->addTab(audioPage, QString::fromUtf8(obs_module_text("AudioEncoderSettings")));

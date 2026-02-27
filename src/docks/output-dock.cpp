@@ -4,6 +4,7 @@
 #include <obs-frontend-api.h>
 #include <obs-module.h>
 #include <QCheckBox>
+#include <QDateTime>
 #include <QGroupBox>
 #include <QIcon>
 #include <QLabel>

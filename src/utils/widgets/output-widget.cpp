@@ -111,8 +111,8 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		std::string unpauseDescription = obs_frontend_get_locale_string("Basic.Main.UnpauseRecording");
 		unpauseDescription = unpauseDescription + " " + nameChars;
 
-		PauseHotkey = obs_hotkey_pair_register_frontend(pauseName.c_str(), pauseDescription.c_str(),
-								 unpauseName.c_str(), unpauseDescription.c_str(),
+		PauseHotkey = obs_hotkey_pair_register_frontend(
+			pauseName.c_str(), pauseDescription.c_str(), unpauseName.c_str(), unpauseDescription.c_str(),
 			[](void *data, obs_hotkey_pair_id id, obs_hotkey_t *hotkey, bool pressed) {
 				UNUSED_PARAMETER(id);
 				UNUSED_PARAMETER(hotkey);
@@ -803,6 +803,13 @@ bool OutputWidget::StartOutput(bool automated)
 		output = obs_output_create(type, output_name.c_str(), nullptr, nullptr);
 		obs_output_set_service(output, service);
 
+		bool customDelay = obs_data_get_bool(settings, "custom_delay");
+		if (customDelay) {
+			auto delaySec = (uint32_t)obs_data_get_int(settings, "delay_sec");
+			bool preserveDelay = obs_data_get_bool(settings, "delay_preserve");
+			obs_output_set_delay(output, delaySec, preserveDelay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
+		}
+
 		config_t *config = obs_frontend_get_profile_config();
 		if (config) {
 			obs_data_t *output_settings = obs_data_create();
@@ -811,10 +818,13 @@ bool OutputWidget::StartOutput(bool automated)
 			obs_output_update(output, output_settings);
 			obs_data_release(output_settings);
 
-			bool useDelay = config_get_bool(config, "Output", "DelayEnable");
-			auto delaySec = (uint32_t)config_get_int(config, "Output", "DelaySec");
-			bool preserveDelay = config_get_bool(config, "Output", "DelayPreserve");
-			obs_output_set_delay(output, useDelay ? delaySec : 0, preserveDelay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
+			if (!customDelay) {
+				bool useDelay = config_get_bool(config, "Output", "DelayEnable");
+				auto delaySec = (uint32_t)config_get_int(config, "Output", "DelaySec");
+				bool preserveDelay = config_get_bool(config, "Output", "DelayPreserve");
+				obs_output_set_delay(output, useDelay ? delaySec : 0,
+						     preserveDelay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
+			}
 		}
 	}
 

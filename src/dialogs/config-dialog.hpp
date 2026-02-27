@@ -63,6 +63,8 @@ private:
 	std::map<QWidget *, obs_properties_t *> video_encoder_properties;
 	std::map<QWidget *, obs_properties_t *> audio_encoder_properties;
 
+	std::vector<std::pair<QComboBox *, QString>> sourceCombos;
+
 	QFormLayout *canvasLayout;
 	QFormLayout *outputsLayout;
 	QLabel *newVersion;
@@ -84,6 +86,7 @@ private:
 	void AddStream();
 	void AddRecord(bool backtrack);
 	void AddVirtualCam();
+	void LoadSourceCombos();
 
 	obs_hotkey_t *GetHotkeyByName(const char *name);
 	std::vector<obs_key_combination_t> GetCombosForHotkey(obs_hotkey_id hotkey);
