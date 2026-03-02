@@ -256,6 +256,18 @@ int OBSProjector::GetMonitor()
 	return savedMonitor;
 }
 
+const char *OBSProjector::GetSourceName() {
+	if (!source)
+		return "";
+	return obs_source_get_name(source);
+}
+
+const char *OBSProjector::GetSourceUuid() {
+	if (!source)
+		return "";
+	return obs_source_get_uuid(source);
+}
+
 void OBSProjector::RenameProjector(QString oldName, QString newName)
 {
 	if (oldName == newName)

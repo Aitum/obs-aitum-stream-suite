@@ -1678,6 +1678,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	}
 	canvasLayout->addLayout(canvasSubLayout);
 	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasLayout);
+	outputLayout->setRowVisible(canvasLayout, expanded);
 	//QList<QWidget *> canvasWidgets;
 
 	//outputLayout->insertRow
@@ -1687,6 +1688,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	if (!isNew) {
 		hotkeyGroup = new QWidget;
 		outputLayout->addRow(QString::fromUtf8(obs_module_text("Hotkeys")), hotkeyGroup);
+		outputLayout->setRowVisible(hotkeyGroup, expanded);
 		auto hotkeyLayout = new QFormLayout;
 		hotkeyLayout->setContentsMargins(0, 0, 0, 0);
 		hotkeyGroup->setLayout(hotkeyLayout);

@@ -52,6 +52,8 @@ public:
 	~OBSProjector();
 
 	int GetMonitor();
+	const char *GetSourceName();
+	const char *GetSourceUuid();
 	void RenameProjector(QString oldName, QString newName);
 	void SetHideCursor();
 

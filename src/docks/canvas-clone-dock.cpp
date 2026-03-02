@@ -15,6 +15,8 @@ std::list<CanvasCloneDock *> canvas_clone_docks;
 extern std::list<CanvasDock *> canvas_docks;
 extern QTabBar *modesTabBar;
 
+extern bool WindowPositionValid(QRect rect);
+
 CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	: QFrame(parent),
 	  preview(new OBSQTDisplay(this)),
@@ -269,6 +271,35 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 			}
 		}
 	}
+
+	auto pa = obs_data_get_array(settings, "projectors");
+	auto count = obs_data_array_count(pa);
+	for (size_t i = 0; i < count; i++) {
+		auto p = obs_data_array_item(pa, i);
+		if (!p)
+			continue;
+
+		auto monitor = obs_data_get_int(p, "monitor");
+		OBSProjector *projector = new OBSProjector(canvas, nullptr, monitor,
+							   [this](OBSProjector *p) { DeleteProjector(p); });
+
+		auto g = obs_data_get_string(p, "geometry");
+		if (g[0] != '\0' && monitor < 0) {
+			QByteArray byteArray = QByteArray::fromBase64(QByteArray(g));
+			projector->restoreGeometry(byteArray);
+
+			if (!WindowPositionValid(projector->normalGeometry())) {
+				QRect rect = QGuiApplication::primaryScreen()->geometry();
+				projector->setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, size(), rect));
+			}
+
+			if (obs_data_get_bool(p, "alwaysOnTopOverridden"))
+				projector->SetIsAlwaysOnTop(obs_data_get_bool(p, "alwaysOnTop"), true);
+		}
+		projectors.emplace_back(projector);
+		obs_data_release(p);
+	}
+	obs_data_array_release(pa);
 }
 
 CanvasCloneDock::~CanvasCloneDock()
@@ -962,24 +993,39 @@ void CanvasCloneDock::RemoveSource(QString source_name)
 
 void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 {
-	if (!closing) {
-		auto state = canvas_split->saveState();
-		auto b64 = state.toBase64();
-		auto state_chars = b64.constData();
-		if (mode.isEmpty() && modesTabBar) {
-			auto d = modesTabBar->tabData(modesTabBar->currentIndex());
-			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-				mode = d.toString();
-			} else {
-				mode = modesTabBar->tabText(modesTabBar->currentIndex());
-			}
-		}
-		if (mode.isEmpty()) {
-			obs_data_set_string(settings, "canvas_split", state_chars);
+	if (closing)
+		return;
+
+	auto pa = obs_data_array_create();
+	for (auto projector : projectors) {
+		auto p = obs_data_create();
+		obs_data_set_int(p, "monitor", projector->GetMonitor());
+		obs_data_set_string(p, "geometry", projector->saveGeometry().toBase64().constData());
+		if (projector->IsAlwaysOnTopOverridden())
+			obs_data_set_bool(p, "alwaysOnTop", projector->IsAlwaysOnTop());
+		obs_data_set_bool(p, "alwaysOnTopOverridden", projector->IsAlwaysOnTopOverridden());
+		obs_data_array_push_back(pa, p);
+		obs_data_release(p);
+	}
+	obs_data_set_array(settings, "projectors", pa);
+	obs_data_array_release(pa);
+
+	auto state = canvas_split->saveState();
+	auto b64 = state.toBase64();
+	auto state_chars = b64.constData();
+	if (mode.isEmpty() && modesTabBar) {
+		auto d = modesTabBar->tabData(modesTabBar->currentIndex());
+		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+			mode = d.toString();
 		} else {
-			std::string setting_name = "canvas_split_" + mode.toStdString();
-			obs_data_set_string(settings, setting_name.c_str(), state_chars);
+			mode = modesTabBar->tabText(modesTabBar->currentIndex());
 		}
+	}
+	if (mode.isEmpty()) {
+		obs_data_set_string(settings, "canvas_split", state_chars);
+	} else {
+		std::string setting_name = "canvas_split_" + mode.toStdString();
+		obs_data_set_string(settings, setting_name.c_str(), state_chars);
 	}
 }
 

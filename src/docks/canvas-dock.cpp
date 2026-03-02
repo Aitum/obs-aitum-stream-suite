@@ -836,12 +836,61 @@ void CanvasDock::LoadUI()
 		}
 		LoadScenes();
 		LogScenes();
+
+		auto pa = obs_data_get_array(settings, "projectors");
+		LoadProjectors(pa);
+		obs_data_array_release(pa);
 	}
 	connect(canvas_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
 	if (panel_split)
 		connect(panel_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
 
 	obs_frontend_add_save_callback(save_load, this);
+}
+
+bool WindowPositionValid(QRect rect)
+{
+	for (QScreen *screen : QGuiApplication::screens()) {
+		if (screen->availableGeometry().intersects(rect))
+			return true;
+	}
+	return false;
+}
+
+void CanvasDock::LoadProjectors(obs_data_array_t *pa)
+{
+	if (!pa)
+		return;
+	auto count = obs_data_array_count(pa);
+	for (size_t i = 0; i < count; i++) {
+		auto p = obs_data_array_item(pa, i);
+		if (!p)
+			continue;
+
+		auto monitor = obs_data_get_int(p, "monitor");
+		auto source_uuid = obs_data_get_string(p, "source_uuid");
+		obs_source_t *source = source_uuid[0] == '\0' ? nullptr : obs_get_source_by_uuid(source_uuid);
+
+		OBSProjector *projector = new OBSProjector(source ? nullptr : canvas, source, monitor,
+							   [this](OBSProjector *p) { DeleteProjector(p); });
+		obs_source_release(source);
+
+		auto g = obs_data_get_string(p, "geometry");
+		if (g[0] != '\0' && monitor < 0) {
+			QByteArray byteArray = QByteArray::fromBase64(QByteArray(g));
+			projector->restoreGeometry(byteArray);
+
+			if (!WindowPositionValid(projector->normalGeometry())) {
+				QRect rect = QGuiApplication::primaryScreen()->geometry();
+				projector->setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, size(), rect));
+			}
+
+			if (obs_data_get_bool(p, "alwaysOnTopOverridden"))
+				projector->SetIsAlwaysOnTop(obs_data_get_bool(p, "alwaysOnTop"), true);
+		}
+		projectors.emplace_back(projector);
+		obs_data_release(p);
+	}
 }
 
 void CanvasDock::GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale)
@@ -1022,6 +1071,22 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 		return;
 	}
 	if (!closing) {
+		auto pa = obs_data_array_create();
+		for (auto projector : projectors) {
+			auto p = obs_data_create();
+			obs_data_set_string(p, "source_name", projector->GetSourceName());
+			obs_data_set_string(p, "source_uuid", projector->GetSourceUuid());
+			obs_data_set_int(p, "monitor", projector->GetMonitor());
+			obs_data_set_string(p, "geometry", projector->saveGeometry().toBase64().constData());
+			if (projector->IsAlwaysOnTopOverridden())
+				obs_data_set_bool(p, "alwaysOnTop", projector->IsAlwaysOnTop());
+			obs_data_set_bool(p, "alwaysOnTopOverridden", projector->IsAlwaysOnTopOverridden());
+			obs_data_array_push_back(pa, p);
+			obs_data_release(p);
+		}
+		obs_data_set_array(settings, "projectors", pa);
+		obs_data_array_release(pa);
+
 		auto state = canvas_split->saveState();
 		auto b64 = state.toBase64();
 		auto state_chars = b64.constData();

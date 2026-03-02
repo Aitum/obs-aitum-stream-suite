@@ -124,6 +124,7 @@ private:
 	std::unique_ptr<OBSEventFilter> eventFilter;
 	OBSEventFilter *BuildEventFilter();
 	void LoadUI();
+	void LoadProjectors(obs_data_array_t* pa);
 	bool HandleMousePressEvent(QMouseEvent *event);
 	bool HandleMouseReleaseEvent(QMouseEvent *event);
 	bool HandleMouseMoveEvent(QMouseEvent *event);
