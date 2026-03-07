@@ -764,7 +764,7 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 			auto text = sourceCombo->currentText().trimmed();
 			obs_data_set_string(item, "source", text.toUtf8().constData());
 		});
-		sourceCombos.push_back(std::make_pair(sourceCombo,QString::fromUtf8(obs_data_get_string(item, "source"))));
+		sourceCombos.push_back(std::make_pair(sourceCombo, QString::fromUtf8(obs_data_get_string(item, "source"))));
 
 		auto replaceCombo = new QComboBox;
 		replaceCombo->setEditable(true);
@@ -773,7 +773,7 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 			auto text = replaceCombo->currentText().trimmed();
 			obs_data_set_string(item, "replacement", text.toUtf8().constData());
 		});
-		sourceCombos.push_back(std::make_pair(replaceCombo,QString::fromUtf8(obs_data_get_string(item, "replacement"))));
+		sourceCombos.push_back(std::make_pair(replaceCombo, QString::fromUtf8(obs_data_get_string(item, "replacement"))));
 		replaceLayout->addWidget(sourceCombo, i + 1, 0);
 		replaceLayout->addWidget(replaceCombo, i + 1, 1);
 
@@ -963,7 +963,8 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 	LoadSourceCombos();
 }
 
-void OBSBasicSettings::LoadSourceCombos() {
+void OBSBasicSettings::LoadSourceCombos()
+{
 	if (sourceCombos.empty())
 		return;
 	for (auto it : sourceCombos) {
@@ -1667,9 +1668,12 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	canvasSubLayout->addWidget(canvasCombo);
 	QToolButton *add = nullptr;
 	auto streamServer = QString::fromUtf8(obs_data_get_string(settings, "stream_server"));
-	if ((strcmp(output_type, "record") == 0) ||
+	auto format = obs_data_get_string(settings, "format");
+	if (((strcmp(output_type, "record") == 0) &&
+	     ((strcmp(format, "hybrid_mp4") == 0) || (strcmp(format, "hybrid_mov") == 0) || (strcmp(format, "flv") == 0))) ||
 	    ((output_type[0] == '\0' || strcmp(output_type, "stream") == 0) &&
-	     (streamServer.startsWith("srt://", Qt::CaseInsensitive) || streamServer.startsWith("rist://", Qt::CaseInsensitive)))) {
+	     (streamServer.startsWith("srt://", Qt::CaseInsensitive) || streamServer.startsWith("rist://", Qt::CaseInsensitive) ||
+	      streamServer.contains("whip", Qt::CaseInsensitive)))) {
 		add = new QToolButton;
 		add->setProperty("themeID", "addIconSmall");
 		add->setProperty("class", "icon-plus");
