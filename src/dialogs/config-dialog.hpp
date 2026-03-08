@@ -56,6 +56,9 @@ private:
 	void RefreshProperties(obs_properties_t *properties, QFormLayout *layout);
 	void AddCanvas();
 
+	void LoadOutputLayout(obs_data_t *settings, QFormLayout *outputLayout, obs_data_array_t *outputs,
+			      QToolButton *streaming_title, bool isNew);
+
 	obs_data_t *main_settings = nullptr;
 	obs_data_array_t *extra_outputs = nullptr;
 

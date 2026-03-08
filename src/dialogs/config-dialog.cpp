@@ -1514,20 +1514,21 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	streaming_title->setCheckable(true);
 	streaming_title->setChecked(expanded);
 	streaming_title->setStyleSheet(QString::fromUtf8("font-weight: bold;"));
-	output_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
 
-	auto canvasCombo = new QComboBox;
-	obs_enum_canvases(
-		[](void *param, obs_canvas_t *canvas) {
-			auto c = (QComboBox *)param;
-			auto name = QString::fromUtf8(obs_canvas_get_name(canvas));
-			if (name == "Components")
-				return true;
-			c->addItem(name);
-			return true;
-		},
-		canvasCombo);
-	canvasCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(settings, "canvas")));
+	connect(streaming_title, &QToolButton::toggled,
+		[this, streaming_title, settings, outputLayout, outputs, isNew](bool checked) {
+			obs_data_set_bool(settings, "expanded", checked);
+			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
+			if (outputLayout->rowCount() == 1 && checked) {
+				LoadOutputLayout(settings, outputLayout, outputs, streaming_title, isNew);
+				return;
+			}
+			for (auto i = 1; i < outputLayout->rowCount(); ++i) {
+				outputLayout->setRowVisible(i, checked);
+			}
+		});
+
+	output_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
 
 	// Remove button
 	auto removeButton =
@@ -1661,6 +1662,31 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	outputLayout->addRow(output_title_layout);
 
+	if (expanded) {
+		LoadOutputLayout(settings, outputLayout, outputs, streaming_title, isNew);
+	}
+
+	outputGroup->setLayout(outputLayout);
+
+	outputsLayout->addRow(outputGroup);
+}
+
+void OBSBasicSettings::LoadOutputLayout(obs_data_t *settings, QFormLayout *outputLayout, obs_data_array_t *outputs,
+					QToolButton *streaming_title, bool isNew)
+{
+	auto canvasCombo = new QComboBox;
+	obs_enum_canvases(
+		[](void *param, obs_canvas_t *canvas) {
+			auto c = (QComboBox *)param;
+			auto name = QString::fromUtf8(obs_canvas_get_name(canvas));
+			if (name == "Components")
+				return true;
+			c->addItem(name);
+			return true;
+		},
+		canvasCombo);
+	canvasCombo->setCurrentText(QString::fromUtf8(obs_data_get_string(settings, "canvas")));
+
 	auto canvasLayout = new QVBoxLayout;
 	canvasLayout->setContentsMargins(0, 0, 0, 0);
 	auto canvasSubLayout = new QHBoxLayout;
@@ -1669,6 +1695,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	QToolButton *add = nullptr;
 	auto streamServer = QString::fromUtf8(obs_data_get_string(settings, "stream_server"));
 	auto format = obs_data_get_string(settings, "format");
+	auto output_type = obs_data_get_string(settings, "type");
 	if (((strcmp(output_type, "record") == 0) &&
 	     ((strcmp(format, "hybrid_mp4") == 0) || (strcmp(format, "hybrid_mov") == 0) || (strcmp(format, "flv") == 0))) ||
 	    ((output_type[0] == '\0' || strcmp(output_type, "stream") == 0) &&
@@ -1682,7 +1709,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	}
 	canvasLayout->addLayout(canvasSubLayout);
 	outputLayout->addRow(QString::fromUtf8(obs_module_text("Canvas")), canvasLayout);
-	outputLayout->setRowVisible(canvasLayout, expanded);
 	//QList<QWidget *> canvasWidgets;
 
 	//outputLayout->insertRow
@@ -1692,7 +1718,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	if (!isNew) {
 		hotkeyGroup = new QWidget;
 		outputLayout->addRow(QString::fromUtf8(obs_module_text("Hotkeys")), hotkeyGroup);
-		outputLayout->setRowVisible(hotkeyGroup, expanded);
 		auto hotkeyLayout = new QFormLayout;
 		hotkeyLayout->setContentsMargins(0, 0, 0, 0);
 		hotkeyGroup->setLayout(hotkeyLayout);
@@ -1812,26 +1837,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		}
 	}
 
-	if (!expanded) {
-		outputLayout->setRowVisible(canvasLayout, false);
-		if (hotkeyGroup)
-			outputLayout->setRowVisible(hotkeyGroup, false);
-		streaming_title->setArrowType(Qt::ArrowType::RightArrow);
-	}
-
-	outputGroup->setLayout(outputLayout);
-
-	outputsLayout->addRow(outputGroup);
-
 	if (strcmp(output_type, "virtual_cam") == 0) {
-		connect(streaming_title, &QToolButton::toggled,
-			[streaming_title, settings, canvasCombo, outputLayout, hotkeyGroup](bool checked) {
-				outputLayout->setRowVisible(canvasCombo, checked);
-				if (hotkeyGroup)
-					outputLayout->setRowVisible(hotkeyGroup, checked);
-				obs_data_set_bool(settings, "expanded", checked);
-				streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
-			});
 		connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, settings] {
 			obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		});
@@ -1983,7 +1989,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 		customDelayGroup = new QFrame;
 		customDelayGroup->setContentsMargins(0, 4, 0, 0);
-		customDelayGroup->setVisible(customDelay && expanded);
+		customDelayGroup->setVisible(customDelay);
 
 		customDelayCheckBox = new QCheckBox(QString::fromUtf8(obs_module_text("CustomDelay")));
 		customDelayCheckBox->setCheckable(true);
@@ -1994,8 +2000,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		connect(customDelayCheckBox, &QCheckBox::stateChanged, [customDelayCheckBox, customDelayGroup, settings] {
 #endif
 			const bool is_custom_delay = customDelayCheckBox->isChecked();
-			const bool expanded = obs_data_get_bool(settings, "expanded");
-			customDelayGroup->setVisible(is_custom_delay && expanded);
+			customDelayGroup->setVisible(is_custom_delay);
 			obs_data_set_bool(settings, "custom_delay", is_custom_delay);
 		});
 
@@ -2148,8 +2153,8 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	}
 
 	connect(audioEncoder, &QComboBox::currentIndexChanged,
-		[this, outputGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup, audioEncoderGroupLayout,
-		 settings, audioPage] {
+		[this, advancedGroup, advancedGroupLayout, audioPageLayout, audioEncoder, audioEncoderGroup,
+		 audioEncoderGroupLayout, settings, audioPage] {
 			auto encoder_string = audioEncoder->currentData().toString().toUtf8();
 			auto encoder = encoder_string.constData();
 			const bool encoder_changed = !encoder_string.isEmpty() &&
@@ -2157,7 +2162,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			if (encoder_changed)
 				obs_data_set_string(settings, "audio_encoder", encoder);
 
-			auto t = audio_encoder_properties.find(outputGroup);
+			auto t = audio_encoder_properties.find(advancedGroup);
 			if (t != audio_encoder_properties.end()) {
 				obs_properties_destroy(t->second);
 				audio_encoder_properties.erase(t);
@@ -2177,7 +2182,7 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				obs_data_set_obj(settings, "audio_encoder_settings", aes);
 			}
 			auto stream_encoder_properties = obs_get_encoder_properties(encoder);
-			audio_encoder_properties[outputGroup] = stream_encoder_properties;
+			audio_encoder_properties[advancedGroup] = stream_encoder_properties;
 
 			obs_property_t *property = obs_properties_first(stream_encoder_properties);
 			while (property) {
@@ -2202,41 +2207,20 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	connect(advancedButton, &QCheckBox::stateChanged, [advancedButton, advancedGroup, settings] {
 #endif
 		const bool is_advanced = advancedButton->isChecked();
-		const bool expanded = obs_data_get_bool(settings, "expanded");
-		advancedGroup->setVisible(is_advanced && expanded);
+		advancedGroup->setVisible(is_advanced);
 		obs_data_set_bool(settings, "advanced", is_advanced);
 	});
 
-	connect(streaming_title, &QToolButton::toggled,
-		[advancedGroup, advancedButton, streaming_title, settings, canvasLayout, outputLayout, hotkeyGroup,
-		 customDelayCheckBox, customDelayGroup](bool checked) {
-			advancedButton->setVisible(checked);
-			if (customDelayCheckBox)
-				customDelayCheckBox->setVisible(checked);
-			outputLayout->setRowVisible(canvasLayout, checked);
-			if (hotkeyGroup)
-				outputLayout->setRowVisible(hotkeyGroup, checked);
-			advancedGroup->setVisible(checked && obs_data_get_bool(settings, "advanced"));
-			if (customDelayGroup)
-				customDelayGroup->setVisible(checked && obs_data_get_bool(settings, "custom_delay"));
-			obs_data_set_bool(settings, "expanded", checked);
-			streaming_title->setArrowType(checked ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
-		});
-
-	if (expanded) {
-		streaming_title->setArrowType(Qt::ArrowType::DownArrow);
-		if (!advanced)
-			advancedGroup->setVisible(false);
-		if (!customDelay && customDelayGroup)
-			customDelayGroup->setVisible(false);
-	} else {
-		advancedButton->setVisible(false);
-		advancedGroup->setVisible(false);
-		if (customDelayCheckBox)
-			customDelayCheckBox->setVisible(false);
+	connect(streaming_title, &QToolButton::toggled, [this, advancedGroup, settings, customDelayGroup](bool checked) {
+		advancedGroup->setVisible(checked && obs_data_get_bool(settings, "advanced"));
 		if (customDelayGroup)
-			customDelayGroup->setVisible(false);
-	}
+			customDelayGroup->setVisible(checked && obs_data_get_bool(settings, "custom_delay"));
+	});
+
+	if (!advanced)
+		advancedGroup->setVisible(false);
+	if (!customDelay && customDelayGroup)
+		customDelayGroup->setVisible(false);
 
 	advancedTabWidget->addTab(audioPage, QString::fromUtf8(obs_module_text("AudioEncoderSettings")));
 	advancedGroupLayout->addWidget(advancedTabWidget, 1);
