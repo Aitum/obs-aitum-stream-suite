@@ -6,6 +6,7 @@
 #include <QTime>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMainWindow>
 #include <QRegularExpression>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
@@ -361,7 +362,24 @@ void OutputWidget::replay_saved(void *data, calldata_t *calldata)
 {
 	UNUSED_PARAMETER(calldata);
 	auto this_ = (OutputWidget *)data;
-	QMetaObject::invokeMethod(this_->extraButton, [this_] { this_->startTime = QDateTime::currentDateTime(); });
+	QMetaObject::invokeMethod(this_->extraButton, [this_] {
+		this_->startTime = QDateTime::currentDateTime();
+		proc_handler_t *ph = obs_output_get_proc_handler(this_->output);
+		if (!ph)
+			return;
+		QString path;
+		calldata_t cd = {0};
+		if (proc_handler_call(ph, "get_last_replay", &cd)) {
+			const char *p = calldata_string(&cd, "path");
+			if (p)
+				path = QString::fromUtf8(p);
+		}
+		calldata_free(&cd);
+		if (!path.isEmpty()) {
+			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			QMetaObject::invokeMethod(main_window, "RecordingFileChanged", Q_ARG(QString, path));
+		}
+	});
 }
 
 extern obs_websocket_vendor vendor;
@@ -746,6 +764,8 @@ bool OutputWidget::StartOutput(bool automated)
 			output_id = "mp4_output";
 		else if (strcmp(format, "hybrid_mov") == 0)
 			output_id = "mov_output";
+		else if (strcmp(format, "flv") == 0)
+			output_id = "flv_output";
 
 		output = obs_output_create(output_id, output_name.c_str(), nullptr, nullptr);
 
