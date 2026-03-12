@@ -103,7 +103,7 @@ private:
 		 }},
 		{"Output", "TotalData", true, Qt::AlignRight | Qt::AlignVCenter,
 		 [](const OutputStatsRow &row) {
-			 return QVariant(row.output_bytes);
+			 return QVariant((qulonglong)row.output_bytes);
 		 }},
 		{"Encoder", "Name", true, Qt::AlignLeft | Qt::AlignVCenter,
 		 [](const OutputStatsRow &row) {
