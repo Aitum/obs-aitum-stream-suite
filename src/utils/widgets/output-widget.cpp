@@ -775,8 +775,10 @@ bool OutputWidget::StartOutput(bool automated)
 		obs_data_set_string(ps, "format", filenameFormat.c_str());
 		obs_data_set_string(ps, "extension", ext.c_str());
 		obs_data_set_bool(ps, "split_file", true);
-		obs_data_set_int(ps, "max_size_mb", obs_data_get_int(settings, "max_size_mb"));
-		obs_data_set_int(ps, "max_time_sec", obs_data_get_int(settings, "max_time_sec"));
+		auto max_size = obs_data_get_int(settings, "max_size_mb");
+		obs_data_set_int(ps, "max_size_mb", max_size > 0 ? max_size : 0);
+		auto max_sec = obs_data_get_int(settings, "max_time_sec");
+		obs_data_set_int(ps, "max_time_sec", max_sec > 0 ? max_sec : 0);
 		obs_output_update(output, ps);
 		obs_data_release(ps);
 	} else {
