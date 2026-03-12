@@ -8,6 +8,7 @@
 #include "docks/live-scenes-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
+#include "docks/stats-dock.hpp"
 #include "docks/transform-dock.hpp"
 #include "utils/file-download.h"
 #include "utils/icon.hpp"
@@ -47,6 +48,7 @@ FiltersDock *filters_dock = nullptr;
 TransformDock *transform_dock = nullptr;
 LiveScenesDock *live_scenes_dock = nullptr;
 CanvasDock *component_dock = nullptr;
+StatsDock *stats_dock = nullptr;
 
 QString newer_version_available;
 
@@ -202,6 +204,8 @@ void save_dock_state(QString mode)
 	}
 	if (component_dock)
 		QMetaObject::invokeMethod(component_dock, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
+	if (stats_dock)
+		QMetaObject::invokeMethod(stats_dock, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
 }
 
 void reset_live_dock_state()
@@ -587,6 +591,8 @@ void load_dock_state(QString mode)
 	}
 	if (component_dock)
 		QMetaObject::invokeMethod(component_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
+	if (stats_dock)
+		QMetaObject::invokeMethod(stats_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 }
 
 void load_outputs()
@@ -1752,6 +1758,8 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteLiveScenes", obs_module_text("AitumStreamSuiteLiveScenes"), live_scenes_dock);
 	auto capture_dock = new CaptureDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteCapture", obs_module_text("AitumStreamSuiteCapture"), capture_dock);
+	stats_dock = new StatsDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteStats", obs_module_text("AitumStreamSuiteStats"), stats_dock);
 
 	std::string url = "https://api.aitum.tv/plugin/streamsuite";
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
@@ -1886,6 +1894,7 @@ void obs_module_unload()
 	obs_frontend_remove_dock("AitumStreamSuiteTransform");
 	obs_frontend_remove_dock("AitumStreamSuiteLiveScenes");
 	obs_frontend_remove_dock("AitumStreamSuiteCapture");
+	obs_frontend_remove_dock("AitumStreamSuiteStats");
 
 	obs_frontend_remove_dock("AitumStreamSuiteChat");
 	obs_frontend_remove_dock("AitumStreamSuiteActivity");
