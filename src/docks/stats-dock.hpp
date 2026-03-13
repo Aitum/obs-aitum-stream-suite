@@ -7,6 +7,7 @@
 #include <QStyledItemDelegate>
 #include <QTableView>
 #include <QTimer>
+#include <QHeaderView>
 #include <set>
 
 class StatsDock : public QFrame {
@@ -105,12 +106,12 @@ private:
 		 [](const OutputStatsRow &row) {
 			 return QVariant((qulonglong)row.output_bytes);
 		 }},
-		{"Encoder", "Name", true, Qt::AlignLeft | Qt::AlignVCenter,
+		{"Encoder", "Name", false, Qt::AlignLeft | Qt::AlignVCenter,
 		 [](const OutputStatsRow &row) {
 			 return row.encoder ? QVariant(QString::fromUtf8(row.encoder_name)) : QVariant();
 		 }},
 		//{"Encoder", "Status", true, [](const OutputStatsRow &row) { return QVariant(); }},
-		{"Encoder", "Resolution", true, Qt::AlignCenter,
+		{"Encoder", "Resolution", false, Qt::AlignCenter,
 		 [](const OutputStatsRow &row) {
 			 return row.encoded_width && row.encoded_height
 					? QVariant(QString::number(row.encoded_width) + QString("x") +
@@ -127,11 +128,11 @@ private:
 		 [](const OutputStatsRow &row) {
 			 return QVariant(row.encoded_frames);
 		 }},
-		{"Canvas", "Name", true, Qt::AlignLeft | Qt::AlignVCenter,
+		{"Canvas", "Name", false, Qt::AlignLeft | Qt::AlignVCenter,
 		 [](const OutputStatsRow &row) {
 			 return row.canvas ? QVariant(QString::fromUtf8(row.canvas_name)) : QVariant();
 		 }},
-		{"Canvas", "Resolution", true, Qt::AlignCenter,
+		{"Canvas", "Resolution", false, Qt::AlignCenter,
 		 [](const OutputStatsRow &row) {
 			 return row.canvas_width && row.canvas_height
 					? QVariant(QString::number(row.canvas_width) + "x" + QString::number(row.canvas_height))
@@ -187,4 +188,18 @@ public:
 	UserRoleTypeDelegate(QObject *parent = nullptr) : QStyledItemDelegate(parent) {}
 
 	void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
+};
+
+class GroupedHeaderView : public QHeaderView {
+	Q_OBJECT
+
+private:
+	bool isFirstVisibleSection(int visual) const;
+	bool isLastVisibleSection(int visual) const;
+
+public:
+	explicit GroupedHeaderView(Qt::Orientation orientation, QWidget *parent = nullptr);
+
+protected:
+	virtual void paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const override;
 };

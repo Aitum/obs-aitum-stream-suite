@@ -27,6 +27,10 @@ StatsDock::StatsDock(QWidget *parent) : QFrame(parent)
 	proxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
 
 	table->setModel(proxyModel);
+	table->setHorizontalHeader(new GroupedHeaderView(Qt::Horizontal, table));
+	table->setTextElideMode(Qt::ElideRight);
+	table->horizontalHeader()->setTextElideMode(Qt::ElideRight);
+
 	table->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	table->setItemDelegate(new UserRoleTypeDelegate(table));
 
@@ -112,6 +116,7 @@ void StatsDock::SaveSettings(bool closing, QString mode)
 
 OutputStatsModel::OutputStatsModel(QObject *parent) : QAbstractTableModel(parent)
 {
+
 	updateTimer.setInterval(1000);
 	connect(&updateTimer, &QTimer::timeout, this, &OutputStatsModel::updateStats);
 	updateTimer.start();
@@ -376,7 +381,7 @@ void OutputStatsModel::updateGraph(QImage *graph, uint32_t value, uint32_t *max_
 				   uint graph_color)
 {
 	if (width > 0) {
-		if (value * 12 < *max_value * 10) {
+		if (value > 0 && value * 12 < *max_value * 10) {
 			*graph = graph->copy(0, 1, graph->width(), graph->height() - 1)
 					 .scaled(graph->width(), height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			auto diff = *max_value / height;
@@ -495,4 +500,222 @@ void UserRoleTypeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 	//painter->drawRect(option.rect.left() + 1, option.rect.top() + 1, option.rect.width() - 2, option.rect.height() - 2);
 	painter->drawLine(option.rect.left() + 1, option.rect.top() + 1, option.rect.right(), option.rect.top() + 1);
 	painter->drawLine(option.rect.left() + 1, option.rect.bottom(), option.rect.right(), option.rect.bottom());
+}
+
+GroupedHeaderView::GroupedHeaderView(Qt::Orientation orientation, QWidget *parent) : QHeaderView(orientation, parent) {}
+
+void GroupedHeaderView::paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const
+{
+	if (!rect.isValid()) {
+		return;
+	}
+
+	// get the state of the section
+	QStyleOptionHeader opt;
+	initStyleOption(&opt);
+
+	QStyle::State state = QStyle::State_None;
+
+	if (isEnabled()) {
+		state |= QStyle::State_Enabled;
+	}
+
+	if (window()->isActiveWindow()) {
+		state |= QStyle::State_Active;
+	}
+
+	//if (sectionsClickable()) {
+	//	if (logicalIndex == d->hover) {
+	//		state |= QStyle::State_MouseOver;
+	//	}
+	//
+	//	if (logicalIndex == pressed()) {
+	//		state |= QStyle::State_Sunken;
+	//
+	//	} else if (d->highlightSelected) {
+	//		if (d->sectionIntersectsSelection(logicalIndex)) {
+	//			state |= QStyle::State_On;
+	//		}
+	//
+	//		if (d->isSectionSelected(logicalIndex)) {
+	//			state |= QStyle::State_Sunken;
+	//		}
+	//	}
+	//}
+
+	if (isSortIndicatorShown() && sortIndicatorSection() == logicalIndex)
+		opt.sortIndicator = (sortIndicatorOrder() == Qt::AscendingOrder) ? QStyleOptionHeader::SortDown
+										 : QStyleOptionHeader::SortUp;
+
+	// setup the style options structure
+	QVariant textAlignment = model()->headerData(logicalIndex, orientation(), Qt::TextAlignmentRole);
+	opt.rect = QRect(rect.left(), rect.top() + opt.rect.height() / 2, rect.width(), rect.height() / 2);
+	opt.section = logicalIndex;
+	opt.state |= state;
+
+	opt.textAlignment = Qt::Alignment(textAlignment.isValid() ? Qt::Alignment(textAlignment.toInt()) : defaultAlignment());
+
+	opt.iconAlignment = Qt::AlignVCenter;
+	auto text = model()->headerData(logicalIndex, orientation(), Qt::DisplayRole).toString();
+	auto t = text.split("\n");
+	opt.text = t[1];
+
+	int margin = 2 * style()->pixelMetric(QStyle::PM_HeaderMargin, nullptr, this);
+
+	const Qt::Alignment headerArrowAlignment =
+		static_cast<Qt::Alignment>(style()->styleHint(QStyle::SH_Header_ArrowAlignment, nullptr, this));
+	const bool isHeaderArrowOnTheSide = headerArrowAlignment & Qt::AlignVCenter;
+	if (isSortIndicatorShown() && sortIndicatorSection() == logicalIndex && isHeaderArrowOnTheSide) {
+		margin += style()->pixelMetric(QStyle::PM_HeaderMarkSize, nullptr, this);
+	}
+
+	if (textElideMode() != Qt::ElideNone) {
+		opt.text = opt.fontMetrics.elidedText(opt.text, textElideMode(), rect.width() - margin);
+	}
+
+	QVariant variant = model()->headerData(logicalIndex, orientation(), Qt::DecorationRole);
+	opt.icon = variant.value<QIcon>();
+
+	if (opt.icon.isNull()) {
+		opt.icon = variant.value<QPixmap>();
+	}
+
+	QVariant foregroundBrush = model()->headerData(logicalIndex, orientation(), Qt::ForegroundRole);
+
+	if (foregroundBrush.canConvert<QBrush>()) {
+		opt.palette.setBrush(QPalette::ButtonText, foregroundBrush.value<QBrush>());
+	}
+
+	QPointF oldBO = painter->brushOrigin();
+	QVariant backgroundBrush = model()->headerData(logicalIndex, orientation(), Qt::BackgroundRole);
+
+	if (backgroundBrush.canConvert<QBrush>()) {
+		opt.palette.setBrush(QPalette::Button, foregroundBrush.value<QBrush>());
+		opt.palette.setBrush(QPalette::Window, backgroundBrush.value<QBrush>());
+		painter->setBrushOrigin(opt.rect.topLeft());
+	}
+
+	// the section position
+	int visual = visualIndex(logicalIndex);
+	Q_ASSERT(visual != -1);
+
+	bool first = isFirstVisibleSection(visual);
+	bool last = isLastVisibleSection(visual);
+
+	if (first && last) {
+		opt.position = QStyleOptionHeader::OnlyOneSection;
+	} else if (first) {
+		opt.position = QStyleOptionHeader::Beginning;
+	} else if (last) {
+		opt.position = QStyleOptionHeader::End;
+	} else {
+		opt.position = QStyleOptionHeader::Middle;
+	}
+
+	opt.orientation = orientation();
+
+	// the selected position
+	//bool previousSelected = false; //d->isSectionSelected(this->logicalIndex(visual - 1));
+	//bool nextSelected = false;     //d->isSectionSelected(this->logicalIndex(visual + 1));
+
+	//if (previousSelected && nextSelected) {
+	//	opt.selectedPosition = QStyleOptionHeader::NextAndPreviousAreSelected;
+	//} else if (previousSelected) {
+	//	opt.selectedPosition = QStyleOptionHeader::PreviousIsSelected;
+	//} else if (nextSelected) {
+	//	opt.selectedPosition = QStyleOptionHeader::NextIsSelected;
+	//} else {
+	//	opt.selectedPosition = QStyleOptionHeader::NotAdjacent;
+	//}
+
+	// draw the section
+	style()->drawControl(QStyle::CE_Header, &opt, painter, this);
+
+	auto prev_group_visual = visual;
+	auto left = rect.left();
+	auto li = this->logicalIndex(prev_group_visual);
+	while (li >= 0 && model()->headerData(li, orientation(), Qt::DisplayRole).toString().startsWith(t[0])) {
+		if (li != logicalIndex)
+			left -= sectionSize(li);
+		prev_group_visual--;
+		li = this->logicalIndex(prev_group_visual);
+		while (li >= 0 && isSectionHidden(li)) {
+			prev_group_visual--;
+			li = this->logicalIndex(prev_group_visual);
+		}
+	}
+	first = li < 0;
+
+	auto next_group_visual = prev_group_visual + 1;
+	li = this->logicalIndex(next_group_visual);
+	while (li >= 0 && isSectionHidden(li)) {
+		next_group_visual++;
+		li = this->logicalIndex(next_group_visual);
+	}
+	auto width = rect.width();
+	while (li >= 0 && model()->headerData(li, orientation(), Qt::DisplayRole).toString().startsWith(t[0])) {
+		if (li != logicalIndex)
+			width += sectionSize(li);
+		next_group_visual++;
+		li = this->logicalIndex(next_group_visual);
+		while (li >= 0 && isSectionHidden(li)) {
+			next_group_visual++;
+			li = this->logicalIndex(next_group_visual);
+		}
+	}
+	last = li < 0;
+	if (!opt.icon.isNull())
+		opt.icon = QIcon();
+	opt.textAlignment = Qt::AlignCenter;
+	opt.rect = QRect(left, rect.top(), width, rect.height() / 2);
+	opt.text = t[0];
+	if (textElideMode() != Qt::ElideNone) {
+		margin = 2 * style()->pixelMetric(QStyle::PM_HeaderMargin, nullptr, this);
+		opt.text = opt.fontMetrics.elidedText(opt.text, textElideMode(), width - margin);
+	}
+	opt.sortIndicator = QStyleOptionHeader::SortIndicator::None;
+	if (first && last) {
+		opt.position = QStyleOptionHeader::OnlyOneSection;
+	} else if (first) {
+		opt.position = QStyleOptionHeader::Beginning;
+	} else if (last) {
+		opt.position = QStyleOptionHeader::End;
+	} else {
+		opt.position = QStyleOptionHeader::Middle;
+	}
+	style()->drawControl(QStyle::CE_Header, &opt, painter, this);
+
+	painter->setBrushOrigin(oldBO);
+}
+
+bool GroupedHeaderView::isFirstVisibleSection(int visual) const
+{
+	if (visual < 0)
+		return false;
+	auto li = logicalIndex(visual);
+	if (li < 0)
+		return false;
+	auto vi = visual - 1;
+	li = logicalIndex(vi);
+	while (li >= 0 && isSectionHidden(li)) {
+		vi--;
+		li = logicalIndex(vi);
+	}
+	return vi < 0;
+}
+
+bool GroupedHeaderView::isLastVisibleSection(int visual) const
+{
+	if (visual < 0)
+		return false;
+	auto li = logicalIndex(visual);
+	if (li < 0)
+		return false;
+	auto vi = visual + 1;
+	li = logicalIndex(vi);
+	while (li >= 0 && isSectionHidden(li)) {
+		vi++;
+		li = logicalIndex(vi);
+	}
+	return li < 0;
 }
