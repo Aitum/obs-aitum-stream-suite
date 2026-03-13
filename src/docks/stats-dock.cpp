@@ -484,7 +484,10 @@ void UserRoleTypeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 		auto image = data.value<QImage>();
 		if (image.height() != option.rect.height())
 			image = image.scaled(image.width(), option.rect.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-		painter->drawImage(option.rect.right() - image.width(), option.rect.top(), image);
+		if (image.width() > option.rect.width())
+			painter->drawImage(option.rect.left(), option.rect.top(), image, image.width() - option.rect.width());
+		else
+			painter->drawImage(option.rect.right() - image.width(), option.rect.top(), image);
 	}
 
 	auto row = (struct OutputStatsRow *)index.data(Qt::UserRole + 1).toLongLong();
