@@ -846,30 +846,44 @@ void OBSBasicSettings::AddUnmanagedCanvas(std::string name)
 
 	canvas_title_layout->addWidget(new QLabel(QString::fromUtf8(obs_module_text("UnmanagedCanvas"))), 1, Qt::AlignLeft);
 
-	// Remove button
-	auto removeButton =
-		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
-	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
-	removeButton->setProperty("class", "icon-minus");
-	connect(removeButton, &QPushButton::clicked, [this, canvasGroup, name] {
-		canvasLayout->removeWidget(canvasGroup);
-		RemoveWidget(canvasGroup);
+	auto addButton = new QPushButton(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("ManageCanvas")));
+	addButton->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
+	addButton->setProperty("class", "icon-plus");
+
+	connect(addButton, &QPushButton::clicked, [this, canvasGroup, name] {
 		if (!main_settings)
 			return;
-		auto canvas = obs_data_get_array(main_settings, "canvas");
-		if (!canvas) {
-			canvas = obs_data_array_create();
-			obs_data_set_array(main_settings, "canvas", canvas);
-		}
+		canvasLayout->removeWidget(canvasGroup);
+		RemoveWidget(canvasGroup);
 
-		obs_data_t *settings = obs_data_create();
-		obs_data_set_string(settings, "name", name.c_str());
-		obs_data_set_bool(settings, "delete", true);
-		obs_data_array_push_back(canvas, settings);
-		obs_data_release(settings);
-		obs_data_array_release(canvas);
+		auto canvases = obs_data_get_array(main_settings, "canvas");
+		if (!canvases) {
+			canvases = obs_data_array_create();
+			obs_data_set_array(main_settings, "canvas", canvases);
+		}
+		auto s = obs_data_create();
+		// Set the info from the output dialog
+		obs_data_set_string(s, "name", name.c_str());
+		obs_data_set_int(s, "color", 0x1F1A17);
+		obs_data_set_bool(s, "expanded", true);
+
+		auto canvas = obs_get_canvas_by_name(name.c_str());
+		if (canvas) {
+			struct obs_video_info ovi;
+			if (obs_canvas_get_video_info(canvas, &ovi)) {
+				obs_data_set_int(s, "width", ovi.base_width);
+				obs_data_set_int(s, "height", ovi.base_height);
+			}
+			obs_canvas_release(canvas);
+		}
+		obs_data_array_push_back(canvases, s);
+		AddCanvas(canvasLayout, s, canvases);
+		LoadSourceCombos();
+		obs_data_release(s);
+		obs_data_array_release(canvases);
 	});
-	canvas_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
+
+	canvas_title_layout->addWidget(addButton, 0, Qt::AlignRight);
 
 	canvasGroup->setLayout(canvas_title_layout);
 
