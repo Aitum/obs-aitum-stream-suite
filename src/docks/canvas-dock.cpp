@@ -840,7 +840,13 @@ void CanvasDock::LoadUI()
 		auto pa = obs_data_get_array(settings, "projectors");
 		LoadProjectors(pa);
 		obs_data_array_release(pa);
+		preview_disabled = obs_data_get_bool(settings, "preview_disabled");
+		locked = obs_data_get_bool(settings, "preview_locked");
 	}
+	obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
+	preview->setVisible(!preview_disabled);
+	previewDisabledWidget->setVisible(preview_disabled);
+
 	connect(canvas_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
 	if (panel_split)
 		connect(panel_split, &SwitchingSplitter::splitterMoved, [this] { SaveSettings(); });
@@ -1051,7 +1057,6 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 {
 	if (!settings) {
 		if (!closing && current_profile_config) {
-
 			auto state = canvas_split->saveState();
 			auto b64 = state.toBase64();
 			auto state_chars = b64.constData();
@@ -1067,6 +1072,9 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 			if (!mode.isEmpty())
 				setting_name += "_" + mode.toStdString();
 			obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
+
+			obs_data_set_bool(current_profile_config, "preview_disabled", preview_disabled);
+			obs_data_set_bool(current_profile_config, "preview_locked", locked);
 		}
 		return;
 	}
@@ -1112,6 +1120,9 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 				setting_name += "_" + mode.toStdString();
 			obs_data_set_string(settings, setting_name.c_str(), state_chars);
 		}
+
+		obs_data_set_bool(settings, "preview_disabled", preview_disabled);
+		obs_data_set_bool(settings, "preview_locked", locked);
 	}
 
 	obs_data_array_t *transition_array = obs_data_array_create();
