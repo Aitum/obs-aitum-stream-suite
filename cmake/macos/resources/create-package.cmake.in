@@ -11,6 +11,10 @@ if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_PROJECT_NAME@.plugin" AND
   endif()
 endif()
 
+make_directory("$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/package/Library/Application Support/obs-studio/themes/Aitum")
+file(INSTALL DESTINATION "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/package/Library/Application Support/obs-studio/themes"
+    TYPE DIRECTORY FILES "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/theme/" USE_SOURCE_PERMISSIONS)
+
 make_directory("$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/temp")
 
 execute_process(
