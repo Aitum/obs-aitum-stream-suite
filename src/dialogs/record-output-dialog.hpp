@@ -18,6 +18,6 @@ public:
 	QString recordPath;
 	QString filenameFormat;
 	QString fileFormat;
-	long long maxSize;
-	long long maxTime;
+	long long maxSize = 0;
+	long long maxTime = 0;
 };

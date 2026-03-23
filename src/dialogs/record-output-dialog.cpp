@@ -18,7 +18,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 	  backtrack(backtrack_)
 {
 
-	setWindowTitle(obs_module_text(backtrack ? "NewBacktrackOutputWindowTitle" : "NewRecordOutputWindowTitle"));
+	setWindowTitle(QString::fromUtf8(obs_module_text(backtrack ? "NewBacktrackOutputWindowTitle" : "NewRecordOutputWindowTitle")));
 
 	auto pageLayout = new QVBoxLayout;
 	setModal(true);
