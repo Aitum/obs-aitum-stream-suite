@@ -1621,16 +1621,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 			delete outputDialog;
 
 		} else if (strcmp(output_type, "virtual_cam") == 0) {
-			QStringList otherNames;
-			obs_data_array_enum(
-				extra_outputs,
-				[](obs_data_t *data2, void *param) {
-					((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
-				},
-				&otherNames);
-			otherNames.removeDuplicates();
-			otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
-
 			std::string name = obs_module_text("VirtualCamera");
 			while (true) {
 				if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("OutputName")), name))
@@ -2320,7 +2310,8 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 		for (size_t i = 0; i < count; i++) {
 			auto output = obs_data_array_item(outputs, i);
 			auto name = obs_data_get_string(output, "name");
-			if (name && name[0] != '\0' && strcmp(obs_data_get_string(settings, "name"), name) != 0) {
+			if (name && name[0] != '\0' && strcmp(obs_data_get_string(settings, "name"), name) != 0 &&
+			    strcmp(obs_data_get_string(output, "type"), "virtual_cam") != 0) {
 				outputVideoEncoder->addItem(QString::fromUtf8(name), QVariant(QString::fromUtf8(name)));
 			}
 			obs_data_release(output);
