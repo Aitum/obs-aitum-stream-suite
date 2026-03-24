@@ -206,7 +206,7 @@ void OutputStatsModel::updateStats()
 				model->rows_changed.insert(row_number);
 				model->beginInsertRows(QModelIndex(), row_number, row_number);
 				OutputStatsRow row{
-					nullptr, encoder, nullptr, obs_encoder_video(encoder), -1, "", encoder_name(encoder),
+					nullptr, encoder, nullptr, obs_encoder_parent_video(encoder), -1, "", encoder_name(encoder),
 					"",      true};
 				row.output_bitrate_graph.fill(0);
 				row.output_fps_graph.fill(0);
@@ -273,7 +273,7 @@ void OutputStatsModel::updateStats()
 						output,
 						encoder,
 						nullptr,
-						obs_encoder_video(encoder),
+						obs_encoder_parent_video(encoder),
 						-1,
 						output_name(output),
 						encoder_name(encoder),
