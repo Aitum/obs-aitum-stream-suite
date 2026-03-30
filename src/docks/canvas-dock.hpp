@@ -254,7 +254,9 @@ private:
 	static void LogFilter(obs_source_t *, obs_source_t *filter, void *v_val);
 	static void check_descendant(obs_source_t *parent, obs_source_t *child, void *param);
 	static bool nudge_callback(obs_scene_t *, obs_sceneitem_t *item, void *param);
-
+	static bool save_undo_source_enum(obs_scene_t *, obs_sceneitem_t *item, void *p);
+	static void undo_redo_scene(const char *json);
+	static std::string backup_scene(obs_scene_t *scene);
 private slots:
 	void AddSourceFromAction();
 	void SceneAdded(const QString name);

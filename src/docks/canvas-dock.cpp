@@ -137,6 +137,81 @@ CanvasDock::CanvasDock(const char *canvas_name_, QWidget *parent)
 	LoadUI();
 }
 
+bool CanvasDock::save_undo_source_enum(obs_scene_t * /* scene */, obs_sceneitem_t *item, void *p)
+{
+	obs_source_t *source = obs_sceneitem_get_source(item);
+	if (obs_obj_is_private(source) && !obs_source_removed(source))
+		return true;
+
+	obs_data_array_t *array = (obs_data_array_t *)p;
+
+	/* check if the source is already stored in the array */
+	const char *name = obs_source_get_name(source);
+	const size_t count = obs_data_array_count(array);
+	for (size_t i = 0; i < count; i++) {
+		OBSDataAutoRelease sourceData = obs_data_array_item(array, i);
+		if (strcmp(name, obs_data_get_string(sourceData, "name")) == 0)
+			return true;
+	}
+
+	if (obs_source_is_group(source))
+		obs_scene_enum_items(obs_group_from_source(source), save_undo_source_enum, p);
+
+	OBSDataAutoRelease source_data = obs_save_source(source);
+	obs_data_array_push_back(array, source_data);
+	return true;
+}
+
+void CanvasDock::undo_redo_scene(const char *json)
+{
+	OBSDataAutoRelease base = obs_data_create_from_json(json);
+	OBSDataArrayAutoRelease array = obs_data_get_array(base, "array");
+	std::vector<OBSSource> sources;
+
+	/* create missing sources */
+	const size_t count = obs_data_array_count(array);
+	sources.reserve(count);
+
+	for (size_t i = 0; i < count; i++) {
+		OBSDataAutoRelease data = obs_data_array_item(array, i);
+		const char *name = obs_data_get_string(data, "name");
+		const char *canvas_uuid = obs_data_get_string(data, "canvas_uuid");
+		obs_canvas_t *canvas = nullptr;
+		if (canvas_uuid && canvas_uuid[0] != '\0')
+			canvas = obs_get_canvas_by_uuid(canvas_uuid);
+
+		OBSSourceAutoRelease source = canvas ? obs_canvas_get_source_by_name(canvas, name) : obs_get_source_by_name(name);
+		obs_canvas_release(canvas);
+		if (!source)
+			source = obs_load_source(data);
+
+		sources.push_back(source.Get());
+
+		/* update scene/group settings to restore their
+					* contents to their saved settings */
+		obs_scene_t *scene = obs_group_or_scene_from_source(source);
+		if (scene) {
+			OBSDataAutoRelease scene_settings = obs_data_get_obj(data, "settings");
+			obs_source_update(source, scene_settings);
+		}
+	}
+
+	/* actually load sources now */
+	for (obs_source_t *source : sources)
+		obs_source_load2(source);
+}
+
+std::string CanvasDock::backup_scene(obs_scene_t* scene) {
+	OBSDataArrayAutoRelease backup_array = obs_data_array_create();
+	obs_scene_enum_items(scene, save_undo_source_enum, backup_array);
+	auto scene_source = obs_scene_get_source(scene);
+	OBSDataAutoRelease undo_scene_data = obs_save_source(scene_source);
+	obs_data_array_push_back(backup_array, undo_scene_data);
+	OBSDataAutoRelease backup_data = obs_data_create();
+	obs_data_set_array(backup_data, "array", backup_array);
+	return obs_data_get_json(backup_data);
+}
+
 void CanvasDock::LoadUI()
 {
 	obs_enter_graphics();
@@ -284,13 +359,22 @@ void CanvasDock::LoadUI()
 		obs_sceneitem_t *sceneItem = GetSelectedItem();
 		if (!sceneItem)
 			return;
+		auto scene = obs_sceneitem_get_scene(sceneItem);
+		if (!scene)
+			return;
 		QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
 			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text"))
 				       .arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(sceneItem)))),
 			       QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
 		mb.setDefaultButton(QMessageBox::NoButton);
 		if (mb.exec() == QMessageBox::Yes) {
+			std::string undo_json = backup_scene(scene);
 			obs_sceneitem_remove(sceneItem);
+			std::string redo_json = backup_scene(scene);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Delete"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(sceneItem))));
+			obs_frontend_add_undo_redo_action(undoName.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+							  undo_json.c_str(), redo_json.c_str(), false);
 		}
 	});
 #ifdef __APPLE__
@@ -548,11 +632,27 @@ void CanvasDock::LoadUI()
 			if (!confirmed)
 				return;
 
+			std::string undo_json = backup_scene(scene);
+
 			/* ----------------------------------------------- */
 			/* remove items                                    */
 
 			for (auto &item : items)
 				obs_sceneitem_remove(item);
+
+			std::string redo_json = backup_scene(scene);
+
+			QString action_name;
+			if (items.size() > 1) {
+				action_name = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Sources.Multi"))
+						      .arg(QString::number(items.size()));
+			} else {
+				QString str = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Delete"));
+				action_name = str.arg(obs_source_get_name(obs_sceneitem_get_source(items[0])));
+			}
+
+			obs_frontend_add_undo_redo_action(action_name.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+							  undo_json.c_str(), redo_json.c_str(), false);
 		});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-minus");
@@ -2849,6 +2949,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	popup->addAction(
 		//removeButton->icon(),
 		QString::fromUtf8(obs_frontend_get_locale_string("Remove")), this, [sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
+			if (!scene)
+				return;
 			QMessageBox mb(QMessageBox::Question,
 				       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
 				       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text"))
@@ -2856,7 +2959,14 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				       QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
 			mb.setDefaultButton(QMessageBox::NoButton);
 			if (mb.exec() == QMessageBox::Yes) {
+				std::string undo_json = backup_scene(scene);
 				obs_sceneitem_remove(sceneItem);
+				std::string redo_json = backup_scene(scene);
+				auto undoName =
+					QString::fromUtf8(obs_frontend_get_locale_string("Undo.Delete"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(sceneItem))));
+				obs_frontend_add_undo_redo_action(undoName.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+								  undo_json.c_str(), redo_json.c_str(), false);
 			}
 		});
 
@@ -3575,8 +3685,7 @@ void CanvasDock::UpdateLinkedScenes()
 				if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(canvas)) == 0) {
 					auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
 					auto sil = sceneList->findItems(sn, Qt::MatchExactly);
-					foreach(auto si, sil)
-					{
+					for (auto &si : sil) {
 						si->setIcon(QIcon(":/aitum/media/linked.svg"));
 					}
 				} else if (strcmp(obs_data_get_string(item, "name"), "") == 0 &&
@@ -3585,8 +3694,7 @@ void CanvasDock::UpdateLinkedScenes()
 					obs_data_set_string(item, "name", obs_canvas_get_name(canvas));
 					auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
 					auto sil = sceneList->findItems(sn, Qt::MatchExactly);
-					foreach(auto si, sil)
-					{
+					for (auto &si : sil) {
 						si->setIcon(QIcon(":/aitum/media/linked.svg"));
 					}
 				}
