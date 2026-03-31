@@ -24,6 +24,8 @@ private:
 	static void filter_remove(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void filter_reorder(void *param, calldata_t *cd);
+	static void restore_filter(const char *json);
+	static void remove_filter(const char *json);
 
 private slots:
 	void SourceChanged(OBSSource source);

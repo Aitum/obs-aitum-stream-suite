@@ -161,7 +161,7 @@ void FiltersDock::ShowFiltersContextMenu(QListWidgetItem *widget_item)
 
 		std::string name = obs_source_get_name(f);
 		int i = 2;
-		obs_source_t* existing = nullptr;
+		obs_source_t *existing = nullptr;
 		do {
 			obs_source_release(existing);
 			existing = obs_source_get_filter_by_name(s, name.c_str());
@@ -226,8 +226,52 @@ void FiltersDock::RemoveFilter(QListWidgetItem *item)
 		return;
 
 	auto s = obs_weak_source_get_source(source);
+	if (!s)
+		return;
+
+	OBSDataAutoRelease wrapper = obs_save_source(f);
+	obs_data_set_string(wrapper, "undo_uuid", obs_source_get_uuid(s));
+	std::string undo_json = obs_data_get_json(wrapper);
+
 	obs_source_filter_remove(s, f);
+
+	OBSDataAutoRelease rwrapper = obs_data_create();
+	obs_data_set_string(rwrapper, "fname", obs_source_get_name(f));
+	obs_data_set_string(rwrapper, "suuid", obs_source_get_uuid(s));
+	std::string redo_json = obs_data_get_json(rwrapper);
+
 	obs_source_release(s);
+
+	auto actionName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Delete")).arg(obs_source_get_name(f));
+
+	obs_frontend_add_undo_redo_action(actionName.toUtf8().constData(), restore_filter, remove_filter, undo_json.c_str(),
+					  redo_json.c_str(), false);
+}
+
+void FiltersDock::restore_filter(const char *json)
+{
+	OBSDataAutoRelease data = obs_data_create_from_json(json);
+	const char *filter_uuid = obs_data_get_string(data, "uuid");
+	OBSSourceAutoRelease existing_filter = obs_get_source_by_uuid(filter_uuid);
+	if (existing_filter)
+		return;
+	OBSSourceAutoRelease source = obs_get_source_by_uuid(obs_data_get_string(data, "undo_uuid"));
+	if (!source)
+		return;
+	OBSSourceAutoRelease filter = obs_load_source(data);
+	obs_source_filter_add(source, filter);
+}
+
+void FiltersDock::remove_filter(const char *json)
+{
+	OBSDataAutoRelease data = obs_data_create_from_json(json);
+	OBSSourceAutoRelease source = obs_get_source_by_uuid(obs_data_get_string(data, "suuid"));
+	if (!source)
+		return;
+	OBSSourceAutoRelease filter = obs_source_get_filter_by_name(source, obs_data_get_string(data, "fname"));
+	if (!filter)
+		return;
+	obs_source_filter_remove(source, filter);
 }
 
 void FiltersDock::RenameFilter(QListWidgetItem *item)
