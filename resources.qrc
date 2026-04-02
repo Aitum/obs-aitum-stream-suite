@@ -13,17 +13,17 @@
     <file>media/studio_mode_on.svg</file>
     <file>media/linked.svg</file>
     <file>media/unlinked.svg</file>
-	<file>media/facebook.png</file>
-	<file>media/tiktok.png</file>
-	<file>media/trovo.png</file>
-	<file>media/twitch.png</file>
-	<file>media/twitter.png</file>
-	<file>media/unknown.png</file>
-	<file>media/youtube.png</file>
-	<file>media/kick.png</file>
-  <file>media/Roboto.ttf</file>
-  <file>media/Roboto-Italic.ttf</file>
-  <file>media/RobotoCondensed.ttf</file>
-  <file>media/RobotoCondensed-Italic.ttf</file>
+    <file>media/facebook.png</file>
+    <file>media/tiktok.png</file>
+    <file>media/trovo.png</file>
+    <file>media/twitch.png</file>
+    <file>media/twitter.png</file>
+    <file>media/unknown.png</file>
+    <file>media/youtube.png</file>
+    <file>media/kick.png</file>
+    <file>media/Roboto.ttf</file>
+    <file>media/Roboto-Italic.ttf</file>
+    <file>media/RobotoCondensed.ttf</file>
+    <file>media/RobotoCondensed-Italic.ttf</file>
   </qresource>
 </RCC>
