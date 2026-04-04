@@ -1148,7 +1148,7 @@ void OutputWidget::CheckActive()
 	if (activeTimer.isActive() != active) {
 		if (active) {
 			startTime = QDateTime::currentDateTime();
-			activeTimer.start();
+			activeTimer.start(500);
 		} else {
 			activeTimer.stop();
 			if (extraButton)
