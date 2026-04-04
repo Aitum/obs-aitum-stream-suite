@@ -20,7 +20,7 @@ StatsDock::StatsDock(QWidget *parent) : QFrame(parent)
 	table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	table->setSortingEnabled(true);
 
-	auto model = new OutputStatsModel();
+	auto model = new OutputStatsModel([this]() { return isVisible(); });
 	model->setGraphWidthFunc([this](int i) { return table->columnWidth(i); });
 	auto proxyModel = new QSortFilterProxyModel(this);
 	proxyModel->setSourceModel(model);
@@ -114,9 +114,9 @@ void StatsDock::SaveSettings(bool closing, QString mode)
 	obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
 }
 
-OutputStatsModel::OutputStatsModel(QObject *parent) : QAbstractTableModel(parent)
+OutputStatsModel::OutputStatsModel(std::function<bool()> isActiveFunc, QObject *parent) : QAbstractTableModel(parent)
 {
-
+	this->isActiveFunc = isActiveFunc;
 	updateTimer.setInterval(1000);
 	connect(&updateTimer, &QTimer::timeout, this, &OutputStatsModel::updateStats);
 	updateTimer.start();
@@ -170,6 +170,17 @@ QVariant OutputStatsModel::headerData(int section, Qt::Orientation orientation, 
 
 void OutputStatsModel::updateStats()
 {
+	bool new_active = isActiveFunc();
+	if (new_active != active) {
+		active = new_active;
+		if (!active) {
+			beginResetModel();
+			rows.clear();
+			endResetModel();
+		}
+	}
+	if (!active)
+		return;
 	for (auto &row : rows) {
 		row.updated = false;
 	}
