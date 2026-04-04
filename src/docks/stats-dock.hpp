@@ -81,6 +81,9 @@ private:
 	friend class StatsDock;
 	friend class UserRoleTypeDelegate;
 
+	std::function<bool()> isActiveFunc = nullptr;
+	bool active = false;
+
 	const std::vector<OutputStatsColumn> columns = {
 		{"Output", "Name", true, Qt::AlignLeft | Qt::AlignVCenter,
 		 [](const OutputStatsRow &row) {
@@ -172,7 +175,7 @@ private slots:
 	void updateStats();
 
 public:
-	OutputStatsModel(QObject *parent = nullptr);
+	OutputStatsModel(std::function<bool()> isActiveFunc, QObject *parent = nullptr);
 	~OutputStatsModel();
 
 	int rowCount(const QModelIndex &parent = QModelIndex()) const override;

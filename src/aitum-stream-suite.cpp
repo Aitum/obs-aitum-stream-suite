@@ -149,8 +149,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 				auto close = new QAction("x");
 				close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
 				close->connect(close, &QAction::triggered, [] {
-					foreach(auto &a, partnerBlockActions)
-					{
+					for (auto &a : partnerBlockActions) {
 						toolbar->removeAction(a);
 					}
 					partnerBlockActions.clear();
@@ -309,8 +308,7 @@ void reset_live_dock_state()
 	QList<QDockWidget *> left_docks;
 	QList<int> left_dock_sizes;
 
-	foreach(auto &canvas_dock, canvas_docks)
-	{
+	for (auto &canvas_dock : canvas_docks) {
 		d = (QDockWidget *)canvas_dock->parentWidget();
 		d->setVisible(true);
 		d->setFloating(false);
@@ -324,8 +322,7 @@ void reset_live_dock_state()
 		canvas_dock->reset_live_state();
 	}
 
-	foreach(auto &canvas_clone_dock, canvas_clone_docks)
-	{
+	for (auto &canvas_clone_dock : canvas_clone_docks) {
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
 		d->setVisible(true);
 		d->setFloating(false);
@@ -454,8 +451,7 @@ void reset_build_dock_state()
 	QList<QDockWidget *> right_docks;
 	QList<int> right_dock_sizes;
 
-	foreach(auto &canvas_dock, canvas_docks)
-	{
+	for (auto &canvas_dock : canvas_docks) {
 		d = (QDockWidget *)canvas_dock->parentWidget();
 		d->setVisible(true);
 		d->setFloating(false);
@@ -469,8 +465,7 @@ void reset_build_dock_state()
 		canvas_dock->reset_build_state();
 	}
 
-	foreach(auto &canvas_clone_dock, canvas_clone_docks)
-	{
+	for (auto &canvas_clone_dock : canvas_clone_docks) {
 		d = (QDockWidget *)canvas_clone_dock->parentWidget();
 		d->setVisible(true);
 		d->setFloating(false);

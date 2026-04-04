@@ -1002,8 +1002,7 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 						auto videoEncoderIds = {"obs_nvenc_h264_tex", "jim_nvenc", "ffmpeg_nvenc",
 									"obs_qsv11_v2", "h264_texture_amf"};
 						const char *vencid = "obs_x264";
-						foreach(auto videoEncoderId, videoEncoderIds)
-						{
+						for (auto &videoEncoderId : videoEncoderIds) {
 							if (EncoderAvailable(videoEncoderId)) {
 								vencid = videoEncoderId;
 								break;
@@ -1106,8 +1105,7 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 			auto videoEncoderIds = {"obs_nvenc_h264_tex", "jim_nvenc", "ffmpeg_nvenc", "obs_qsv11_v2",
 						"h264_texture_amf"};
 			const char *vencid = "obs_x264";
-			foreach(auto videoEncoderId, videoEncoderIds)
-			{
+			for (auto &videoEncoderId : videoEncoderIds) {
 				if (EncoderAvailable(videoEncoderId)) {
 					vencid = videoEncoderId;
 					break;
