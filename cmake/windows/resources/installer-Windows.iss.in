@@ -96,6 +96,8 @@ Source: "..\LICENSE"; Flags: dontcopy
 [InstallDelete]
 Type: files; Name: "{app}\obs-plugins\64bit\vertical-canvas.dll"
 Type: files; Name: "{app}\obs-plugins\64bit\vertical-canvas.pdb"
+Type: files; Name: "{app}\obs-plugins\64bit\aitum-multistream.dll"
+Type: files; Name: "{app}\obs-plugins\64bit\aitum-multistream.pdb"
 
 [Ini]
 filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
