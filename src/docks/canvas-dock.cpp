@@ -162,6 +162,8 @@ bool CanvasDock::save_undo_source_enum(obs_scene_t * /* scene */, obs_sceneitem_
 	return true;
 }
 
+static bool undoing = false;
+
 void CanvasDock::undo_redo_scene(const char *json)
 {
 	OBSDataAutoRelease base = obs_data_create_from_json(json);
@@ -171,6 +173,8 @@ void CanvasDock::undo_redo_scene(const char *json)
 	/* create missing sources */
 	const size_t count = obs_data_array_count(array);
 	sources.reserve(count);
+
+	undoing = true;
 
 	for (size_t i = 0; i < count; i++) {
 		OBSDataAutoRelease data = obs_data_array_item(array, i);
@@ -199,9 +203,12 @@ void CanvasDock::undo_redo_scene(const char *json)
 	/* actually load sources now */
 	for (obs_source_t *source : sources)
 		obs_source_load2(source);
+
+	undoing = false;
 }
 
-std::string CanvasDock::backup_scene(obs_scene_t* scene) {
+std::string CanvasDock::backup_scene(obs_scene_t *scene)
+{
 	OBSDataArrayAutoRelease backup_array = obs_data_array_create();
 	obs_scene_enum_items(scene, save_undo_source_enum, backup_array);
 	auto scene_source = obs_scene_get_source(scene);
@@ -685,18 +692,42 @@ void CanvasDock::LoadUI()
 	toolbar->widgetForAction(a)->setProperty("class", "icon-gear");
 
 	toolbar->addSeparator();
-	a = toolbar->addAction(QIcon(":/res/images/up.svg"), QString::fromUtf8(obs_frontend_get_locale_string("MoveSourceUp")),
-			       [this] {
-				       auto item = GetCurrentSceneItem();
-				       obs_sceneitem_set_order(item, OBS_ORDER_MOVE_UP);
-			       });
+	a = toolbar->addAction(
+		QIcon(":/res/images/up.svg"), QString::fromUtf8(obs_frontend_get_locale_string("MoveSourceUp")), [this] {
+			auto item = GetCurrentSceneItem();
+			if (!item)
+				return;
+			auto scene = obs_sceneitem_get_scene(item);
+			if (!scene)
+				return;
+			std::string undo_json = backup_scene(scene);
+			obs_sceneitem_set_order(item, OBS_ORDER_MOVE_UP);
+			std::string redo_json = backup_scene(scene);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.MoveUp"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(item))),
+						     QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(undoName.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+							  undo_json.c_str(), redo_json.c_str(), false);
+		});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("upArrowIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-up");
-	a = toolbar->addAction(QIcon(":/res/images/down.svg"), QString::fromUtf8(obs_frontend_get_locale_string("MoveSourceDown")),
-			       [this] {
-				       auto item = GetCurrentSceneItem();
-				       obs_sceneitem_set_order(item, OBS_ORDER_MOVE_DOWN);
-			       });
+	a = toolbar->addAction(
+		QIcon(":/res/images/down.svg"), QString::fromUtf8(obs_frontend_get_locale_string("MoveSourceDown")), [this] {
+			auto item = GetCurrentSceneItem();
+			if (!item)
+				return;
+			auto scene = obs_sceneitem_get_scene(item);
+			if (!scene)
+				return;
+			std::string undo_json = backup_scene(scene);
+			obs_sceneitem_set_order(item, OBS_ORDER_MOVE_DOWN);
+			std::string redo_json = backup_scene(scene);
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.MoveDown"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(item))),
+						     QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
+			obs_frontend_add_undo_redo_action(undoName.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+							  undo_json.c_str(), redo_json.c_str(), false);
+		});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("downArrowIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-down");
 
@@ -2379,7 +2410,8 @@ void CanvasDock::SceneItemAdded(void *data, calldata_t *params)
 
 	obs_sceneitem_t *item = (obs_sceneitem_t *)calldata_ptr(params, "item");
 
-	QMetaObject::invokeMethod(window, "AddSceneItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, OBSSceneItem(item)));
+	QMetaObject::invokeMethod(window, "AddSceneItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, OBSSceneItem(item)),
+				  Q_ARG(bool, undoing));
 }
 
 void CanvasDock::SceneReordered(void *data, calldata_t *params)
@@ -3849,12 +3881,15 @@ void CanvasDock::SceneRemoved(const QString name)
 	}
 }
 
-void CanvasDock::AddSceneItem(OBSSceneItem item)
+void CanvasDock::AddSceneItem(OBSSceneItem item, bool no_select)
 {
 	obs_scene_t *add_scene = obs_sceneitem_get_scene(item);
 
 	if (scene == add_scene)
 		sourceList->Add(item);
+
+	if (no_select)
+		return;
 
 	obs_scene_enum_items(add_scene, select_one, (obs_sceneitem_t *)item);
 }

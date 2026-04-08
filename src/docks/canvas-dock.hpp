@@ -261,7 +261,7 @@ private slots:
 	void AddSourceFromAction();
 	void SceneAdded(const QString name);
 	void SceneRemoved(const QString name);
-	void AddSceneItem(OBSSceneItem item);
+	void AddSceneItem(OBSSceneItem item, bool no_select = false);
 	void RefreshSources(OBSScene scene);
 	void ReorderSources(OBSScene scene);
 	void SwitchBackToSelectedTransition();
