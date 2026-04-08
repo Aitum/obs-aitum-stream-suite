@@ -578,7 +578,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 			obs_sceneitem_set_pos(item, &pos);
 
 			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
-			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.VCenter"))
+			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.HCenter"))
 						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
 			obs_frontend_add_undo_redo_action(
 				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
