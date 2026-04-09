@@ -107,61 +107,67 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		time_t current_time = time(nullptr);
 		auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
 		if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
-			QMetaObject::invokeMethod(toolbar, [blocks] {
-				auto before = studioModeAction;
-				size_t count = obs_data_array_count(blocks);
-				for (size_t i = 0; i < count; i++) {
-					obs_data_t *block = obs_data_array_item(blocks, i);
-					auto block_type = obs_data_get_string(block, "type");
-					if (strcmp(block_type, "LINK") == 0) {
-						auto button =
-							new QPushButton(QString::fromUtf8(obs_data_get_string(block, "label")));
-						button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
-						auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
-						button->connect(button, &QPushButton::clicked,
-								[url] { QDesktopServices::openUrl(QUrl(url)); });
-						partnerBlockActions.append(toolbar->insertWidget(before, button));
-					} else if (strcmp(block_type, "IMAGE") == 0) {
-						auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
-						if (image_data.startsWith("data:image/")) {
-							auto pos = image_data.indexOf(";");
-							auto format = image_data.mid(11, pos - 11);
-							QImage image;
-							if (image.loadFromData(QByteArray::fromBase64(
-										       image_data.mid(pos + 7).toUtf8().constData()),
-									       format.toUtf8().constData())) {
-								auto label = new AspectRatioPixmapLabel;
-								label->setPixmap(QPixmap::fromImage(image));
-								label->setAlignment(Qt::AlignCenter);
-								label->setStyleSheet(
-									QString::fromUtf8(obs_data_get_string(block, "qss")));
-								partnerBlockActions.append(toolbar->insertWidget(before, label));
+			QMetaObject::invokeMethod(
+				toolbar,
+				[blocks] {
+					auto before = studioModeAction;
+					size_t count = obs_data_array_count(blocks);
+					for (size_t i = 0; i < count; i++) {
+						obs_data_t *block = obs_data_array_item(blocks, i);
+						auto block_type = obs_data_get_string(block, "type");
+						if (strcmp(block_type, "LINK") == 0) {
+							auto button = new QPushButton(
+								QString::fromUtf8(obs_data_get_string(block, "label")));
+							button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+							auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
+							button->connect(button, &QPushButton::clicked,
+									[url] { QDesktopServices::openUrl(QUrl(url)); });
+							partnerBlockActions.append(toolbar->insertWidget(before, button));
+						} else if (strcmp(block_type, "IMAGE") == 0) {
+							auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
+							if (image_data.startsWith("data:image/")) {
+								auto pos = image_data.indexOf(";");
+								auto format = image_data.mid(11, pos - 11);
+								QImage image;
+								if (image.loadFromData(
+									    QByteArray::fromBase64(
+										    image_data.mid(pos + 7).toUtf8().constData()),
+									    format.toUtf8().constData())) {
+									auto label = new AspectRatioPixmapLabel;
+									label->setPixmap(QPixmap::fromImage(image));
+									label->setAlignment(Qt::AlignCenter);
+									label->setStyleSheet(QString::fromUtf8(
+										obs_data_get_string(block, "qss")));
+									partnerBlockActions.append(
+										toolbar->insertWidget(before, label));
+								}
 							}
+						} else if (strcmp(block_type, "LABEL") == 0) {
+							auto label =
+								new QLabel(QString::fromUtf8(obs_data_get_string(block, "label")));
+							label->setOpenExternalLinks(true);
+							label->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
+							partnerBlockActions.append(toolbar->insertWidget(before, label));
 						}
-					} else if (strcmp(block_type, "LABEL") == 0) {
-						auto label = new QLabel(QString::fromUtf8(obs_data_get_string(block, "label")));
-						label->setOpenExternalLinks(true);
-						label->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
-						partnerBlockActions.append(toolbar->insertWidget(before, label));
+						obs_data_release(block);
 					}
-					obs_data_release(block);
-				}
-				auto close = new QAction("x");
-				close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
-				close->connect(close, &QAction::triggered, [] {
-					for (auto &a : partnerBlockActions) {
-						toolbar->removeAction(a);
-					}
-					partnerBlockActions.clear();
-					config_set_int(obs_frontend_get_user_config(), "Aitum", "partner_block",
-						       (int64_t)time(nullptr));
-				});
-				toolbar->insertAction(before, close);
-				partnerBlockActions.append(close);
-				QWidget *spacer = new QWidget();
-				spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-				partnerBlockActions.append(toolbar->insertWidget(before, spacer));
-			});
+					auto close = new QAction("x");
+					close->setToolTip(QString::fromUtf8(obs_module_text("ClosePartnerBlock")));
+					close->connect(close, &QAction::triggered, [] {
+						for (auto &a : partnerBlockActions) {
+							toolbar->removeAction(a);
+						}
+						partnerBlockActions.clear();
+						config_set_int(obs_frontend_get_user_config(), "Aitum", "partner_block",
+							       (int64_t)time(nullptr));
+					});
+					toolbar->insertAction(before, close);
+					partnerBlockActions.append(close);
+					QWidget *spacer = new QWidget();
+					spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+					partnerBlockActions.append(toolbar->insertWidget(before, spacer));
+				},
+				Qt::BlockingQueuedConnection);
 		}
 	}
 	obs_data_array_release(blocks);
