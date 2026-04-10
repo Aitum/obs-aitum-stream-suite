@@ -26,7 +26,10 @@ LiveScenesDock::LiveScenesDock(QWidget *parent) : QFrame(parent)
 		if (!scene)
 			scene = obs_get_source_by_name(item->text().toUtf8().constData());
 		if (scene) {
-			obs_frontend_set_current_scene(scene);
+			auto current_scene = obs_frontend_get_current_scene();
+			if (scene != current_scene)
+				obs_frontend_set_current_scene(scene);
+			obs_source_release(current_scene);
 			obs_source_release(scene);
 		}
 		if (!item->isSelected())
@@ -46,31 +49,30 @@ LiveScenesDock::LiveScenesDock(QWidget *parent) : QFrame(parent)
 	toolbar->setObjectName(QStringLiteral("scenesToolbar"));
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setFloatable(false);
-	auto a = toolbar->addAction(QIcon(QString::fromUtf8(":/res/images/plus.svg")),
-				    QString::fromUtf8(obs_frontend_get_locale_string("Add")), [this] {
-					    QMenu menu;
-					    auto names = obs_frontend_get_scene_names();
-					    auto name = names;
-					    while (name && *name) {
-						    auto n = *name;
-						    menu.addAction(QString::fromUtf8(n), [this, n] {
-							    auto scene = obs_get_source_by_name(n);
-							    if (!scene)
-								    return;
-							    
-							    auto sli = new QListWidgetItem(
-								    QString::fromUtf8(obs_source_get_name(scene)), sceneList);
-							    sli->setData(Qt::UserRole,
-									 QString::fromUtf8(obs_source_get_uuid(scene)));
-							    sceneList->addItem(sli);
-							    obs_source_release(scene);
-						    });
-						    
-						    name++;
-					    }
-					    menu.exec(QCursor::pos());
-					    bfree(names);
-				    });
+	auto a = toolbar->addAction(
+		QIcon(QString::fromUtf8(":/res/images/plus.svg")), QString::fromUtf8(obs_frontend_get_locale_string("Add")),
+		[this] {
+			QMenu menu;
+			auto names = obs_frontend_get_scene_names();
+			auto name = names;
+			while (name && *name) {
+				auto n = *name;
+				menu.addAction(QString::fromUtf8(n), [this, n] {
+					auto scene = obs_get_source_by_name(n);
+					if (!scene)
+						return;
+
+					auto sli = new QListWidgetItem(QString::fromUtf8(obs_source_get_name(scene)), sceneList);
+					sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
+					sceneList->addItem(sli);
+					obs_source_release(scene);
+				});
+
+				name++;
+			}
+			menu.exec(QCursor::pos());
+			bfree(names);
+		});
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 
