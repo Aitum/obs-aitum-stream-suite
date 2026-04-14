@@ -3264,7 +3264,6 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				undoName.toUtf8().constData(), [](const char *data) { obs_scene_load_transform_states(data); },
 				[](const char *data) { obs_scene_load_transform_states(data); }, obs_data_get_json(wrapper),
 				obs_data_get_json(rwrapper), false);
-
 		});
 
 	popup->addSeparator();
@@ -3298,40 +3297,34 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 
 	auto blendingMode = obs_sceneitem_get_blending_mode(sceneItem);
 	auto blendingMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode")));
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Normal")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_NORMAL); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_NORMAL);
 
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Additive")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_ADDITIVE); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_ADDITIVE);
+	std::map<enum obs_blending_type, const char *> blendingModes = {
+		{OBS_BLEND_NORMAL, "BlendingMode.Normal"},     {OBS_BLEND_ADDITIVE, "BlendingMode.Additive"},
+		{OBS_BLEND_SUBTRACT, "BlendingMode.Subtract"}, {OBS_BLEND_SCREEN, "BlendingMode.Screen"},
+		{OBS_BLEND_MULTIPLY, "BlendingMode.Multiply"}, {OBS_BLEND_LIGHTEN, "BlendingMode.Lighten"},
+		{OBS_BLEND_DARKEN, "BlendingMode.Darken"}};
 
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Subtract")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_SUBTRACT); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_SUBTRACT);
-
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Screen")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_SCREEN); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_SCREEN);
-
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Multiply")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_MULTIPLY); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_MULTIPLY);
-
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Lighten")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_LIGHTEN); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_LIGHTEN);
-
-	a = blendingMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("BlendingMode.Darken")), this,
-				    [sceneItem] { obs_sceneitem_set_blending_mode(sceneItem, OBS_BLEND_DARKEN); });
-	a->setCheckable(true);
-	a->setChecked(blendingMode == OBS_BLEND_DARKEN);
+	for (int i = OBS_BLEND_NORMAL; i <= OBS_BLEND_DARKEN; i++) {
+		a = blendingMenu->addAction(
+			QString::fromUtf8(obs_frontend_get_locale_string(blendingModes[(enum obs_blending_type)i])), this,
+			[sceneItem, i] {
+				if (!sceneItem)
+					return;
+				auto scene = obs_sceneitem_get_scene(sceneItem);
+				if (!scene)
+					return;
+				std::string undo_json = backup_scene(scene);
+				obs_sceneitem_set_blending_mode(sceneItem, (enum obs_blending_type)i);
+				std::string redo_json = backup_scene(scene);
+				auto undoName =
+					QString::fromUtf8(obs_frontend_get_locale_string("Undo.BlendingMethod"))
+						.arg(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(sceneItem))));
+				obs_frontend_add_undo_redo_action(undoName.toUtf8().constData(), undo_redo_scene, undo_redo_scene,
+								  undo_json.c_str(), redo_json.c_str(), false);
+			});
+		a->setCheckable(true);
+		a->setChecked(blendingMode == i);
+	}
 
 	popup->addSeparator();
 	popup->addMenu(CreateVisibilityTransitionMenu(true, sceneItem));
