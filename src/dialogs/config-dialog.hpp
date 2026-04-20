@@ -89,6 +89,7 @@ private:
 	void AddStream();
 	void AddRecord(bool backtrack);
 	void AddVirtualCam();
+	void AddFfmpeg();
 	void LoadSourceCombos();
 
 	obs_hotkey_t *GetHotkeyByName(const char *name);

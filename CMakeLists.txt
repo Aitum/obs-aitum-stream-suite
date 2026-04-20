@@ -20,10 +20,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE OBS::libobs)
 if(BUILD_OUT_OF_TREE)
   find_package(libobs REQUIRED)
   find_package(obs-frontend-api REQUIRED)
+  find_package(FFmpeg REQUIRED COMPONENTS avcodec avutil avformat)
   target_link_libraries(${PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
 else()
   target_link_libraries(${PROJECT_NAME} PRIVATE OBS::frontend-api)
 endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE FFmpeg::avcodec FFmpeg::avutil FFmpeg::avformat)
 
 find_package(Qt6 COMPONENTS Widgets Core)
 if(BUILD_OUT_OF_TREE)
@@ -33,8 +35,9 @@ if(BUILD_OUT_OF_TREE)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt::Core Qt::Widgets)
 
-if((OS_LINUX OR OS_FREEBSD OR OS_OPENBSD) AND Qt_VERSION VERSION_LESS "6.9.0")
-	target_link_libraries(${PROJECT_NAME} PRIVATE Qt::GuiPrivate)
+if((OS_LINUX OR OS_FREEBSD OR OS_OPENBSD) AND Qt6_VERSION VERSION_LESS "6.9.0")
+  find_package(Qt6 COMPONENTS GuiPrivate)
+  target_link_libraries(${PROJECT_NAME} PRIVATE Qt::GuiPrivate)
 endif()
 
 if(BUILD_OUT_OF_TREE)
@@ -89,6 +92,8 @@ target_sources(${PROJECT_NAME} PRIVATE
 target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/config-dialog.cpp
   src/dialogs/config-dialog.hpp
+  src/dialogs/ffmpeg-output-dialog.cpp
+  src/dialogs/ffmpeg-output-dialog.hpp
   src/dialogs/name-dialog.cpp
   src/dialogs/name-dialog.hpp
   src/dialogs/record-output-dialog.cpp

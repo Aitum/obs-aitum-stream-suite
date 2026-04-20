@@ -1,13 +1,14 @@
 #include "output-widget.hpp"
+#include <obs.hpp>
 #include <obs-frontend-api.h>
 #include <obs-module.h>
 #include <QCheckBox>
 #include <QHBoxLayout>
-#include <QTime>
 #include <QLabel>
-#include <QMessageBox>
 #include <QMainWindow>
+#include <QMessageBox>
 #include <QRegularExpression>
+#include <QTime>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
 #include <src/utils/obs-websocket-api.h>
@@ -209,6 +210,10 @@ OutputWidget::OutputWidget(obs_data_t *output_data, QWidget *parent) : QFrame(pa
 		outputButton->setIcon(create2StateIcon(":/aitum/media/virtual_cam_on.svg", ":/aitum/media/virtual_cam_off.svg"));
 		outputButton->setStyleSheet("QAbstractButton:checked{background: rgb(192,128,0);}");
 		outputButton->setToolTip(QString::fromUtf8(obs_module_text("VirtualCamera")));
+	} else if (strcmp(output_type, "ffmpeg") == 0) {
+		outputButton->setIcon(create2StateIcon(":/aitum/media/ffmpeg_on.svg", ":/aitum/media/ffmpeg_off.svg"));
+		outputButton->setStyleSheet("QAbstractButton:checked{background: rgb(0,135,0);}");
+		outputButton->setToolTip(QString::fromUtf8(obs_module_text("Ffmpeg")));
 	} else {
 		outputButton->setIcon(create2StateIcon(":/aitum/media/streaming.svg", ":/aitum/media/stream.svg"));
 		outputButton->setStyleSheet("QAbstractButton:checked{background: rgb(0,210,153);}");
@@ -498,6 +503,109 @@ bool OutputWidget::StartOutput(bool automated)
 			obs_data_release(d);
 		}
 		obs_canvas_release(canvas);
+		return true;
+	} else if (strcmp(output_type, "ffmpeg") == 0) {
+
+		const char *canvas_name = obs_data_get_string(settings, "canvas");
+		auto canvas = (!canvas_name || canvas_name[0] == '\0') ? obs_get_main_canvas()
+								       : obs_get_canvas_by_name(canvas_name);
+		if (!canvas)
+			return false;
+
+
+		std::string output_name = "Aitum Stream Suite Output ";
+		output_name += name;
+		output = obs_output_create("ffmpeg_output", output_name.c_str(), nullptr, nullptr);
+		if (!output) {
+			blog(LOG_WARNING, "[Aitum Stream Suite] failed to create ffmpeg output '%s'", name);
+			return false;
+		}
+
+
+		OBSDataAutoRelease s = obs_data_create();
+		OBSDataArrayAutoRelease audio_names = obs_data_array_create();
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
+			std::string cfg_name = "Track";
+			cfg_name += std::to_string((int)i + 1);
+			cfg_name += "Name";
+
+			const char *audioName = config_get_string(obs_frontend_get_profile_config(), "AdvOut", cfg_name.c_str());
+			OBSDataAutoRelease item = obs_data_create();
+			if (audioName && audioName[0] != '\0')
+				obs_data_set_string(item, "name", audioName);
+			obs_data_array_push_back(audio_names, item);
+		}
+		obs_data_set_array(s, "audio_names", audio_names);
+		if (obs_data_get_bool(settings, "save_file")) {
+			std::string path = obs_data_get_string(settings, "directory");
+			char lastChar = path.empty() ? '\0' : path.back();
+			if (lastChar != '/' && lastChar != '\\')
+				path += "/";
+			auto extension = obs_data_get_string(settings, "extension");
+			bool spaces = obs_data_get_bool(settings, "allow_spaces");
+			auto format = obs_data_get_string(settings, "format");
+			obs_data_set_string(s, "directory", path.c_str());
+			obs_data_set_string(s, "path", path.c_str());
+			obs_data_set_string(s, "format", format);
+			obs_data_set_string(s, "extension", extension);
+			obs_data_set_bool(s, "allow_spaces", spaces);
+			obs_data_set_bool(s, "allow_overwrite", obs_data_get_bool(settings, "allow_overwrite"));
+			obs_data_set_bool(s, "split_file", true);
+			obs_data_set_int(s, "max_time_sec", obs_data_get_int(settings, "max_time_sec"));
+			obs_data_set_int(s, "max_size_mb", obs_data_get_int(settings, "max_size_mb"));
+
+			//ensure_directory_exists(strPath);
+
+			auto filename = os_generate_formatted_filename(extension, spaces, format);
+			path += filename;
+			obs_data_set_string(s, "url", path.c_str());
+			bfree(filename);
+		} else {
+			obs_data_set_string(s, "url", obs_data_get_string(settings, "url"));
+		}
+
+		obs_data_set_string(s, "format_name", obs_data_get_string(settings, "format_name"));
+		obs_data_set_string(s, "format_mime_type", obs_data_get_string(settings, "format_mime_type"));
+		obs_data_set_string(s, "muxer_settings", obs_data_get_string(settings, "muxer_settings"));
+		obs_data_set_int(s, "gop_size", obs_data_get_int(settings, "gop_size"));
+		obs_data_set_int(s, "video_bitrate", obs_data_get_int(settings, "video_bitrate"));
+		obs_data_set_string(s, "video_encoder", obs_data_get_string(settings, "video_encoder"));
+		obs_data_set_int(s, "video_encoder_id", obs_data_get_int(settings, "video_encoder_id"));
+		obs_data_set_string(s, "video_settings", obs_data_get_string(settings, "video_settings"));
+		obs_data_set_int(s, "audio_bitrate", obs_data_get_int(settings, "audio_bitrate"));
+		obs_data_set_string(s, "audio_encoder", obs_data_get_string(settings, "audio_encoder"));
+		obs_data_set_int(s, "audio_encoder_id", obs_data_get_int(settings, "audio_encoder_id"));
+		obs_data_set_string(s, "audio_settings", obs_data_get_string(settings, "audio_settings"));
+		if (obs_data_get_bool(settings, "rescale")) {
+			obs_data_set_int(s, "scale_width", obs_data_get_int(settings, "scale_width"));
+			obs_data_set_int(s, "scale_height", obs_data_get_int(settings, "scale_height"));
+		}
+
+		size_t aMixes = obs_data_get_int(settings, "audio_mixes");
+		obs_output_set_mixers(output, aMixes);
+		obs_output_set_media(output, obs_canvas_get_video(canvas), obs_get_audio());
+		obs_canvas_release(canvas);
+
+		obs_output_update(output, s);
+
+		signal_handler_t *signal = obs_output_get_signal_handler(output);
+		signal_handler_disconnect(signal, "start", output_start, this);
+		signal_handler_disconnect(signal, "stop", output_stop, this);
+		signal_handler_connect(signal, "start", output_start, this);
+		signal_handler_connect(signal, "stop", output_stop, this);
+
+		if (!obs_output_start(output)) {
+			obs_output_release(output);
+			output = nullptr;
+			return false;
+		}
+
+		if (vendor) {
+			const auto d = obs_data_create();
+			obs_data_set_string(d, "output", name);
+			obs_websocket_vendor_emit_event(vendor, "start_output", d);
+			obs_data_release(d);
+		}
 		return true;
 	}
 

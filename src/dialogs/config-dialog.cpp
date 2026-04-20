@@ -3,6 +3,7 @@
 #include "obs-module.h"
 #include "stream-output-dialog.hpp"
 #include "record-output-dialog.hpp"
+#include "ffmpeg-output-dialog.hpp"
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
@@ -333,6 +334,9 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
 		connect(a, &QAction::triggered, [this] { AddVirtualCam(); });
+		a = addMenu.addAction(QIcon(":/aitum/media/ffmpeg_off.svg"),
+				      QString::fromUtf8(obs_module_text("AddFfmpeg")));
+		connect(a, &QAction::triggered, [this] { AddFfmpeg(); });
 		addMenu.exec(QCursor::pos());
 	});
 
@@ -1314,6 +1318,8 @@ void OBSBasicSettings::SetCreateType(const char *create_type)
 		AddRecord(true);
 	} else if (strcmp(create_type, "virtual_cam") == 0) {
 		AddVirtualCam();
+	} else if (strcmp(create_type, "ffmpeg") == 0) {
+		AddFfmpeg();
 	}
 }
 
@@ -1346,6 +1352,8 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		iconLabel->setPixmap(QIcon(":/aitum/media/backtrack_off.svg").pixmap(36, 36));
 	} else if (strcmp(output_type, "virtual_cam") == 0) {
 		iconLabel->setPixmap(QIcon(":/aitum/media/virtual_cam_off.svg").pixmap(36, 36));
+	} else if (strcmp(output_type, "ffmpeg") == 0) {
+		iconLabel->setPixmap(QIcon(":/aitum/media/ffmpeg_off.svg").pixmap(36, 36));
 	} else {
 		auto platformIcon = getPlatformIconFromEndpoint(QString::fromUtf8(obs_data_get_string(settings, "stream_server")));
 		iconLabel->setPixmap(platformIcon.pixmap(36, 36));
@@ -1466,6 +1474,27 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 				LoadSettings(main_settings);
 				break;
 			}
+		} else if (strcmp(output_type, "ffmpeg") == 0) {
+			auto outputDialog = new FfmpegOutputDialog(this, otherNames, settings);
+
+			outputDialog->setWindowModality(Qt::WindowModal);
+			outputDialog->setModal(true);
+
+			if (outputDialog->exec() == QDialog::Accepted) { // edit an output
+				if (!settings)
+					return;
+
+				obs_data_set_bool(settings, "enabled", true);
+
+				outputDialog->SaveSettings(settings);
+
+				// Reload
+				LoadSettings(main_settings);
+			}
+
+			delete outputDialog;
+
+
 		} else {
 			auto outputDialog =
 				new StreamOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
@@ -1674,7 +1703,7 @@ void OBSBasicSettings::LoadOutputLayout(obs_data_t *settings, QFormLayout *outpu
 		}
 	}
 
-	if (strcmp(output_type, "virtual_cam") == 0) {
+	if (strcmp(output_type, "virtual_cam") == 0 || strcmp(output_type, "ffmpeg") == 0) {
 		connect(canvasCombo, &QComboBox::currentTextChanged, [canvasCombo, settings] {
 			obs_data_set_string(settings, "canvas", canvasCombo->currentText().toUtf8().constData());
 		});
@@ -2471,6 +2500,39 @@ void OBSBasicSettings::AddVirtualCam()
 		obs_data_release(s);
 		break;
 	}
+}
+
+void OBSBasicSettings::AddFfmpeg()
+{
+	QStringList otherNames;
+	obs_data_array_enum(
+		extra_outputs,
+		[](obs_data_t *data2, void *param) {
+			((QStringList *)param)->append(QString::fromUtf8(obs_data_get_string(data2, "name")));
+		},
+		&otherNames);
+	otherNames.removeDuplicates();
+	auto outputDialog = new FfmpegOutputDialog(this, otherNames);
+
+	outputDialog->setWindowModality(Qt::WindowModal);
+	outputDialog->setModal(true);
+
+	if (outputDialog->exec() == QDialog::Accepted) {
+		// create a new output
+		if (!extra_outputs)
+			return;
+		auto s = obs_data_create();
+		obs_data_set_bool(s, "enabled", true);
+		obs_data_set_bool(s, "expanded", true);
+		obs_data_set_string(s, "type", "ffmpeg");
+		outputDialog->SaveSettings(s);
+
+		obs_data_array_push_back(extra_outputs, s);
+		AddOutput(outputsLayout, s, extra_outputs, true);
+		obs_data_release(s);
+	}
+
+	delete outputDialog;
 }
 
 obs_hotkey_t *OBSBasicSettings::GetHotkeyByName(const char *name)

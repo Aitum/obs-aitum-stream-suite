@@ -107,6 +107,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		time_t current_time = time(nullptr);
 		auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
 		if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
+			obs_data_array_addref(blocks);
 			QMetaObject::invokeMethod(
 				toolbar,
 				[blocks] {
@@ -166,6 +167,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 					QWidget *spacer = new QWidget();
 					spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 					partnerBlockActions.append(toolbar->insertWidget(before, spacer));
+					obs_data_array_release(blocks);
 				},
 				Qt::BlockingQueuedConnection);
 		}
