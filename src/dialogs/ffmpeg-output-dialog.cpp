@@ -58,7 +58,7 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	setContentsMargins(0, 0, 0, 0);
 	setMinimumSize(400, 120);
 
-	auto confirmButton = new QPushButton(QString::fromUtf8(obs_module_text(settings ? "SaveOutput" : "CreateOutput")));
+	auto confirmButton = new QPushButton(QString::fromUtf8(obs_module_text(settings ? "SaveFfmpegOutput" : "CreateFfmpegOutput")));
 	confirmButton->setEnabled(false);
 
 	auto formLayout = new QFormLayout;

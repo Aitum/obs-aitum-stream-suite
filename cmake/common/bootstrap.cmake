@@ -32,6 +32,7 @@ set(
 
 # Add common module directories to default search path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/common")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/finders")
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/buildspec.json" buildspec)
 

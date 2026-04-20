@@ -120,6 +120,10 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			       QString::fromUtf8(obs_module_text("VirtualCamera")),
 			       [this] { open_config_dialog(2, "virtual_cam"); });
 
+	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/ffmpeg_off.svg")),
+			       QString::fromUtf8(obs_module_text("FfmpegOutput")),
+			       [this] { open_config_dialog(2, "ffmpeg"); });
+
 	layout->addWidget(toolbar);
 
 	setLayout(layout);
