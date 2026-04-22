@@ -489,7 +489,7 @@ void OutputDock::LoadSettings()
 			if (name == (*it)->objectName()) {
 				(*it)->UpdateSettings(data2);
 				auto j = mainLayout->indexOf(*it);
-				if (i + 4 != j) {
+				if (j >= 0 && i + 4 != (size_t)j) {
 					mainLayout->takeAt(j);
 					mainLayout->insertWidget((int)i + 4, (*it));
 				}
