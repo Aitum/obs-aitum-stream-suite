@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRadioButton>
@@ -816,7 +817,15 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
-	connect(removeButton, &QPushButton::clicked, [this, canvasLayout, canvasGroup, settings, canvas] {
+	connect(removeButton, &QPushButton::clicked, [this, canvasLayout, canvasGroup, settings, canvas, canvas_title] {
+		QMessageBox mb(
+			QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
+			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text")).arg(canvas_title->text()),
+			QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
+		mb.setDefaultButton(QMessageBox::NoButton);
+		if (mb.exec() != QMessageBox::Yes)
+			return;
+
 		canvasLayout->removeWidget(canvasGroup);
 		RemoveWidget(canvasGroup);
 		obs_data_set_bool(settings, "delete", true);
@@ -1451,7 +1460,15 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
-	connect(removeButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, settings, outputs] {
+	connect(removeButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, settings, outputs, streaming_title] {
+		QMessageBox mb(
+			QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
+			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text")).arg(streaming_title->text()),
+			QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
+		mb.setDefaultButton(QMessageBox::NoButton);
+		if (mb.exec() != QMessageBox::Yes)
+			return;
+
 		for (auto it = hotkeys.begin(); it != hotkeys.end();) {
 			auto parent = (*it)->parentWidget();
 			if (parent == outputGroup || parent->parentWidget() == outputGroup) {
