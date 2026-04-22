@@ -11,6 +11,7 @@
 class PropertiesDock : public QFrame {
 	Q_OBJECT
 private:
+	bool exiting = false;
 	QLabel *sourceLabel = nullptr;
 	QLabel *sourceTypeLabel = nullptr;
 
@@ -49,4 +50,5 @@ private slots:
 public:
 	PropertiesDock(QWidget *parent = nullptr);
 	~PropertiesDock();
+	void Exiting() { exiting = true; }
 };

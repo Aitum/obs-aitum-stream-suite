@@ -1235,6 +1235,8 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 		if (output_dock)
 			output_dock->Exiting();
+		if (properties_dock)
+			properties_dock->Exiting();
 		for (auto &it : empty_docks) {
 			obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 		}
@@ -1486,7 +1488,6 @@ bool obs_module_load(void)
 		const char *theme = config_get_string(user_config, "Appearance", "Theme");
 		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
 			main_window->setContentsMargins(10, 10, 10, 10);
-			main_window->findChild<QWidget *>("centralwidget")->setContentsMargins(0, 0, 0, 0);
 		}
 	}
 
@@ -1746,6 +1747,15 @@ bool obs_module_load(void)
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::InsertLink));
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::CameraWeb));
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::EditUndo));
+
+	auto cw = main_window->centralWidget();
+	if (cw && cw->objectName() == "centralwidget") {
+		obs_frontend_add_dock_by_id("AitumStreamSuiteMainCanvas", obs_module_text("AitumStreamSuiteMainCanvas"), cw);
+		cw = new QWidget();
+		cw->setContentsMargins(0, 0, 0, 0);
+		cw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+		main_window->setCentralWidget(cw);
+	}
 
 	output_dock = new OutputDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOutput", obs_module_text("AitumStreamSuiteOutput"), output_dock);
