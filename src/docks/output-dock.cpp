@@ -121,8 +121,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			       [this] { open_config_dialog(2, "virtual_cam"); });
 
 	a = addMenu->addAction(QIcon(QString::fromUtf8(":/aitum/media/ffmpeg_off.svg")),
-			       QString::fromUtf8(obs_module_text("FfmpegOutput")),
-			       [this] { open_config_dialog(2, "ffmpeg"); });
+			       QString::fromUtf8(obs_module_text("FfmpegOutput")), [this] { open_config_dialog(2, "ffmpeg"); });
 
 	layout->addWidget(toolbar);
 
@@ -335,7 +334,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto active = obs_frontend_streaming_active();
 			if (mainStreamButton->isChecked() != active) {
 				mainStreamButton->setChecked(active);
-				if (!active) 
+				if (!active)
 					mainStreamButton->setText("");
 			} else if (active) {
 				auto t = QTime::fromMSecsSinceStartOfDay(mainStreamStartTime.msecsTo(QDateTime::currentDateTime()));
@@ -359,7 +358,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 			auto enabled = obs_frontend_replay_buffer_active();
 			if (mainBacktrackCheckboxButton->isChecked() != enabled) {
 				mainBacktrackCheckboxButton->setChecked(enabled);
-				if (!enabled) 
+				if (!enabled)
 					mainBacktrackButton->setText("");
 			} else if (enabled) {
 				auto t = QTime::fromMSecsSinceStartOfDay(
@@ -489,6 +488,11 @@ void OutputDock::LoadSettings()
 			obs_data_release(data2);
 			if (name == (*it)->objectName()) {
 				(*it)->UpdateSettings(data2);
+				auto j = mainLayout->indexOf(*it);
+				if (i + 4 != j) {
+					mainLayout->takeAt(j);
+					mainLayout->insertWidget((int)i + 4, (*it));
+				}
 				found = true;
 				break;
 			}

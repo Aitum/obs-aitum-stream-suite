@@ -50,6 +50,7 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 
 		setWindowTitle(obs_module_text("EditFfmpegOutputWindowTitle"));
 	} else {
+		outputName = QString::fromUtf8(obs_module_text("FfmpegOutput"));
 		setWindowTitle(QString::fromUtf8(obs_module_text("NewFfmpegOutputWindowTitle")));
 	}
 

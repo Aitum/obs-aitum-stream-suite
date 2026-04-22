@@ -334,8 +334,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
 		connect(a, &QAction::triggered, [this] { AddVirtualCam(); });
-		a = addMenu.addAction(QIcon(":/aitum/media/ffmpeg_off.svg"),
-				      QString::fromUtf8(obs_module_text("AddFfmpeg")));
+		a = addMenu.addAction(QIcon(":/aitum/media/ffmpeg_off.svg"), QString::fromUtf8(obs_module_text("AddFfmpeg")));
 		connect(a, &QAction::triggered, [this] { AddFfmpeg(); });
 		addMenu.exec(QCursor::pos());
 	});
@@ -1385,6 +1384,68 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 	output_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
 
+	auto moveUpButton = new QToolButton();
+	moveUpButton->setIcon(QIcon(":/res/images/up.svg"));
+	moveUpButton->setText(QString::fromUtf8(obs_module_text("MoveUp")));
+	moveUpButton->setProperty("themeID", QVariant(QString::fromUtf8("upArrowIconSmall")));
+	moveUpButton->setProperty("class", "icon-up");
+	connect(moveUpButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, outputs, settings] {
+		for (int i = 0; i < outputsLayout->rowCount(); i++) {
+			auto item = outputsLayout->itemAt(i, QFormLayout::FieldRole);
+			if (item && item->widget() == outputGroup) {
+				if (i > 2) {
+					auto row = outputsLayout->takeRow(i);
+					delete row.labelItem;
+					delete row.fieldItem;
+					outputsLayout->insertRow(i - 1, outputGroup);
+				}
+				break;
+			}
+		}
+		auto count = obs_data_array_count(outputs);
+		for (size_t i = 0; i < count; i++) {
+			auto item = obs_data_array_item(outputs, i);
+			if (item == settings) {
+				if (i > 0) {
+					obs_data_array_erase(outputs, i);
+					obs_data_array_insert(outputs, i - 1, settings);
+				}
+				obs_data_release(item);
+				break;
+			}
+			obs_data_release(item);
+		}
+	});
+	auto moveDownButton = new QToolButton();
+	moveDownButton->setIcon(QIcon(":/res/images/down.svg"));
+	moveDownButton->setText(QString::fromUtf8(obs_module_text("MoveDown")));
+	moveDownButton->setProperty("themeID", QVariant(QString::fromUtf8("downArrowIconSmall")));
+	moveDownButton->setProperty("class", "icon-down");
+
+	connect(moveDownButton, &QToolButton::clicked, [this, outputsLayout, outputGroup, outputs, settings] {
+		for (int i = 2; i < outputsLayout->rowCount() - 1; i++) {
+			auto item = outputsLayout->itemAt(i, QFormLayout::FieldRole);
+			if (item && item->widget() == outputGroup) {
+				auto row = outputsLayout->takeRow(i);
+				delete row.labelItem;
+				delete row.fieldItem;
+				outputsLayout->insertRow(i + 1, outputGroup);
+				break;
+			}
+		}
+		auto count = obs_data_array_count(outputs);
+		for (size_t i = 0; i < count - 1; i++) {
+			auto item = obs_data_array_item(outputs, i);
+			if (item == settings) {
+				obs_data_array_erase(outputs, i);
+				obs_data_array_insert(outputs, i + 1, settings);
+				obs_data_release(item);
+				break;
+			}
+			obs_data_release(item);
+		}
+	});
+
 	// Remove button
 	auto removeButton =
 		new QPushButton(QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("Remove")));
@@ -1494,7 +1555,6 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 
 			delete outputDialog;
 
-
 		} else {
 			auto outputDialog =
 				new StreamOutputDialog(this, QString::fromUtf8(obs_data_get_string(settings, "name")),
@@ -1525,6 +1585,8 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	// Buttons to layout
 	output_title_layout->addWidget(editButton, 0, Qt::AlignRight);
 	output_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
+	output_title_layout->addWidget(moveUpButton, 0, Qt::AlignRight);
+	output_title_layout->addWidget(moveDownButton, 0, Qt::AlignRight);
 
 	outputLayout->addRow(output_title_layout);
 
