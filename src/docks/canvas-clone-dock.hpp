@@ -1,6 +1,7 @@
 #pragma once
 #include "../utils/widgets/projector.hpp"
 #include "../utils/widgets/qt-display.hpp"
+#include "../utils/widgets/switching-splitter.hpp"
 #include <obs.h>
 #include <QComboBox>
 #include <QFrame>
@@ -10,7 +11,7 @@
 class CanvasCloneDock : public QFrame {
 	Q_OBJECT
 private:
-	QSplitter *canvas_split = nullptr;
+	SwitchingSplitter *canvas_split = nullptr;
 	OBSQTDisplay *preview;
 	obs_canvas_t *canvas = nullptr;
 	obs_weak_canvas_t *clone = nullptr;

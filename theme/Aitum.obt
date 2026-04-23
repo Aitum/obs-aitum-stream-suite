@@ -1589,7 +1589,6 @@ VolumeMeter {
 #hVolumeWidgets>*>* {
     /* background:red; */
     /* border: 2px solid transparent; */
-    alignment-baseline: bottom;
     line-height: 30px !important;
     min-height: 0 !important;
     vertical-align: middle;

@@ -1749,7 +1749,7 @@ bool obs_module_load(void)
 	//action->setIcon(QIcon::fromTheme(QIcon::ThemeIcon::EditUndo));
 
 	auto cw = main_window->centralWidget();
-	if (cw && cw->objectName() == "centralwidget") {
+	if (cw && cw->objectName() == "centralwidget" && cw->findChild<QWidget *>("canvasEditor") != nullptr) {
 		obs_frontend_add_dock_by_id("AitumStreamSuiteMainCanvas", obs_module_text("AitumStreamSuiteMainCanvas"), cw);
 		cw = new QWidget();
 		cw->setContentsMargins(0, 0, 0, 0);

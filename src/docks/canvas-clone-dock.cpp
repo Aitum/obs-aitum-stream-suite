@@ -49,6 +49,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	canvas_split->addWidget(preview);
 
 	auto replaceGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Replace")));
+	replaceGroup->setObjectName(QStringLiteral("replaceGroup"));
 	replaceGroup->setContentsMargins(0, 0, 0, 0);
 
 	auto scroll = new QScrollArea;
@@ -1021,12 +1022,22 @@ void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 			mode = modesTabBar->tabText(modesTabBar->currentIndex());
 		}
 	}
-	if (mode.isEmpty()) {
-		obs_data_set_string(settings, "canvas_split", state_chars);
-	} else {
-		std::string setting_name = "canvas_split_" + mode.toStdString();
-		obs_data_set_string(settings, setting_name.c_str(), state_chars);
-	}
+	std::string setting_name = "canvas_split";
+	if (!mode.isEmpty())
+		setting_name += "_" + mode.toStdString();
+	obs_data_set_string(settings, setting_name.c_str(), state_chars);
+	setting_name = "canvas_split_automatic";
+	if (!mode.isEmpty())
+		setting_name += "_" + mode.toStdString();
+	obs_data_set_bool(settings, setting_name.c_str(), canvas_split->automaticSwitching);
+	setting_name = "canvas_split_horizontal";
+	if (!mode.isEmpty())
+		setting_name += "_" + mode.toStdString();
+	obs_data_set_bool(settings, setting_name.c_str(), canvas_split->orientation() == Qt::Horizontal);
+	setting_name = "canvas_split_order";
+	if (!mode.isEmpty())
+		setting_name += "_" + mode.toStdString();
+	obs_data_set_string(settings, setting_name.c_str(), canvas_split->savePanelOrder().toUtf8().constData());
 }
 
 void CanvasCloneDock::LoadMode(QString mode)
@@ -1037,6 +1048,15 @@ void CanvasCloneDock::LoadMode(QString mode)
 		setting_name = "canvas_split_" + mode.toLower().toStdString();
 		state = obs_data_get_string(settings, setting_name.c_str());
 	}
+	setting_name = "canvas_split_automatic_" + mode.toStdString();
+	obs_data_set_default_bool(settings, setting_name.c_str(), true);
+	canvas_split->automaticSwitching = obs_data_get_bool(settings, setting_name.c_str());
+	setting_name = "canvas_split_horizontal_" + mode.toStdString();
+	canvas_split->setOrientation(obs_data_get_bool(settings, setting_name.c_str()) ? Qt::Horizontal : Qt::Vertical);
+	setting_name = "canvas_split_order_" + mode.toStdString();
+	auto order = obs_data_get_string(settings, setting_name.c_str());
+	if (order[0] != '\0')
+		canvas_split->restorePanelOrder(QString::fromUtf8(order));
 	if (state[0] != '\0')
 		canvas_split->restoreState(QByteArray::fromBase64(state));
 }

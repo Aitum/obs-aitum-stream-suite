@@ -1,9 +1,12 @@
 
 #pragma once
 #include "../utils/event-filter.hpp"
+#include "../utils/widgets/projector.hpp"
 #include "../utils/widgets/qt-display.hpp"
 #include "../utils/widgets/source-tree.hpp"
-#include "../utils/widgets/projector.hpp"
+#include "../utils/widgets/switching-splitter.hpp"
+#include <graphics/matrix4.h>
+#include <graphics/vec2.h>
 #include <mutex>
 #include <obs.h>
 #include <QComboBox>
@@ -15,8 +18,6 @@
 #include <QSplitter>
 #include <QWheelEvent>
 #include <util/config-file.h>
-#include <graphics/matrix4.h>
-#include <graphics/vec2.h>
 
 #define ITEM_LEFT (1 << 0)
 #define ITEM_RIGHT (1 << 1)
@@ -48,8 +49,8 @@ private:
 	friend class CanvasCloneDock;
 	friend class OBSProjector;
 	std::string canvas_name;
-	QSplitter *canvas_split = nullptr;
-	QSplitter *panel_split = nullptr;
+	SwitchingSplitter *canvas_split = nullptr;
+	SwitchingSplitter *panel_split = nullptr;
 	OBSQTDisplay *preview;
 	obs_data_t *settings = nullptr;
 

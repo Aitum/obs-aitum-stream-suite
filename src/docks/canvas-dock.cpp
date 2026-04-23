@@ -2,7 +2,6 @@
 #include "../utils/color.hpp"
 #include "../utils/icon.hpp"
 #include "../utils/widgets/source-tree.hpp"
-#include "../utils/widgets/switching-splitter.hpp"
 #include "canvas-dock.hpp"
 #include <QComboBox>
 #include <QDockWidget>
@@ -244,6 +243,7 @@ void CanvasDock::LoadUI()
 	canvas_split->setOrientation(Qt::Vertical);
 
 	auto canvas_preview = new QWidget;
+	canvas_preview->setObjectName(QStringLiteral("canvasPreview"));
 	auto cwl = new QVBoxLayout;
 	canvas_preview->setLayout(cwl);
 	if (!settings) {
@@ -393,10 +393,11 @@ void CanvasDock::LoadUI()
 	preview->addAction(deleteAction);
 
 	if (settings) {
-
 		panel_split = new SwitchingSplitter;
+		panel_split->setObjectName(QStringLiteral("panelSplit"));
 		panel_split->setContentsMargins(0, 0, 0, 0);
 		auto scenesGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Scenes")));
+		scenesGroup->setObjectName(QStringLiteral("scenesGroup"));
 		scenesGroup->setContentsMargins(0, 0, 0, 0);
 		auto scenesGroupLayout = new QVBoxLayout();
 		scenesGroupLayout->setContentsMargins(0, 0, 0, 0);
@@ -518,6 +519,7 @@ void CanvasDock::LoadUI()
 		panel_split->addWidget(scenesGroup);
 	}
 	auto sourcesGroup = new QGroupBox(QString::fromUtf8(obs_module_text("Sources")));
+	sourcesGroup->setObjectName(QStringLiteral("sourcesGroup"));
 	sourcesGroup->setContentsMargins(0, 0, 0, 0);
 	auto sourcesGroupLayout = new QVBoxLayout();
 	sourcesGroupLayout->setContentsMargins(0, 0, 0, 0);
@@ -742,6 +744,7 @@ void CanvasDock::LoadUI()
 	if (settings) {
 
 		auto transitionsGroup = new QGroupBox(QString::fromUtf8(obs_frontend_get_locale_string("Basic.SceneTransitions")));
+		transitionsGroup->setObjectName(QStringLiteral("transitionsGroup"));
 		transitionsGroup->setContentsMargins(0, 0, 0, 0);
 		auto transitionsGroupLayout = new QVBoxLayout();
 		transitionsGroupLayout->setContentsMargins(0, 0, 0, 0);
@@ -1203,6 +1206,20 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 			if (!mode.isEmpty())
 				setting_name += "_" + mode.toStdString();
 			obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
+			setting_name = canvas_name + "_canvas_split_automatic";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_bool(current_profile_config, setting_name.c_str(), canvas_split->automaticSwitching);
+			setting_name = canvas_name + "_canvas_split_horizontal";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_bool(current_profile_config, setting_name.c_str(),
+					  canvas_split->orientation() == Qt::Horizontal);
+			setting_name = canvas_name + "_canvas_split_order";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_string(current_profile_config, setting_name.c_str(),
+					    canvas_split->savePanelOrder().toUtf8().constData());
 
 			obs_data_set_bool(current_profile_config, "preview_disabled", preview_disabled);
 			obs_data_set_bool(current_profile_config, "preview_locked", locked);
@@ -1241,8 +1258,19 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 		if (!mode.isEmpty())
 			setting_name += "_" + mode.toStdString();
 		obs_data_set_string(settings, setting_name.c_str(), state_chars);
+		setting_name = "canvas_split_automatic";
+		if (!mode.isEmpty())
+			setting_name += "_" + mode.toStdString();
+		obs_data_set_bool(settings, setting_name.c_str(), canvas_split->automaticSwitching);
+		setting_name = "canvas_split_horizontal";
+		if (!mode.isEmpty())
+			setting_name += "_" + mode.toStdString();
+		obs_data_set_bool(settings, setting_name.c_str(), canvas_split->orientation() == Qt::Horizontal);
+		setting_name = "canvas_split_order";
+		if (!mode.isEmpty())
+			setting_name += "_" + mode.toStdString();
+		obs_data_set_string(settings, setting_name.c_str(), canvas_split->savePanelOrder().toUtf8().constData());
 		if (panel_split) {
-
 			state = panel_split->saveState();
 			b64 = state.toBase64();
 			state_chars = b64.constData();
@@ -1250,6 +1278,18 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 			if (!mode.isEmpty())
 				setting_name += "_" + mode.toStdString();
 			obs_data_set_string(settings, setting_name.c_str(), state_chars);
+			setting_name = "panel_split_automatic";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_bool(settings, setting_name.c_str(), panel_split->automaticSwitching);
+			setting_name = "panel_split_horizontal";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_bool(settings, setting_name.c_str(), panel_split->orientation() == Qt::Horizontal);
+			setting_name = "panel_split_order";
+			if (!mode.isEmpty())
+				setting_name += "_" + mode.toStdString();
+			obs_data_set_string(settings, setting_name.c_str(), panel_split->savePanelOrder().toUtf8().constData());
 		}
 
 		obs_data_set_bool(settings, "preview_disabled", preview_disabled);
@@ -5666,6 +5706,15 @@ void CanvasDock::LoadMode(QString mode)
 				       [](unsigned char c) { return std::tolower(c); });
 			state = obs_data_get_string(settings, setting_name.c_str());
 		}
+		setting_name = "panel_split_automatic_" + mode.toStdString();
+		obs_data_set_default_bool(settings, setting_name.c_str(), true);
+		panel_split->automaticSwitching = obs_data_get_bool(settings, setting_name.c_str());
+		setting_name = "panel_split_horizontal_" + mode.toStdString();
+		panel_split->setOrientation(obs_data_get_bool(settings, setting_name.c_str()) ? Qt::Horizontal : Qt::Vertical);
+		setting_name = "panel_split_order_" + mode.toStdString();
+		auto order = obs_data_get_string(settings, setting_name.c_str());
+		if (order[0] != '\0')
+			panel_split->restorePanelOrder(QString::fromUtf8(order));
 		if (state[0] != '\0')
 			panel_split->restoreState(QByteArray::fromBase64(state));
 	}
@@ -5678,6 +5727,16 @@ void CanvasDock::LoadMode(QString mode)
 				setting_name = "canvas_split_" + mode.toLower().toStdString();
 				state = obs_data_get_string(settings, setting_name.c_str());
 			}
+			setting_name = "canvas_split_automatic_" + mode.toStdString();
+			obs_data_set_default_bool(settings, setting_name.c_str(), true);
+			canvas_split->automaticSwitching = obs_data_get_bool(settings, setting_name.c_str());
+			setting_name = "canvas_split_horizontal_" + mode.toStdString();
+			canvas_split->setOrientation(obs_data_get_bool(settings, setting_name.c_str()) ? Qt::Horizontal
+												       : Qt::Vertical);
+			setting_name = "canvas_split_order_" + mode.toStdString();
+			auto order = obs_data_get_string(settings, setting_name.c_str());
+			if (order[0] != '\0')
+				canvas_split->restorePanelOrder(QString::fromUtf8(order));
 		} else if (current_profile_config) {
 			std::string setting_name = canvas_name + "_canvas_split_" + mode.toStdString();
 			state = obs_data_get_string(current_profile_config, setting_name.c_str());
@@ -5685,6 +5744,16 @@ void CanvasDock::LoadMode(QString mode)
 				setting_name = canvas_name + "_canvas_split_" + mode.toLower().toStdString();
 				state = obs_data_get_string(current_profile_config, setting_name.c_str());
 			}
+			setting_name = canvas_name + "_canvas_split_automatic_" + mode.toStdString();
+			obs_data_set_default_bool(current_profile_config, setting_name.c_str(), true);
+			canvas_split->automaticSwitching = obs_data_get_bool(current_profile_config, setting_name.c_str());
+			setting_name = canvas_name + "_canvas_split_horizontal_" + mode.toStdString();
+			canvas_split->setOrientation(
+				obs_data_get_bool(current_profile_config, setting_name.c_str()) ? Qt::Horizontal : Qt::Vertical);
+			setting_name = canvas_name + "_canvas_split_order_" + mode.toStdString();
+			auto order = obs_data_get_string(current_profile_config, setting_name.c_str());
+			if (order[0] != '\0')
+				canvas_split->restorePanelOrder(QString::fromUtf8(order));
 		}
 		if (state[0] != '\0')
 			canvas_split->restoreState(QByteArray::fromBase64(state));
