@@ -148,7 +148,9 @@ void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 
 void PropertiesDock::scene_item_remove(void *param, calldata_t *cd)
 {
-	UNUSED_PARAMETER(param);
+	auto this_ = static_cast<PropertiesDock *>(param);
+	if (this_->exiting)
+		return;
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	QMetaObject::invokeMethod(transform_dock, "unsetItem", Qt::QueuedConnection, Q_ARG(OBSSceneItem, item));
 }

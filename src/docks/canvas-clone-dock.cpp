@@ -281,8 +281,8 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 			continue;
 
 		auto monitor = obs_data_get_int(p, "monitor");
-		OBSProjector *projector = new OBSProjector(canvas, nullptr, monitor,
-							   [this](OBSProjector *p) { DeleteProjector(p); });
+		OBSProjector *projector =
+			new OBSProjector(canvas, nullptr, monitor, [this](OBSProjector *p) { DeleteProjector(p); });
 
 		auto g = obs_data_get_string(p, "geometry");
 		if (g[0] != '\0' && monitor < 0) {
@@ -498,26 +498,37 @@ void CanvasCloneDock::DrawBackdrop(float cx, float cy)
 	GS_DEBUG_MARKER_END();
 }
 
-bool CanvasCloneDock::SceneDetectReplacedSource(obs_scene_t *, obs_sceneitem_t *item, void *param)
+void CanvasCloneDock::SceneDetectReplacedSource(obs_sceneitem_t *item, bool *change_source)
 {
-	std::pair<bool *, CanvasCloneDock *> *p = (std::pair<bool *, CanvasCloneDock *> *)param;
-	CanvasCloneDock *ccd = p->second;
-	bool *change_source = p->first;
 	obs_source_t *source = obs_sceneitem_get_source(item);
-	pthread_mutex_lock(&ccd->replace_sources_mutex);
-	if (ccd->replace_sources.find(source) != ccd->replace_sources.end()) {
-		pthread_mutex_unlock(&ccd->replace_sources_mutex);
+	pthread_mutex_lock(&replace_sources_mutex);
+	if (replace_sources.find(source) != replace_sources.end()) {
+		pthread_mutex_unlock(&replace_sources_mutex);
 		*change_source = true;
-	} else {
-		pthread_mutex_unlock(&ccd->replace_sources_mutex);
-		obs_scene_t *scene = obs_scene_from_source(source);
-		if (!scene)
-			scene = obs_group_from_source(source);
-		if (scene) {
-			obs_scene_enum_items(scene, SceneDetectReplacedSource, param);
+		return;
+	}
+	pthread_mutex_unlock(&replace_sources_mutex);
+	obs_scene_t *scene = obs_scene_from_source(source);
+	if (!scene)
+		scene = obs_group_from_source(source);
+	if (scene) {
+		std::list<obs_sceneitem_t *> items;
+		obs_scene_enum_items(
+			scene,
+			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+				UNUSED_PARAMETER(scene);
+				auto items = (std::list<obs_sceneitem_t *> *)param;
+				obs_sceneitem_addref(item);
+				items->push_back(item);
+				return true;
+			},
+			&items);
+		for (auto &item2 : items) {
+			if (!*change_source)
+				SceneDetectReplacedSource(item2, change_source);
+			obs_sceneitem_release(item2);
 		}
 	}
-	return !*change_source;
 }
 
 obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_t *current)
@@ -616,9 +627,23 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 		if (!scene)
 			scene = obs_group_from_source(source);
 
+		std::list<obs_sceneitem_t *> items;
+		obs_scene_enum_items(
+			scene,
+			[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+				UNUSED_PARAMETER(scene);
+				auto items = (std::list<obs_sceneitem_t *> *)param;
+				obs_sceneitem_addref(item);
+				items->push_back(item);
+				return true;
+			},
+			&items);
 		bool change_source = false;
-		std::pair<bool *, CanvasCloneDock *> p = {&change_source, this};
-		obs_scene_enum_items(scene, SceneDetectReplacedSource, &p);
+		for (auto &item : items) {
+			if (!change_source)
+				SceneDetectReplacedSource(item, &change_source);
+			obs_sceneitem_release(item);
+		}
 		if (!change_source) {
 			duplicate = obs_source_get_ref(source);
 		} else if (current && source &&
@@ -660,67 +685,71 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 			if (!scene2) {
 				return nullptr;
 			}
-			std::pair<obs_scene_t *, CanvasCloneDock *> p = {scene, this};
 
+			std::list<obs_sceneitem_t *> items;
 			obs_scene_enum_items(
 				scene2,
-				[](obs_scene_t *scene2, obs_sceneitem_t *item, void *param) {
-					UNUSED_PARAMETER(scene2);
-					auto p = (std::pair<obs_scene_t *, CanvasCloneDock *> *)param;
-					obs_scene_t *scene = p->first;
-					CanvasCloneDock *ccd = p->second;
-					auto source = obs_sceneitem_get_source(item);
-					auto source_name = obs_source_get_name(source);
-					if (!obs_scene_find_source(scene, source_name)) {
-						//item not found in original scene
-						bool found = false;
-						pthread_mutex_lock(&ccd->replace_sources_mutex);
-						for (auto it = ccd->replace_sources.begin();
-						     !found && it != ccd->replace_sources.end(); it++) {
-							if (obs_weak_source_references_source(it->second, source) &&
-							    obs_scene_find_source(scene, obs_source_get_name(it->first)))
-								found = true;
-						}
-						pthread_mutex_unlock(&ccd->replace_sources_mutex);
-						if (!found)
-							obs_sceneitem_remove(item);
-					}
+				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
+					UNUSED_PARAMETER(scene);
+					auto items = (std::list<obs_sceneitem_t *> *)param;
+					obs_sceneitem_addref(item);
+					items->push_back(item);
 					return true;
 				},
-				&p);
-
-			p = {scene2, this};
+				&items);
+			for (auto &item : items) {
+				auto source = obs_sceneitem_get_source(item);
+				auto source_name = obs_source_get_name(source);
+				if (!obs_scene_find_source(scene, source_name)) {
+					//item not found in original scene
+					bool found = false;
+					pthread_mutex_lock(&replace_sources_mutex);
+					for (auto it = replace_sources.begin(); !found && it != replace_sources.end(); it++) {
+						if (obs_weak_source_references_source(it->second, source) &&
+						    obs_scene_find_source(scene, obs_source_get_name(it->first)))
+							found = true;
+					}
+					pthread_mutex_unlock(&replace_sources_mutex);
+					if (!found)
+						obs_sceneitem_remove(item);
+				}
+				obs_sceneitem_release(item);
+			}
+			items.clear();
 
 			obs_scene_enum_items(
 				scene,
 				[](obs_scene_t *scene, obs_sceneitem_t *item, void *param) {
 					UNUSED_PARAMETER(scene);
-					auto p = (std::pair<obs_scene_t *, CanvasCloneDock *> *)param;
-					CanvasCloneDock *ccd = p->second;
-					obs_scene_t *scene2 = p->first;
-					obs_sceneitem_t *item2 =
-						obs_scene_find_source(scene2, obs_source_get_name(obs_sceneitem_get_source(item)));
-					obs_sceneitem_t *item3 = nullptr;
-					obs_source_t *source = obs_sceneitem_get_source(item);
-					obs_source_t *source2 = obs_sceneitem_get_source(item2);
-					obs_source_t *source3 = ccd->DuplicateSource(source, source2);
-					if (!item2) {
-						item2 = obs_scene_find_source(scene2, obs_source_get_name(source3));
-						source2 = obs_sceneitem_get_source(item2);
-					}
-					if (source2 && source3 != source2) {
-						obs_sceneitem_remove(item2);
-						item3 = obs_scene_add(scene2, source3);
-					} else if (!item2) {
-						item3 = obs_scene_add(scene2, source3);
-					} else {
-						item3 = item2;
-					}
-					ccd->DuplicateSceneItem(item, item3);
-					obs_source_release(source3);
+					auto items = (std::list<obs_sceneitem_t *> *)param;
+					obs_sceneitem_addref(item);
+					items->push_back(item);
 					return true;
 				},
-				&p);
+				&items);
+			for (auto &item : items) {
+				obs_sceneitem_t *item2 =
+					obs_scene_find_source(scene2, obs_source_get_name(obs_sceneitem_get_source(item)));
+				obs_sceneitem_t *item3 = nullptr;
+				obs_source_t *source = obs_sceneitem_get_source(item);
+				obs_source_t *source2 = obs_sceneitem_get_source(item2);
+				obs_source_t *source3 = DuplicateSource(source, source2);
+				if (!item2) {
+					item2 = obs_scene_find_source(scene2, obs_source_get_name(source3));
+					source2 = obs_sceneitem_get_source(item2);
+				}
+				if (source2 && source3 != source2) {
+					obs_sceneitem_remove(item2);
+					item3 = obs_scene_add(scene2, source3);
+				} else if (!item2) {
+					item3 = obs_scene_add(scene2, source3);
+				} else {
+					item3 = item2;
+				}
+				DuplicateSceneItem(item, item3);
+				obs_source_release(source3);
+				obs_sceneitem_release(item);
+			}
 		}
 	} else {
 		duplicate = obs_source_get_ref(source);

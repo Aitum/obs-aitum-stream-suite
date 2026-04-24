@@ -34,6 +34,7 @@ private:
 	void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
 	void DrawBackdrop(float cx, float cy);
 	void LoadReplacements();
+	void SceneDetectReplacedSource(obs_sceneitem_t *item, bool *change_source);
 	void RemoveSource(QString source_name);
 	void DeleteProjector(OBSProjector *projector);
 	OBSProjector *OpenProjector(int monitor);
@@ -44,7 +45,6 @@ private:
 	static void source_create(void *param, calldata_t *cd);
 	static void source_remove(void *param, calldata_t *cd);
 	static void source_rename(void *param, calldata_t *cd);
-	static bool SceneDetectReplacedSource(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 
 private slots:
 	void LoadMode(QString mode);
