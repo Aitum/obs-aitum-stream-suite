@@ -5796,27 +5796,28 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 
 void CanvasDock::reset_live_state()
 {
-	panel_split->setSizes({1, 0, 0});
-	auto w = width();
-	auto h = height();
-	if (w > h) {
-		canvas_split->setSizes({w * 2 / 3, w / 3});
-	} else {
-		canvas_split->setSizes({h * 2 / 3, h / 3});
+	if (panel_split) {
+		panel_split->restorePanelOrder("scenesGroup,sourcesGroup,transitionsGroup");
+		panel_split->setSizes({1, 0, 0});
 	}
+	canvas_split->restorePanelOrder(panel_split ? "canvasPreview,panelSplit" : "canvasPreview,sourcesGroup");
+	canvas_split->setSizes({1, 0});
 }
 
 void CanvasDock::reset_build_state()
 {
 	auto w = width();
 	auto h = height();
+	canvas_split->restorePanelOrder(panel_split ? "panelSplit,canvasPreview" : "sourcesGroup,canvasPreview");
+	if (panel_split)
+		panel_split->restorePanelOrder("scenesGroup,sourcesGroup,transitionsGroup");
 	if (w > h) {
-		canvas_split->setSizes({w * 2 / 3, w / 3});
-		panel_split->setSizes({1, 1, 1});
+		canvas_split->setSizes({w / 3, w * 2 / 3});
 	} else {
-		canvas_split->setSizes({h * 2 / 3, h / 3});
-		panel_split->setSizes({1, 1, 1});
+		canvas_split->setSizes({h / 3, h * 2 / 3});
 	}
+	if (panel_split)
+		panel_split->setSizes({1, 1, 1});
 }
 
 void CanvasDock::LogScenes()
