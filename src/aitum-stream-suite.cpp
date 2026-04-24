@@ -1639,8 +1639,8 @@ bool obs_module_load(void)
 					}
 				});
 			} else {
-				bool found = tabName == "Main";
 				auto tabName = modesTabBar->tabText(index);
+				bool found = tabName == "Main";
 				for (auto it : canvas_docks) {
 					if (it->parentWidget()->objectName() == tabName) {
 						found = true;
