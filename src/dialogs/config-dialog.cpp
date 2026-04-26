@@ -335,7 +335,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 		a = addMenu.addAction(QIcon(":/aitum/media/virtual_cam_off.svg"),
 				      QString::fromUtf8(obs_module_text("AddVirtualCameraOutput")));
 		connect(a, &QAction::triggered, [this] { AddVirtualCam(); });
-		a = addMenu.addAction(QIcon(":/aitum/media/ffmpeg_off.svg"), QString::fromUtf8(obs_module_text("AddFfmpeg")));
+		a = addMenu.addAction(QIcon(":/aitum/media/ffmpeg_off.svg"), QString::fromUtf8(obs_module_text("AddFfmpegOutput")));
 		connect(a, &QAction::triggered, [this] { AddFfmpeg(); });
 		addMenu.exec(QCursor::pos());
 	});

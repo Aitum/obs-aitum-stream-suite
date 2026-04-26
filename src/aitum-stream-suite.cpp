@@ -238,6 +238,8 @@ void reset_live_dock_state()
 		d->setVisible(false);
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!d)
+		d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -394,6 +396,8 @@ void reset_build_dock_state()
 	QList<int> top_dock_sizes;
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!d)
+		d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -646,6 +650,8 @@ void reset_canvas_dock_state(QString name)
 	bool main = false;
 	if (!d && name == "Main") {
 		d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+		if (!d)
+			d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
 		main = true;
 	}
 	if (!d)

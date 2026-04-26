@@ -512,7 +512,6 @@ bool OutputWidget::StartOutput(bool automated)
 		if (!canvas)
 			return false;
 
-
 		std::string output_name = "Aitum Stream Suite Output ";
 		output_name += name;
 		output = obs_output_create("ffmpeg_output", output_name.c_str(), nullptr, nullptr);
@@ -520,7 +519,6 @@ bool OutputWidget::StartOutput(bool automated)
 			blog(LOG_WARNING, "[Aitum Stream Suite] failed to create ffmpeg output '%s'", name);
 			return false;
 		}
-
 
 		OBSDataAutoRelease s = obs_data_create();
 		OBSDataArrayAutoRelease audio_names = obs_data_array_create();
@@ -1412,12 +1410,18 @@ void OutputWidget::StopOutput()
 bool OutputWidget::IsStream() const
 {
 	const auto output_type = obs_data_get_string(settings, "type");
+	if (strcmp(output_type, "ffmpeg") == 0) {
+		return !obs_data_get_bool(settings, "save_file");
+	}
 	return (output_type[0] == '\0' || strcmp(output_type, "stream") == 0);
 }
 
 bool OutputWidget::IsRecord() const
 {
 	const auto output_type = obs_data_get_string(settings, "type");
+	if (strcmp(output_type, "ffmpeg") == 0) {
+		return obs_data_get_bool(settings, "save_file");
+	}
 	return (strcmp(output_type, "record") == 0 || strcmp(output_type, "backtrack") == 0);
 }
 
