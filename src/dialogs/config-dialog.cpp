@@ -818,10 +818,9 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
 	connect(removeButton, &QPushButton::clicked, [this, canvasLayout, canvasGroup, settings, canvas, canvas_title] {
-		QMessageBox mb(
-			QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
+		QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
 			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text")).arg(canvas_title->text()),
-			QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
+			       QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
 		mb.setDefaultButton(QMessageBox::NoButton);
 		if (mb.exec() != QMessageBox::Yes)
 			return;
@@ -1461,10 +1460,9 @@ void OBSBasicSettings::AddOutput(QFormLayout *outputsLayout, obs_data_t *setting
 	removeButton->setProperty("themeID", QVariant(QString::fromUtf8("removeIconSmall")));
 	removeButton->setProperty("class", "icon-minus");
 	connect(removeButton, &QPushButton::clicked, [this, outputsLayout, outputGroup, settings, outputs, streaming_title] {
-		QMessageBox mb(
-			QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
+		QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Title")),
 			       QString::fromUtf8(obs_frontend_get_locale_string("ConfirmRemove.Text")).arg(streaming_title->text()),
-			QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
+			       QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No));
 		mb.setDefaultButton(QMessageBox::NoButton);
 		if (mb.exec() != QMessageBox::Yes)
 			return;
@@ -2252,7 +2250,8 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 			auto output = obs_data_array_item(outputs, i);
 			auto name = obs_data_get_string(output, "name");
 			if (name && name[0] != '\0' && strcmp(obs_data_get_string(settings, "name"), name) != 0 &&
-			    strcmp(obs_data_get_string(output, "type"), "virtual_cam") != 0) {
+			    strcmp(obs_data_get_string(output, "type"), "virtual_cam") != 0 &&
+			    strcmp(obs_data_get_string(output, "type"), "ffmpeg") != 0) {
 				outputVideoEncoder->addItem(QString::fromUtf8(name), QVariant(QString::fromUtf8(name)));
 			}
 			obs_data_release(output);
