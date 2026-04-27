@@ -1253,6 +1253,69 @@ void unload_browser_panels()
 	obs_frontend_remove_dock("AitumStreamSuitePortal");
 }
 
+static bool all_string_settings_the_same(obs_data_t *settings_a, obs_data_t *settings_b)
+{
+	size_t string_count = 0;
+	obs_data_item_t *i = obs_data_first(settings_a);
+	while (i) {
+		const enum obs_data_type t = obs_data_item_gettype(i);
+		if (t == OBS_DATA_STRING) {
+			string_count++;
+			const char *name = obs_data_item_get_name(i);
+			const char *value_a = obs_data_item_get_string(i);
+			const char *value_b = obs_data_get_string(settings_b, name);
+			if (strcmp(value_a, value_b) != 0) {
+				return false;
+			}
+		}
+		obs_data_item_next(&i);
+	}
+	return string_count > 0;
+}
+
+static void log_same_sources()
+{
+	std::list<obs_source_t *> sources;
+	obs_enum_sources(
+		[](void *data, obs_source_t *source) {
+			auto sources = static_cast<std::list<obs_source_t *> *>(data);
+			auto id_a = obs_source_get_id(source);
+			auto settings_a = obs_source_get_settings(source);
+			bool do_not_duplicate = obs_source_get_output_flags(source) & OBS_SOURCE_DO_NOT_DUPLICATE;
+			if (settings_a) {
+				const char *json_a = obs_data_get_json(settings_a);
+				for (auto &it : (*sources)) {
+					auto id_b = obs_source_get_id(it);
+					if (strcmp(id_a, id_b) == 0) {
+						auto settings_b = obs_source_get_settings(it);
+						if (settings_b) {
+
+							const char *json_b = obs_data_get_json(settings_b);
+							if (strcmp(json_a, json_b) == 0) {
+								blog(LOG_WARNING,
+								     "[Aitum Stream Suite] Duplicate source found: '%s', '%s'",
+								     obs_source_get_name(source), obs_source_get_name(it));
+							} else if (do_not_duplicate &&
+								   all_string_settings_the_same(settings_a, settings_b)) {
+								blog(LOG_WARNING,
+								     "[Aitum Stream Suite] Similar source found: '%s', '%s'",
+								     obs_source_get_name(source), obs_source_get_name(it));
+							}
+							obs_data_release(settings_b);
+						}
+					}
+				}
+				obs_data_release(settings_a);
+			}
+			sources->push_back(obs_source_get_ref(source));
+			return true;
+		},
+		&sources);
+	for (auto &it : sources) {
+		obs_source_release(it);
+	}
+}
+
 struct QCef;
 extern QCef *cef;
 void DestroyPanelCookieManager();
@@ -1275,6 +1338,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			});
 			return;
 		}
+		log_same_sources();
 		load_browser_panels();
 		struct obs_frontend_source_list transitions = {};
 		obs_frontend_get_transitions(&transitions);
@@ -1358,6 +1422,7 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED) {
 		if (finished_loading) {
+			log_same_sources();
 			struct obs_frontend_source_list transitions = {};
 			obs_frontend_get_transitions(&transitions);
 			for (size_t i = 0; i < transitions.sources.num; i++) {
