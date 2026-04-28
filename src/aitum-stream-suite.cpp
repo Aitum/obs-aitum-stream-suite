@@ -202,6 +202,8 @@ void save_dock_state(QString mode)
 	auto state_chars = b64.constData();
 	std::string setting_name = "dock_state_" + mode.toStdString();
 	obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
+	setting_name = "dock_state_main_restored_" + mode.toStdString();
+	obs_data_set_bool(current_profile_config, setting_name.c_str(), true);
 
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
@@ -579,11 +581,16 @@ void load_dock_state(QString mode)
 		return;
 	scene_collection_changing = false;
 	std::string state;
+	bool main_restored = false;
 	std::string setting_name = "dock_state_" + mode.toStdString();
 	state = obs_data_get_string(current_profile_config, setting_name.c_str());
+	setting_name = "dock_state_main_restored_" + mode.toStdString();
+	main_restored = obs_data_get_bool(current_profile_config, setting_name.c_str());
 	if (state.empty()) {
 		setting_name = "dock_state_" + mode.toLower().toStdString();
 		state = obs_data_get_string(current_profile_config, setting_name.c_str());
+		setting_name = "dock_state_main_restored_" + mode.toLower().toStdString();
+		main_restored = obs_data_get_bool(current_profile_config, setting_name.c_str());
 	}
 	if (state.empty()) {
 		for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
@@ -599,7 +606,31 @@ void load_dock_state(QString mode)
 	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
-
+		if (!main_restored) {
+			auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+			if (!d)
+				d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+			if (d && !d->isVisibleTo(main_window)) {
+				bool canvas_mode = false;
+				for (auto it : canvas_docks) {
+					if (it->parentWidget()->objectName() == mode) {
+						canvas_mode = true;
+						break;
+					}
+				}
+				for (auto it : canvas_clone_docks) {
+					if (it->parentWidget()->objectName() == mode) {
+						canvas_mode = true;
+						break;
+					}
+				}
+				if (!canvas_mode) {
+					d->setVisible(true);
+					d->setFloating(false);
+					main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+				}
+			}
+		}
 		auto docks = main_window->findChildren<QDockWidget *>();
 		for (auto &dock : docks) {
 			if (dock->isVisible())
@@ -1289,7 +1320,6 @@ static void log_same_sources()
 					if (strcmp(id_a, id_b) == 0) {
 						auto settings_b = obs_source_get_settings(it);
 						if (settings_b) {
-
 							const char *json_b = obs_data_get_json(settings_b);
 							if (strcmp(json_a, json_b) == 0) {
 								blog(LOG_WARNING,
