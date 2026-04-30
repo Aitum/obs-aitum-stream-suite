@@ -202,9 +202,13 @@ void save_dock_state(QString mode)
 	auto state_chars = b64.constData();
 	std::string setting_name = "dock_state_" + mode.toStdString();
 	obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
-	setting_name = "dock_state_main_restored_" + mode.toStdString();
-	obs_data_set_bool(current_profile_config, setting_name.c_str(), true);
-
+	auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!main_dock)
+		main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+	if (main_dock) {
+		setting_name = "dock_state_main_restored_" + mode.toStdString();
+		obs_data_set_bool(current_profile_config, setting_name.c_str(), true);
+	}
 	for (const auto &it : canvas_docks) {
 		QMetaObject::invokeMethod(it, "SaveSettings", Q_ARG(bool, false), Q_ARG(QString, mode));
 	}
@@ -1067,9 +1071,11 @@ void load_current_profile_config()
 		if (modesTabBar->count() <= (int)fixed_tabs.size()) {
 			auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 			auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-			main_dock->setVisible(true);
-			main_dock->setFloating(false);
-			main_window->addDockWidget(Qt::TopDockWidgetArea, main_dock);
+			if (main_dock) {
+				main_dock->setVisible(true);
+				main_dock->setFloating(false);
+				main_window->addDockWidget(Qt::TopDockWidgetArea, main_dock);
+			}
 			modesTab = "";
 			auto tn = QString::fromUtf8(obs_module_text("User"));
 			auto index = modesTabBar->addTab(tn);

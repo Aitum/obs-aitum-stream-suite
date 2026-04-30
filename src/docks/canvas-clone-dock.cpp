@@ -1071,6 +1071,7 @@ void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 
 void CanvasCloneDock::LoadMode(QString mode)
 {
+	canvas_split->blockSignals(true);
 	std::string setting_name = "canvas_split_" + mode.toStdString();
 	auto state = obs_data_get_string(settings, setting_name.c_str());
 	if (state[0] == '\0') {
@@ -1088,6 +1089,7 @@ void CanvasCloneDock::LoadMode(QString mode)
 		canvas_split->restorePanelOrder(QString::fromUtf8(order));
 	if (state[0] != '\0')
 		canvas_split->restoreState(QByteArray::fromBase64(state));
+	canvas_split->blockSignals(false);
 }
 
 void CanvasCloneDock::reset_live_state()

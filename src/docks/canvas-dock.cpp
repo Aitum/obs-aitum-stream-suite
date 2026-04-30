@@ -5699,6 +5699,7 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 void CanvasDock::LoadMode(QString mode)
 {
 	if (panel_split && settings) {
+		panel_split->blockSignals(true);
 		std::string setting_name = "panel_split_" + mode.toStdString();
 		auto state = obs_data_get_string(settings, setting_name.c_str());
 		if (state[0] == '\0') {
@@ -5717,8 +5718,10 @@ void CanvasDock::LoadMode(QString mode)
 			panel_split->restorePanelOrder(QString::fromUtf8(order));
 		if (state[0] != '\0')
 			panel_split->restoreState(QByteArray::fromBase64(state));
+		panel_split->blockSignals(false);
 	}
 	if (canvas_split) {
+		canvas_split->blockSignals(true);
 		auto state = "";
 		if (settings) {
 			std::string setting_name = "canvas_split_" + mode.toStdString();
@@ -5757,6 +5760,7 @@ void CanvasDock::LoadMode(QString mode)
 		}
 		if (state[0] != '\0')
 			canvas_split->restoreState(QByteArray::fromBase64(state));
+		canvas_split->blockSignals(false);
 	}
 }
 
