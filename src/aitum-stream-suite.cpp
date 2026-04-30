@@ -1233,6 +1233,8 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 		if (output_dock)
 			output_dock->Exiting();
+		if (properties_dock)
+			properties_dock->Exiting();
 		for (auto &it : empty_docks) {
 			obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 		}

@@ -134,6 +134,8 @@ void PropertiesDock::scene_item_select(void *param, calldata_t *cd)
 void PropertiesDock::scene_item_deselect(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<PropertiesDock *>(param);
+	if (this_->exiting)
+		return;
 	auto item = (obs_sceneitem_t *)calldata_ptr(cd, "item");
 	if (obs_weak_source_references_source(this_->current_source, obs_sceneitem_get_source(item))) {
 		QMetaObject::invokeMethod(this_, "SourceDeselected", Qt::QueuedConnection,
