@@ -2179,6 +2179,65 @@ void OBSBasicSettings::LoadOutputLayout(obs_data_t *settings, QFormLayout *outpu
 	}
 }
 
+bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex, obs_data_t *settings, obs_data_array_t *outputs)
+{
+	if (!videoEncoderIndex || !settings || !outputs)
+		return false;
+
+	videoEncoderIndex->clear();
+
+	auto output_video_encoder = obs_data_get_string(settings, "output_video_encoder");
+	if (output_video_encoder && output_video_encoder[0] != '\0') {
+		auto count = obs_data_array_count(outputs);
+		for (auto i = 0; i < count; i++) {
+			auto output = obs_data_array_item(outputs, i);
+			if (output == settings) {
+				obs_data_release(output);
+				continue;
+			}
+			auto name = obs_data_get_string(output, "name");
+			if (name && name[0] != '\0' && strcmp(name, output_video_encoder) == 0) {
+				auto video_encoders = obs_data_get_array(output, "video_encoders");
+				auto encoder_count = obs_data_array_count(video_encoders);
+				if (encoder_count > 1) {
+					for (auto j = 0; j < encoder_count; j++) {
+						auto encoder_settings = obs_data_array_item(video_encoders, j);
+						auto canvas_name = obs_data_get_string(encoder_settings, "canvas");
+						if (!canvas_name || canvas_name[0] == '\0') {
+							canvas_name = obs_module_text("MainCanvas");
+						}
+						auto description = QString::number(j + 1) + " " + QString::fromUtf8(canvas_name);
+
+						videoEncoderIndex->addItem(description);
+						obs_data_release(encoder_settings);
+					}
+					obs_data_array_release(video_encoders);
+					obs_data_release(output);
+					videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+					return true;
+				}
+				obs_data_array_release(video_encoders);
+			}
+			obs_data_release(output);
+		}
+		return false;
+	}
+	bool allEmpty = false;
+	for (int i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
+		QString settingName = QString::fromUtf8("video_encoder_description") + QString::number(i);
+		auto description = obs_data_get_string(main_settings, settingName.toUtf8().constData());
+		if (!description || description[0] == '\0') {
+			if (i != 0 && !allEmpty) {
+				break;
+			}
+			allEmpty = true;
+		}
+		videoEncoderIndex->addItem(QString::number(i + 1) + " " + description);
+	}
+	videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+	return true;
+}
+
 void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *settings, obs_data_array_t *outputs,
 					   QComboBox *canvasCombo, int index)
 {
@@ -2203,18 +2262,7 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	QComboBox *videoEncoderIndex = nullptr;
 
 	videoEncoderIndex = new QComboBox;
-	for (int i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
-		QString settingName = QString::fromUtf8("video_encoder_description") + QString::number(i);
-		auto description = obs_data_get_string(main_settings, settingName.toUtf8().constData());
-		if (!description || description[0] == '\0') {
-			if (i != 0 && !allEmpty) {
-				break;
-			}
-			allEmpty = true;
-		}
-		videoEncoderIndex->addItem(QString::number(i + 1) + " " + description);
-	}
-	videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+	UpdateVideoEncoderIndexCombo(videoEncoderIndex, settings, outputs);
 
 	connect(videoEncoderIndex, &QComboBox::currentIndexChanged, [videoEncoderIndex, settings] {
 		if (videoEncoderIndex->currentIndex() >= 0)
@@ -2384,8 +2432,8 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	if (videoEncoder->currentIndex() <= 0)
 		videoEncoderGroup->setVisible(false);
 
-	auto ouputVideoEncoderChanged = [settings, outputVideoEncoder, videoEncoder, videoEncoderIndex, videoEncoderGroup,
-					 videoPageLayout] {
+	auto ouputVideoEncoderChanged = [this, settings, outputs, outputVideoEncoder, videoEncoder, videoEncoderIndex,
+					 videoEncoderGroup, videoPageLayout] {
 		obs_data_set_string(settings, "output_video_encoder",
 				    outputVideoEncoder->currentData().toString().toUtf8().constData());
 		auto ove = obs_data_get_string(settings, "output_video_encoder");
@@ -2397,6 +2445,7 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 			videoPageLayout->setRowVisible(videoEncoder, false);
 			if (!videoEncoderIndex) {
 			} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+				UpdateVideoEncoderIndexCombo(videoEncoderIndex, settings, outputs);
 				videoPageLayout->setRowVisible(videoEncoderIndex, true);
 			} else {
 				videoPageLayout->setRowVisible(videoEncoderIndex, false);
@@ -2404,16 +2453,20 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 					videoEncoderIndex->setCurrentIndex(0);
 			}
 			videoEncoderGroup->setVisible(false);
+		} else if (UpdateVideoEncoderIndexCombo(videoEncoderIndex, settings, outputs)) {
+			videoPageLayout->setRowVisible(videoEncoderIndex, true);
+			videoPageLayout->setRowVisible(videoEncoder, false);
+			videoEncoderGroup->setVisible(false);
 		} else {
 			videoPageLayout->setRowVisible(videoEncoder, false);
 			videoPageLayout->setRowVisible(videoEncoderIndex, false);
 			videoEncoderGroup->setVisible(false);
 		}
+
 	};
 	connect(outputVideoEncoder, &QComboBox::currentTextChanged, ouputVideoEncoderChanged);
-
 	connect(videoEncoder, &QComboBox::currentIndexChanged,
-		[this, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoEncoderGroupLayout, settings,
+		[this, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoEncoderGroupLayout, settings, outputs,
 		 videoPage] {
 			auto encoder_string = videoEncoder->currentData().toString().toUtf8();
 			auto encoder = encoder_string.constData();
@@ -2432,6 +2485,8 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 				if (!videoEncoderIndex) {
 				} else if (main &&
 					   config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
+					videoPageLayout->setRowVisible(videoEncoderIndex, true);
+				} else if (!main && UpdateVideoEncoderIndexCombo(videoEncoderIndex, settings, outputs)) {
 					videoPageLayout->setRowVisible(videoEncoderIndex, true);
 				} else {
 					videoPageLayout->setRowVisible(videoEncoderIndex, false);
