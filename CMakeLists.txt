@@ -15,8 +15,6 @@ include(helpers)
 
 add_library(${PROJECT_NAME} MODULE)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OBS::libobs)
-
 if(BUILD_OUT_OF_TREE)
   find_package(libobs REQUIRED)
   find_package(obs-frontend-api REQUIRED)
@@ -25,7 +23,7 @@ if(BUILD_OUT_OF_TREE)
 else()
   target_link_libraries(${PROJECT_NAME} PRIVATE OBS::frontend-api)
 endif()
-target_link_libraries(${PROJECT_NAME} PRIVATE FFmpeg::avcodec FFmpeg::avutil FFmpeg::avformat)
+target_link_libraries(${PROJECT_NAME} PRIVATE OBS::libobs FFmpeg::avcodec FFmpeg::avutil FFmpeg::avformat)
 
 find_package(Qt6 COMPONENTS Widgets Core)
 if(BUILD_OUT_OF_TREE)

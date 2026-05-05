@@ -2189,7 +2189,7 @@ bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex
 	auto output_video_encoder = obs_data_get_string(settings, "output_video_encoder");
 	if (output_video_encoder && output_video_encoder[0] != '\0') {
 		auto count = obs_data_array_count(outputs);
-		for (auto i = 0; i < count; i++) {
+		for (size_t i = 0; i < count; i++) {
 			auto output = obs_data_array_item(outputs, i);
 			if (output == settings) {
 				obs_data_release(output);
@@ -2200,7 +2200,7 @@ bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex
 				auto video_encoders = obs_data_get_array(output, "video_encoders");
 				auto encoder_count = obs_data_array_count(video_encoders);
 				if (encoder_count > 1) {
-					for (auto j = 0; j < encoder_count; j++) {
+					for (size_t j = 0; j < encoder_count; j++) {
 						auto encoder_settings = obs_data_array_item(video_encoders, j);
 						auto canvas_name = obs_data_get_string(encoder_settings, "canvas");
 						if (!canvas_name || canvas_name[0] == '\0') {
@@ -2258,7 +2258,6 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	videoEncoder->setCurrentIndex(0);
 	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("VideoEncoder")), videoEncoder);
 
-	bool allEmpty = false;
 	QComboBox *videoEncoderIndex = nullptr;
 
 	videoEncoderIndex = new QComboBox;
