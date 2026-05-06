@@ -1155,6 +1155,15 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 					obs_encoder_set_gpu_scale_type(venc,
 								       (obs_scale_type)obs_data_get_int(settings, "scale_type"));
 				}
+
+				enum video_format video_format = (enum video_format)obs_data_get_int(settings, "color_format");
+				obs_encoder_set_preferred_video_format(venc, video_format);
+
+				enum video_colorspace colorspace = (enum video_colorspace)obs_data_get_int(settings, "color_space");
+				obs_encoder_set_preferred_color_space(venc, colorspace);
+
+				enum video_range_type range = (enum video_range_type)obs_data_get_int(settings, "color_range");
+				obs_encoder_set_preferred_range(venc, range);
 			}
 		}
 	} else {

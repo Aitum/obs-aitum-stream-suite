@@ -2321,6 +2321,70 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 
 	struct obs_video_info ovi;
 	obs_get_video_info(&ovi);
+
+	auto colorFormat = new QComboBox;
+	colorFormat->addItem(QString::fromUtf8(obs_module_text("Original")), QVariant(VIDEO_FORMAT_NONE));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.NV12")),
+			     QVariant(VIDEO_FORMAT_NV12));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.I420")),
+			     QVariant(VIDEO_FORMAT_I420));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.I444")),
+			     QVariant(VIDEO_FORMAT_I444));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.P010")),
+			     QVariant(VIDEO_FORMAT_P010));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.I010")),
+			     QVariant(VIDEO_FORMAT_I010));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.P216")),
+			     QVariant(VIDEO_FORMAT_P216));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.P416")),
+			     QVariant(VIDEO_FORMAT_P416));
+	colorFormat->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat.BGRA")),
+			     QVariant(VIDEO_FORMAT_BGRA));
+	colorFormat->setCurrentIndex(colorFormat->findData(QVariant(obs_data_get_int(settings, "color_format"))));
+	connect(colorFormat, &QComboBox::currentIndexChanged, [colorFormat, settings] {
+		if (colorFormat->currentIndex() >= 0)
+			obs_data_set_int(settings, "color_format", colorFormat->currentData().toInt());
+	});
+	videoEncoderGroupLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat")), colorFormat);
+
+	auto colorSpace = new QComboBox;
+	colorSpace->addItem(QString::fromUtf8(obs_module_text("Original")), QVariant(VIDEO_CS_DEFAULT));
+	colorSpace->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace.sRGB")),
+			    QVariant(VIDEO_CS_SRGB));
+	colorSpace->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace.601")),
+			    QVariant(VIDEO_CS_601));
+	colorSpace->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace.709")),
+			    QVariant(VIDEO_CS_709));
+	colorSpace->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace.2100PQ")),
+			    QVariant(VIDEO_CS_2100_PQ));
+	colorSpace->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace.2100HLG")),
+			    QVariant(VIDEO_CS_2100_HLG));
+	colorSpace->setCurrentIndex(colorSpace->findData(QVariant(obs_data_get_int(settings, "color_space"))));
+	connect(colorSpace, &QComboBox::currentIndexChanged, [colorSpace, settings] {
+		if (colorSpace->currentIndex() >= 0) {
+			auto cs = colorSpace->currentData().toInt();
+			obs_data_set_int(settings, "color_space", cs);
+		}
+	});
+	videoEncoderGroupLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorSpace")), colorSpace);
+
+	auto colorRange = new QComboBox;
+	colorRange->addItem(QString::fromUtf8(obs_module_text("Original")), QVariant(VIDEO_RANGE_DEFAULT));
+	colorRange->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorRange.Partial")),
+			    QVariant(VIDEO_RANGE_PARTIAL));
+	colorRange->addItem(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorRange.Full")),
+			    QVariant(VIDEO_RANGE_FULL));
+	colorRange->setCurrentIndex(colorRange->findData(QVariant(obs_data_get_int(settings, "color_range"))));
+	connect(colorRange, &QComboBox::currentIndexChanged, [colorRange, settings] {
+		if (colorRange->currentIndex() >= 0)
+			obs_data_set_int(settings, "color_range", colorRange->currentData().toInt());
+	});
+	videoEncoderGroupLayout->addRow(
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorRange")), colorRange);
+
+
 	double fps = ovi.fps_den > 0 ? (double)ovi.fps_num / (double)ovi.fps_den : 0.0;
 	auto fpsDivisor = new QComboBox;
 	auto frd = obs_data_get_int(settings, "frame_rate_divisor");
@@ -2461,12 +2525,11 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 			videoPageLayout->setRowVisible(videoEncoderIndex, false);
 			videoEncoderGroup->setVisible(false);
 		}
-
 	};
 	connect(outputVideoEncoder, &QComboBox::currentTextChanged, ouputVideoEncoderChanged);
 	connect(videoEncoder, &QComboBox::currentIndexChanged,
-		[this, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoEncoderGroupLayout, settings, outputs,
-		 videoPage] {
+		[this, videoPageLayout, videoEncoder, videoEncoderIndex, videoEncoderGroup, videoEncoderGroupLayout, settings,
+		 outputs, videoPage] {
 			auto encoder_string = videoEncoder->currentData().toString().toUtf8();
 			auto encoder = encoder_string.constData();
 			const bool encoder_changed = strcmp(obs_data_get_string(settings, "video_encoder"), encoder) != 0;
@@ -2503,7 +2566,7 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 					obs_properties_destroy(t->second);
 					video_encoder_properties.erase(t);
 				}
-				for (int i = videoEncoderGroupLayout->rowCount() - 1; i >= 2; i--) {
+				for (int i = videoEncoderGroupLayout->rowCount() - 1; i >= 5; i--) {
 					videoEncoderGroupLayout->removeRow(i);
 				}
 				auto ves = encoder_changed ? nullptr : obs_data_get_obj(settings, "video_encoder_settings");
