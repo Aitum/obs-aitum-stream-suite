@@ -22,6 +22,7 @@
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QTabWidget>
@@ -63,6 +64,44 @@ std::list<QFrame *> empty_docks;
 
 extern QWidget *aitumSettingsWidget;
 
+static bool finished_loading = false;
+
+void AskUpdate()
+{
+	auto parts = newer_version_available.split(".");
+	if (parts.count() < 3)
+		return;
+	int major = parts.value(0).toInt();
+	int minor = parts.value(1).toInt();
+	int patch = parts.value(2).toInt();
+	auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
+	auto user_config = obs_frontend_get_user_config();
+
+	auto skip_version = user_config ? config_get_int(user_config, "Aitum", "skip_version") : 0;
+	if (sv == skip_version)
+		return;
+
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+
+	QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("Updater.Title")),
+		       QString::fromUtf8(obs_frontend_get_locale_string("Updater.Text")) + " " +
+			       QString::fromUtf8(obs_module_text("AitumStreamSuite")) + " " + newer_version_available,
+		       QMessageBox::StandardButtons(), main_window);
+	auto update = mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.UpdateNow")), QMessageBox::YesRole);
+	auto remind =
+		mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.RemindMeLater")), QMessageBox::RejectRole);
+	auto skip = mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.Skip")), QMessageBox::NoRole);
+	mb.setDefaultButton(remind);
+	mb.exec();
+
+	if (mb.clickedButton() == update) {
+		QDesktopServices::openUrl(QUrl(QString::fromUtf8("https://aitum.tv/download/stream-suite")));
+	} else if (mb.clickedButton() == skip && user_config) {
+		config_set_int(user_config, "Aitum", "skip_version", sv);
+		config_save_safe(user_config, "tmp", "bak");
+	}
+}
+
 bool version_info_downloaded(void *param, struct file_download_data *file)
 {
 	UNUSED_PARAMETER(param);
@@ -98,6 +137,8 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 			newer_version_available = QString::fromUtf8(version);
 			QMetaObject::invokeMethod(aitumSettingsWidget, [] {
 				aitumSettingsWidget->setStyleSheet(QString::fromUtf8("background: rgb(192,128,0);"));
+				if (finished_loading)
+					AskUpdate();
 			});
 		}
 	}
@@ -1359,7 +1400,6 @@ static bool restart = false;
 
 static void frontend_event(enum obs_frontend_event event, void *private_data)
 {
-	static bool finished_loading = false;
 	UNUSED_PARAMETER(private_data);
 	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
 		finished_loading = true;
@@ -1391,6 +1431,8 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 						  Q_ARG(OBSSource, OBSSource(scene)));
 			obs_source_release(scene);
 		}
+		if (!newer_version_available.isEmpty())
+			AskUpdate();
 	} else if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		DestroyPanelCookieManager();
 		load_browser_panels();

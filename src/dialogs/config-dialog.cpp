@@ -2384,7 +2384,6 @@ void OBSBasicSettings::AddVideoEncoderPage(QTabWidget *tabWidget, obs_data_t *se
 	videoEncoderGroupLayout->addRow(
 		QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorRange")), colorRange);
 
-
 	double fps = ovi.fps_den > 0 ? (double)ovi.fps_num / (double)ovi.fps_den : 0.0;
 	auto fpsDivisor = new QComboBox;
 	auto frd = obs_data_get_int(settings, "frame_rate_divisor");
