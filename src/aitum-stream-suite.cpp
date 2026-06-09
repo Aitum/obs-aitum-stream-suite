@@ -284,13 +284,13 @@ void reset_live_dock_state()
 	if (d)
 		d->setVisible(false);
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-	if (!d)
-		d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+	auto mcd = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!mcd)
+		mcd = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+	if (mcd) {
+		mcd->setVisible(true);
+		mcd->setFloating(false);
+		main_window->addDockWidget(Qt::TopDockWidgetArea, mcd);
 	}
 
 	QList<QDockWidget *> right_docks;
@@ -413,6 +413,16 @@ void reset_live_dock_state()
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
 
+	auto cw = main_window->centralWidget();
+	if (mcd && cw && cw->height() > 10 && cw->width() > 10) {
+		auto area = main_window->dockWidgetArea(mcd);
+		if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
+			main_window->resizeDocks({mcd}, {mcd->height() + cw->height()}, Qt::Vertical);
+		} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
+			main_window->resizeDocks({mcd}, {mcd->width() + cw->width()}, Qt::Horizontal);
+		}
+	}
+
 	save_dock_state(QString::fromStdString("Live"));
 }
 
@@ -442,14 +452,14 @@ void reset_build_dock_state()
 	QList<QDockWidget *> top_docks;
 	QList<int> top_dock_sizes;
 
-	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-	if (!d)
-		d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
-	if (d) {
-		d->setVisible(true);
-		d->setFloating(false);
-		main_window->addDockWidget(Qt::TopDockWidgetArea, d);
-		top_docks.append(d);
+	auto mcd = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!mcd)
+		mcd = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+	if (mcd) {
+		mcd->setVisible(true);
+		mcd->setFloating(false);
+		main_window->addDockWidget(Qt::TopDockWidgetArea, mcd);
+		top_docks.append(mcd);
 		top_dock_sizes.append(1);
 	}
 
@@ -557,6 +567,16 @@ void reset_build_dock_state()
 	main_window->resizeDocks(top_docks, top_dock_sizes, Qt::Horizontal);
 	main_window->resizeDocks(bottom_docks, bottom_dock_sizes, Qt::Horizontal);
 
+	auto cw = main_window->centralWidget();
+	if (mcd && cw && cw->height() > 10 && cw->width() > 10) {
+		auto area = main_window->dockWidgetArea(mcd);
+		if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
+			main_window->resizeDocks({mcd}, {mcd->height() + cw->height()}, Qt::Vertical);
+		} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
+			main_window->resizeDocks({mcd}, {mcd->width() + cw->width()}, Qt::Horizontal);
+		}
+	}
+
 	save_dock_state(QString::fromStdString("Build"));
 }
 
@@ -651,11 +671,12 @@ void load_dock_state(QString mode)
 	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
-		if (!main_restored) {
-			auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-			if (!d)
-				d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
-			if (d && !d->isVisibleTo(main_window)) {
+
+		auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+		if (!d)
+			d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+		if (d) {
+			if (!main_restored && !d->isVisibleTo(main_window)) {
 				bool canvas_mode = false;
 				for (auto it : canvas_docks) {
 					if (it->parentWidget()->objectName() == mode) {
@@ -675,7 +696,18 @@ void load_dock_state(QString mode)
 					main_window->addDockWidget(Qt::TopDockWidgetArea, d);
 				}
 			}
+
+			auto cw = main_window->centralWidget();
+			if (cw && cw->height() > 10 && cw->width() > 10) {
+				auto area = main_window->dockWidgetArea(d);
+				if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
+					main_window->resizeDocks({d}, {d->height() + cw->height()}, Qt::Vertical);
+				} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
+					main_window->resizeDocks({d}, {d->width() + cw->width()}, Qt::Horizontal);
+				}
+			}
 		}
+
 		auto docks = main_window->findChildren<QDockWidget *>();
 		for (auto &dock : docks) {
 			if (dock->isVisible())
