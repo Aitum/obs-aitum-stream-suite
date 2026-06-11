@@ -1759,7 +1759,7 @@ QTableView QPushButton,
 QTableView QToolButton {
     padding: 0px;
     margin: -1px;
-    border_radius: 0px;
+    border-radius: 0px;
 }
 
 QHeaderView::section {
@@ -2359,7 +2359,6 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
     padding: 5px var(--padding_xlarge);
     margin: 0px 0 0;
     border: none;
-    align-items:center;
 }
 
 #previewXContainer {
