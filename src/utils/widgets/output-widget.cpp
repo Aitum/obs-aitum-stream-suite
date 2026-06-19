@@ -1156,14 +1156,17 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 								       (obs_scale_type)obs_data_get_int(settings, "scale_type"));
 				}
 
-				enum video_format video_format = (enum video_format)obs_data_get_int(settings, "color_format");
-				obs_encoder_set_preferred_video_format(venc, video_format);
+				// obs_data_get_int returns int64_t; use static_cast for the narrowing enum
+				// conversions (explicit, checkable) and rename locals so they no longer shadow
+				// the enum type names video_format / video_colorspace / video_range_type.
+				enum video_format format = static_cast<enum video_format>(obs_data_get_int(settings, "color_format"));
+				obs_encoder_set_preferred_video_format(venc, format);
 
-				enum video_colorspace colorspace = (enum video_colorspace)obs_data_get_int(settings, "color_space");
-				obs_encoder_set_preferred_color_space(venc, colorspace);
+				enum video_colorspace cs = static_cast<enum video_colorspace>(obs_data_get_int(settings, "color_space"));
+				obs_encoder_set_preferred_color_space(venc, cs);
 
-				enum video_range_type range = (enum video_range_type)obs_data_get_int(settings, "color_range");
-				obs_encoder_set_preferred_range(venc, range);
+				enum video_range_type rangeType = static_cast<enum video_range_type>(obs_data_get_int(settings, "color_range"));
+				obs_encoder_set_preferred_range(venc, rangeType);
 			}
 		}
 	} else {

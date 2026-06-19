@@ -18,6 +18,8 @@ public:
 	LiveScenesDock(QWidget *parent = nullptr);
 	~LiveScenesDock();
 
+	// Must be called on the Qt UI thread: reads UI-thread-mutated dock state. Callers on other
+	// threads must marshal via QMetaObject::invokeMethod (BlockingQueuedConnection to read it).
 	obs_data_array_t *GetLiveScenesArray();
 	bool AddLiveScene(const QString &name);
 	bool RemoveLiveScene(const QString &name);

@@ -28,6 +28,10 @@ void vendor_request_version(obs_data_t *request_data, obs_data_t *response_data,
 void vendor_request_get_canvas(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
+	// NOTE: runs on the obs-websocket worker thread. Iterating the global canvas_docks /
+	// canvas_clone_docks std::lists here races with the UI thread, which adds/removes docks
+	// (potential iterator invalidation). The per-canvas data read below is OBS C API only.
+	// Left as a documented race for now; a snapshot under invokeMethod would remove it.
 	auto ca = obs_data_array_create();
 	for (const auto &it : canvas_docks) {
 		auto c = obs_data_create();
@@ -69,6 +73,9 @@ void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_
 		return;
 	}
 	const char *canvas_name = obs_data_get_string(request_data, "canvas");
+	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
+	// add/remove (documented race). The actual scene switch is already correctly marshaled to
+	// the dock's thread via the invokeMethod call below.
 	for (const auto &it : canvas_docks) {
 		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0 ||
 		    strcmp(obs_canvas_get_uuid(it->GetCanvas()), canvas_name) == 0)
@@ -86,6 +93,8 @@ void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
+	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
+	// add/remove (documented race). The per-canvas reads below are OBS C API only.
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
 		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
@@ -119,6 +128,8 @@ void vendor_request_get_scenes(obs_data_t *request_data, obs_data_t *response_da
 		return;
 	}
 
+	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
+	// add/remove (documented race). Scene enumeration below is OBS C API only.
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
 		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
@@ -154,7 +165,14 @@ void vendor_request_get_outputs(obs_data_t *request_data, obs_data_t *response_d
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	auto oa = output_dock->GetOutputsArray();
+	// GetOutputsArray() iterates the outputWidgets container and touches Qt (objectName()),
+	// both of which are only safe on the UI thread. This handler runs on the obs-websocket
+	// worker thread, so marshal the read onto the UI thread and block until it completes.
+	// The blocking connection makes the by-reference capture of `oa` safe: the worker thread
+	// stays parked inside invokeMethod until the lambda returns, so the local is still alive.
+	obs_data_array_t *oa = nullptr;
+	QMetaObject::invokeMethod(
+		output_dock, [&] { oa = output_dock->GetOutputsArray(); }, Qt::BlockingQueuedConnection);
 	obs_data_set_bool(response_data, "success", true);
 	obs_data_set_array(response_data, "outputs", oa);
 	obs_data_array_release(oa);
@@ -354,7 +372,20 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	bool result = output_dock->AddChapterToOutput(output_name, obs_data_get_string(request_data, "chapter_name"));
+	if (!output_dock) {
+		obs_data_set_string(response_data, "error", "Output dock not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
+	// AddChapterToOutput() iterates the outputWidgets container and calls Qt methods, so it
+	// must run on the UI thread. We run on the worker thread here, so marshal it across with a
+	// blocking connection (we need the bool result synchronously). By-ref captures stay valid
+	// because the worker blocks until the lambda finishes.
+	const char *chapter_name = obs_data_get_string(request_data, "chapter_name");
+	bool result = false;
+	QMetaObject::invokeMethod(
+		output_dock, [&] { result = output_dock->AddChapterToOutput(output_name, chapter_name); },
+		Qt::BlockingQueuedConnection);
 
 	obs_data_set_bool(response_data, "success", result);
 }
@@ -520,7 +551,13 @@ void vendor_request_get_live_scenes(obs_data_t *request_data, obs_data_t *respon
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	auto sa = live_scenes_dock->GetLiveScenesArray();
+	// GetLiveScenesArray() reads UI-thread-mutated dock state, so it must run on the UI thread.
+	// This handler runs on the obs-websocket worker thread; marshal the read across with a
+	// blocking connection so we can return the array synchronously. The by-ref capture of `sa`
+	// is safe because the worker stays blocked until the lambda completes.
+	obs_data_array_t *sa = nullptr;
+	QMetaObject::invokeMethod(
+		live_scenes_dock, [&] { sa = live_scenes_dock->GetLiveScenesArray(); }, Qt::BlockingQueuedConnection);
 	obs_data_set_bool(response_data, "success", true);
 	obs_data_set_array(response_data, "live_scenes", sa);
 	obs_data_array_release(sa);
@@ -578,6 +615,9 @@ void vendor_request_dock_show_panel(obs_data_t *request_data, obs_data_t *respon
 		return;
 	}
 
+	// NOTE: iterating canvas_docks / canvas_clone_docks runs on the worker thread and races
+	// with UI-thread dock add/remove (documented race). The SetPanelVisible mutation itself is
+	// already correctly marshaled to the dock's thread via invokeMethod below.
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
 		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
@@ -616,6 +656,9 @@ void vendor_request_dock_hide_panel(obs_data_t *request_data, obs_data_t *respon
 		return;
 	}
 
+	// NOTE: iterating canvas_docks / canvas_clone_docks runs on the worker thread and races
+	// with UI-thread dock add/remove (documented race). The SetPanelVisible mutation itself is
+	// already correctly marshaled to the dock's thread via invokeMethod below.
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
 		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
@@ -649,26 +692,43 @@ void vendor_request_get_transitions(obs_data_t *request_data, obs_data_t *respon
 		return;
 	}
 
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
+	// This handler runs on the obs-websocket worker thread. Both iterating the global
+	// canvas_docks list (mutated on the UI thread) and calling CanvasDock::GetTransitions()
+	// (UI-thread-owned state) are data races, so marshal the whole lookup + array build onto
+	// the UI thread and block until done. By-ref captures are safe under the blocking
+	// connection; the obs_data array is created and populated on the UI thread and returned to
+	// the worker, which attaches it to response_data and releases it as before.
+	bool found = false;
+	obs_data_array_t *ta = nullptr;
+	auto build = [&] {
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+			    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+				continue;
 
-		auto ta = obs_data_array_create();
-		auto transitions = it->GetTransitions();
-		for (const auto &t : transitions) {
-			auto tr = obs_data_create();
-			obs_data_set_string(tr, "name", obs_source_get_name(t));
-			obs_data_set_string(tr, "uuid", obs_source_get_uuid(t));
-			obs_data_set_string(tr, "type", obs_source_get_id(t));
-			auto settings = obs_source_get_settings(t);
-			if (settings) {
-				obs_data_set_obj(tr, "settings", settings);
-				obs_data_release(settings);
+			ta = obs_data_array_create();
+			auto transitions = it->GetTransitions();
+			for (const auto &t : transitions) {
+				auto tr = obs_data_create();
+				obs_data_set_string(tr, "name", obs_source_get_name(t));
+				obs_data_set_string(tr, "uuid", obs_source_get_uuid(t));
+				obs_data_set_string(tr, "type", obs_source_get_id(t));
+				auto settings = obs_source_get_settings(t);
+				if (settings) {
+					obs_data_set_obj(tr, "settings", settings);
+					obs_data_release(settings);
+				}
+				obs_data_array_push_back(ta, tr);
+				obs_data_release(tr);
 			}
-			obs_data_array_push_back(ta, tr);
-			obs_data_release(tr);
+			found = true;
+			return;
 		}
+	};
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMetaObject::invokeMethod(main_window, build, Qt::BlockingQueuedConnection);
+	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		obs_data_set_array(response_data, "transitions", ta);
 		obs_data_array_release(ta);
@@ -692,13 +752,28 @@ void vendor_request_switch_transition(obs_data_t *request_data, obs_data_t *resp
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-
-		it->SetSelectedTransition(QString::fromUtf8(transition_name));
-
+	// Runs on the worker thread: iterating canvas_docks and calling SetSelectedTransition()
+	// (UI-thread state) are both races. Marshal the lookup + mutation onto the UI thread.
+	// We use a blocking connection so we can report whether the canvas was found; by-ref
+	// captures are valid because the worker blocks until the lambda returns.
+	bool found = false;
+	auto tn = QString::fromUtf8(transition_name);
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMetaObject::invokeMethod(
+		main_window,
+		[&] {
+			for (const auto &it : canvas_docks) {
+				auto canvas = it->GetCanvas();
+				if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+				    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+					continue;
+				it->SetSelectedTransition(tn);
+				found = true;
+				return;
+			}
+		},
+		Qt::BlockingQueuedConnection);
+	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
 	}
@@ -727,16 +802,31 @@ void vendor_request_transitions_add(obs_data_t *request_data, obs_data_t *respon
 		return;
 	}
 	obs_data_t *settings = obs_data_get_obj(request_data, "settings");
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		it->AddTransition(transition_type, transition_name, settings);
+	// Runs on the worker thread: iterating canvas_docks and calling AddTransition() (UI-thread
+	// state) are races, so marshal onto the UI thread with a blocking connection. `settings`
+	// stays owned/alive on the worker (released below); the blocking connection guarantees the
+	// lambda finishes using it before we release. By-ref captures are safe for the same reason.
+	bool found = false;
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMetaObject::invokeMethod(
+		main_window,
+		[&] {
+			for (const auto &it : canvas_docks) {
+				auto canvas = it->GetCanvas();
+				if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+				    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+					continue;
+				it->AddTransition(transition_type, transition_name, settings);
+				found = true;
+				return;
+			}
+		},
+		Qt::BlockingQueuedConnection);
+	obs_data_release(settings);
+	if (found) {
 		obs_data_set_bool(response_data, "success", true);
-		obs_data_release(settings);
 		return;
 	}
-	obs_data_release(settings);
 	obs_data_set_string(response_data, "error", "'canvas' not found");
 	obs_data_set_bool(response_data, "success", false);
 }
@@ -755,11 +845,26 @@ void vendor_request_transitions_remove(obs_data_t *request_data, obs_data_t *res
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		it->RemoveTransition(transition_name);
+	// Runs on the worker thread: iterating canvas_docks and calling RemoveTransition()
+	// (UI-thread state) are races, so marshal the lookup + mutation onto the UI thread with a
+	// blocking connection. By-ref captures are valid because the worker blocks until done.
+	bool found = false;
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMetaObject::invokeMethod(
+		main_window,
+		[&] {
+			for (const auto &it : canvas_docks) {
+				auto canvas = it->GetCanvas();
+				if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+				    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+					continue;
+				it->RemoveTransition(transition_name);
+				found = true;
+				return;
+			}
+		},
+		Qt::BlockingQueuedConnection);
+	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
 	}

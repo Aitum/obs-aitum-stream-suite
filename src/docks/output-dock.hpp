@@ -65,11 +65,14 @@ public:
 	OutputDock(QWidget *parent = nullptr);
 	~OutputDock();
 
+	// Must be called on the Qt UI thread: iterates the outputWidgets container and calls Qt
+	// methods (objectName()). Callers on other threads must marshal via QMetaObject::invokeMethod.
 	obs_data_array_t *GetOutputsArray();
 
 	void Exiting() { exiting = true; }
 	void LoadSettings();
 	void SaveSettings();
+	// Must be called on the Qt UI thread: iterates outputWidgets and calls Qt methods.
 	bool AddChapterToOutput(const char *output_name, const char *chapter_name);
 
 public slots:
