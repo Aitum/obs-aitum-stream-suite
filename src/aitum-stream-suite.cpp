@@ -1529,8 +1529,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		load_current_profile_config();
 		auto scene = obs_frontend_get_current_scene();
 		if (scene) {
-			QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
-						  Q_ARG(OBSSource, OBSSource(scene)));
+			if (properties_dock) {
+				QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+							  Q_ARG(OBSSource, OBSSource(scene)));
+			}
 			obs_source_release(scene);
 		}
 		if (!newer_version_available.isEmpty()) {
@@ -1575,31 +1577,49 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			},
 			nullptr, false);
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
-		if (!studioModeAction->isChecked()) {
+		if (studioModeAction  && !studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED) {
-		if (studioModeAction->isChecked()) {
+		if (studioModeAction && studioModeAction->isChecked()) {
 			studioModeAction->setChecked(false);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED) {
-		output_dock->UpdateMainVirtualCameraStatus(true);
+		if (output_dock) {
+			output_dock->UpdateMainVirtualCameraStatus(true);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED) {
-		output_dock->UpdateMainVirtualCameraStatus(false);
+		if (output_dock) {
+			output_dock->UpdateMainVirtualCameraStatus(false);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING || event == OBS_FRONTEND_EVENT_STREAMING_STARTED) {
-		output_dock->UpdateMainStreamStatus(true);
+		if (output_dock) {
+			output_dock->UpdateMainStreamStatus(true);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING || event == OBS_FRONTEND_EVENT_STREAMING_STOPPED) {
-		output_dock->UpdateMainStreamStatus(false);
+		if (output_dock) {
+			output_dock->UpdateMainStreamStatus(false);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STARTING || event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
-		output_dock->UpdateMainRecordingStatus(true);
+		if (output_dock) {
+			output_dock->UpdateMainRecordingStatus(true);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
-		output_dock->UpdateMainRecordingStatus(false);
+		if (output_dock) {
+			output_dock->UpdateMainRecordingStatus(false);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED) {
-		output_dock->UpdateMainBacktrackStatus(true);
+		if (output_dock) {
+			output_dock->UpdateMainBacktrackStatus(true);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
-		output_dock->UpdateMainBacktrackStatus(false);
+		if (output_dock) {
+			output_dock->UpdateMainBacktrackStatus(false);
+		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
-		QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
+		if (live_scenes_dock) {
+			QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
+		}
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 		}
@@ -1617,8 +1637,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 
 			auto scene = obs_frontend_get_current_scene();
 			if (scene) {
-				QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
-							  Q_ARG(OBSSource, OBSSource(scene)));
+				if (properties_dock) {
+					QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+								  Q_ARG(OBSSource, OBSSource(scene)));
+				}
 				obs_source_release(scene);
 			}
 		}
@@ -2227,8 +2249,11 @@ void obs_module_post_load()
 	load_obs_websocket();
 }
 
+void unload_obs_websocket();
+
 void obs_module_unload()
 {
+	unload_obs_websocket();
 	obs_frontend_remove_save_callback(save_load, nullptr);
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
 	if (version_download_info) {

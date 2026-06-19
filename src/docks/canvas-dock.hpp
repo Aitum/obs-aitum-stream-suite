@@ -178,6 +178,7 @@ private:
 	bool SwapTransition(obs_source_t *transition);
 	void ShowSourcesContextMenu(obs_sceneitem_t *item);
 	void AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem);
+	void AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem);
 	QMenu *CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t *sceneItem);
 
 	QMenu *CreateAddSourcePopupMenu();

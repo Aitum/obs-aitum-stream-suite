@@ -71,8 +71,9 @@ void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_
 	const char *canvas_name = obs_data_get_string(request_data, "canvas");
 	for (const auto &it : canvas_docks) {
 		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0 ||
-		    strcmp(obs_canvas_get_uuid(it->GetCanvas()), canvas_name) == 0)
+		    strcmp(obs_canvas_get_uuid(it->GetCanvas()), canvas_name) == 0) {
 			QMetaObject::invokeMethod(it, "SwitchScene", Q_ARG(QString, QString::fromUtf8(scene_name)));
+		}
 	}
 
 	obs_data_set_bool(response_data, "success", true);
@@ -88,8 +89,10 @@ void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response
 	}
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 
 		auto source = obs_canvas_get_channel(canvas, 0);
 		if (source && obs_source_get_type(source) == OBS_SOURCE_TYPE_TRANSITION) {
@@ -121,8 +124,10 @@ void vendor_request_get_scenes(obs_data_t *request_data, obs_data_t *response_da
 
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 
 		auto sa = obs_data_array_create();
 		obs_canvas_enum_scenes(
@@ -183,8 +188,9 @@ void vendor_request_start_output(obs_data_t *request_data, obs_data_t *response_
 			UNUSED_PARAMETER(id);
 			const auto hp = (struct find_hotkey *)param;
 			const auto hn = obs_hotkey_get_name(key);
-			if (strcmp(hp->name, hn) == 0)
+			if (strcmp(hp->name, hn) == 0) {
 				hp->hotkey = key;
+			}
 			return true;
 		},
 		&t);
@@ -221,8 +227,9 @@ void vendor_request_stop_output(obs_data_t *request_data, obs_data_t *response_d
 			UNUSED_PARAMETER(id);
 			const auto hp = (struct find_hotkey *)param;
 			const auto hn = obs_hotkey_get_name(key);
-			if (strcmp(hp->name, hn) == 0)
+			if (strcmp(hp->name, hn) == 0) {
 				hp->hotkey = key;
+			}
 			return true;
 		},
 		&t);
@@ -331,8 +338,9 @@ void vendor_request_save_backtrack(obs_data_t *request_data, obs_data_t *respons
 			UNUSED_PARAMETER(id);
 			const auto hp = (struct find_hotkey *)param;
 			const auto hn = obs_hotkey_get_name(key);
-			if (strcmp(hp->name, hn) == 0)
+			if (strcmp(hp->name, hn) == 0) {
 				hp->hotkey = key;
+			}
 			return true;
 		},
 		&t);
@@ -580,8 +588,10 @@ void vendor_request_dock_show_panel(obs_data_t *request_data, obs_data_t *respon
 
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		auto pn = QString::fromUtf8(panel_name);
 		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, true); });
 		obs_data_set_bool(response_data, "success", true);
@@ -589,8 +599,10 @@ void vendor_request_dock_show_panel(obs_data_t *request_data, obs_data_t *respon
 	}
 	for (const auto &it : canvas_clone_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		auto pn = QString::fromUtf8(panel_name);
 		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, true); });
 		obs_data_set_bool(response_data, "success", true);
@@ -618,8 +630,10 @@ void vendor_request_dock_hide_panel(obs_data_t *request_data, obs_data_t *respon
 
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		auto pn = QString::fromUtf8(panel_name);
 		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, false); });
 		obs_data_set_bool(response_data, "success", true);
@@ -627,8 +641,10 @@ void vendor_request_dock_hide_panel(obs_data_t *request_data, obs_data_t *respon
 	}
 	for (const auto &it : canvas_clone_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		auto pn = QString::fromUtf8(panel_name);
 		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, false); });
 		obs_data_set_bool(response_data, "success", true);
@@ -651,8 +667,10 @@ void vendor_request_get_transitions(obs_data_t *request_data, obs_data_t *respon
 
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 
 		auto ta = obs_data_array_create();
 		auto transitions = it->GetTransitions();
@@ -694,8 +712,10 @@ void vendor_request_switch_transition(obs_data_t *request_data, obs_data_t *resp
 	}
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 
 		it->SetSelectedTransition(QString::fromUtf8(transition_name));
 
@@ -729,8 +749,10 @@ void vendor_request_transitions_add(obs_data_t *request_data, obs_data_t *respon
 	obs_data_t *settings = obs_data_get_obj(request_data, "settings");
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		it->AddTransition(transition_type, transition_name, settings);
 		obs_data_set_bool(response_data, "success", true);
 		obs_data_release(settings);
@@ -757,8 +779,10 @@ void vendor_request_transitions_remove(obs_data_t *request_data, obs_data_t *res
 	}
 	for (const auto &it : canvas_docks) {
 		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
+		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 &&
+		    strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0) {
 			continue;
+		}
 		it->RemoveTransition(transition_name);
 		obs_data_set_bool(response_data, "success", true);
 		return;
@@ -854,4 +878,50 @@ void load_obs_websocket()
 
 	obs_websocket_vendor_register_request(vendor, "refresh_browser_panel", vendor_request_refresh_browser_panel, nullptr);
 	obs_websocket_vendor_register_request(vendor, "reset_browser_panel", vendor_request_reset_browser_panel, nullptr);
+}
+
+void unload_obs_websocket()
+{
+	if (!vendor) {
+		return;
+	}
+	obs_websocket_vendor_unregister_request(vendor, "version");
+	obs_websocket_vendor_unregister_request(vendor, "get_canvas");
+	obs_websocket_vendor_unregister_request(vendor, "switch_scene");
+	obs_websocket_vendor_unregister_request(vendor, "current_scene");
+	obs_websocket_vendor_unregister_request(vendor, "get_scenes");
+
+	obs_websocket_vendor_unregister_request(vendor, "get_outputs");
+	obs_websocket_vendor_unregister_request(vendor, "start_output");
+	obs_websocket_vendor_unregister_request(vendor, "stop_output");
+	obs_websocket_vendor_unregister_request(vendor, "start_all_outputs");
+	obs_websocket_vendor_unregister_request(vendor, "stop_all_outputs");
+	obs_websocket_vendor_unregister_request(vendor, "start_all_streams");
+	obs_websocket_vendor_unregister_request(vendor, "stop_all_streams");
+	obs_websocket_vendor_unregister_request(vendor, "start_all_recordings");
+	obs_websocket_vendor_unregister_request(vendor, "stop_all_recordings");
+	obs_websocket_vendor_unregister_request(vendor, "save_backtrack");
+
+	obs_websocket_vendor_unregister_request(vendor, "add_chapter");
+
+	obs_websocket_vendor_unregister_request(vendor, "get_dock_modes");
+	obs_websocket_vendor_unregister_request(vendor, "switch_dock_mode");
+	obs_websocket_vendor_unregister_request(vendor, "get_docks");
+	obs_websocket_vendor_unregister_request(vendor, "dock_show");
+	obs_websocket_vendor_unregister_request(vendor, "dock_hide");
+
+	obs_websocket_vendor_unregister_request(vendor, "get_live_scenes");
+	obs_websocket_vendor_unregister_request(vendor, "live_scenes_add");
+	obs_websocket_vendor_unregister_request(vendor, "live_scenes_remove");
+
+	obs_websocket_vendor_unregister_request(vendor, "canvas_dock_show_panel");
+	obs_websocket_vendor_unregister_request(vendor, "canvas_dock_hide_panel");
+
+	obs_websocket_vendor_unregister_request(vendor, "get_transitions");
+	obs_websocket_vendor_unregister_request(vendor, "switch_transition");
+	obs_websocket_vendor_unregister_request(vendor, "transitions_add");
+	obs_websocket_vendor_unregister_request(vendor, "transitions_remove");
+
+	obs_websocket_vendor_unregister_request(vendor, "refresh_browser_panel");
+	obs_websocket_vendor_unregister_request(vendor, "reset_browser_panel");
 }
