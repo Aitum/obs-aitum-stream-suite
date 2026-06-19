@@ -6,10 +6,14 @@
 #include "../docks/output-dock.hpp"
 #include "../version.h"
 #include "obs-websocket-api.h"
+#include <atomic>
 #include <list>
+#include <string>
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QTabBar>
+#include <QThread>
+#include <utility>
 
 obs_websocket_vendor vendor = nullptr;
 extern std::list<CanvasDock *> canvas_docks;
@@ -17,6 +21,31 @@ extern std::list<CanvasCloneDock *> canvas_clone_docks;
 extern OutputDock *output_dock;
 extern LiveScenesDock *live_scenes_dock;
 extern QTabBar *modesTabBar;
+extern std::atomic_bool stream_suite_unloading;
+
+template<typename Fn>
+static bool invoke_on_ui_thread(Fn &&fn)
+{
+	if (stream_suite_unloading.load())
+		return false;
+
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window)
+		return false;
+
+	if (QThread::currentThread() == main_window->thread()) {
+		fn();
+		return true;
+	}
+
+	return QMetaObject::invokeMethod(
+		main_window,
+		[callback = std::forward<Fn>(fn)]() mutable {
+			if (!stream_suite_unloading.load())
+				callback();
+		},
+		Qt::BlockingQueuedConnection);
+}
 
 void vendor_request_version(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
@@ -28,36 +57,39 @@ void vendor_request_version(obs_data_t *request_data, obs_data_t *response_data,
 void vendor_request_get_canvas(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	// NOTE: runs on the obs-websocket worker thread. Iterating the global canvas_docks /
-	// canvas_clone_docks std::lists here races with the UI thread, which adds/removes docks
-	// (potential iterator invalidation). The per-canvas data read below is OBS C API only.
-	// Left as a documented race for now; a snapshot under invokeMethod would remove it.
-	auto ca = obs_data_array_create();
-	for (const auto &it : canvas_docks) {
-		auto c = obs_data_create();
-		obs_data_set_string(c, "type", "extra");
-		obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
-		obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
-		obs_video_info ovi;
-		if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
-			obs_data_set_int(c, "width", ovi.base_width);
-			obs_data_set_int(c, "height", ovi.base_height);
+	obs_data_array_t *ca = nullptr;
+	if (!invoke_on_ui_thread([&] {
+		ca = obs_data_array_create();
+		for (const auto &it : canvas_docks) {
+			auto c = obs_data_create();
+			obs_data_set_string(c, "type", "extra");
+			obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
+			obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
+			obs_video_info ovi;
+			if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
+				obs_data_set_int(c, "width", ovi.base_width);
+				obs_data_set_int(c, "height", ovi.base_height);
+			}
+			obs_data_array_push_back(ca, c);
+			obs_data_release(c);
 		}
-		obs_data_array_push_back(ca, c);
-		obs_data_release(c);
-	}
-	for (const auto &it : canvas_clone_docks) {
-		auto c = obs_data_create();
-		obs_data_set_string(c, "type", "clone");
-		obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
-		obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
-		obs_video_info ovi;
-		if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
-			obs_data_set_int(c, "width", ovi.base_width);
-			obs_data_set_int(c, "height", ovi.base_height);
+		for (const auto &it : canvas_clone_docks) {
+			auto c = obs_data_create();
+			obs_data_set_string(c, "type", "clone");
+			obs_data_set_string(c, "name", obs_canvas_get_name(it->GetCanvas()));
+			obs_data_set_string(c, "uuid", obs_canvas_get_uuid(it->GetCanvas()));
+			obs_video_info ovi;
+			if (obs_canvas_get_video_info(it->GetCanvas(), &ovi)) {
+				obs_data_set_int(c, "width", ovi.base_width);
+				obs_data_set_int(c, "height", ovi.base_height);
+			}
+			obs_data_array_push_back(ca, c);
+			obs_data_release(c);
 		}
-		obs_data_array_push_back(ca, c);
-		obs_data_release(c);
+	}) || !ca) {
+		obs_data_set_string(response_data, "error", "UI is not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
 	}
 	obs_data_set_bool(response_data, "success", true);
 	obs_data_set_array(response_data, "canvas", ca);
@@ -72,14 +104,21 @@ void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	const char *canvas_name = obs_data_get_string(request_data, "canvas");
-	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
-	// add/remove (documented race). The actual scene switch is already correctly marshaled to
-	// the dock's thread via the invokeMethod call below.
-	for (const auto &it : canvas_docks) {
-		if (canvas_name[0] == '\0' || strcmp(obs_canvas_get_name(it->GetCanvas()), canvas_name) == 0 ||
-		    strcmp(obs_canvas_get_uuid(it->GetCanvas()), canvas_name) == 0)
-			QMetaObject::invokeMethod(it, "SwitchScene", Q_ARG(QString, QString::fromUtf8(scene_name)));
+	const auto canvas_name = QString::fromUtf8(obs_data_get_string(request_data, "canvas"));
+	const auto scene = QString::fromUtf8(scene_name);
+	bool handled = false;
+	if (!invoke_on_ui_thread([&] {
+		handled = true;
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name.isEmpty() || canvas_name == QString::fromUtf8(obs_canvas_get_name(canvas)) ||
+			    canvas_name == QString::fromUtf8(obs_canvas_get_uuid(canvas)))
+				QMetaObject::invokeMethod(it, "SwitchScene", Qt::DirectConnection, Q_ARG(QString, scene));
+		}
+	}) || !handled) {
+		obs_data_set_string(response_data, "error", "UI is not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
 	}
 
 	obs_data_set_bool(response_data, "success", true);
@@ -87,92 +126,100 @@ void vendor_request_switch_scene(obs_data_t *request_data, obs_data_t *response_
 
 void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
-	const char *canvas_name = obs_data_get_string(request_data, "canvas");
-	if (canvas_name[0] == '\0') {
+	const auto canvas_name = QString::fromUtf8(obs_data_get_string(request_data, "canvas"));
+	if (canvas_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'canvas' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
-	// add/remove (documented race). The per-canvas reads below are OBS C API only.
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
+	bool found = false;
+	std::string scene_name;
+	std::string scene_uuid;
+	if (!invoke_on_ui_thread([&] {
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name != QString::fromUtf8(obs_canvas_get_name(canvas)) &&
+			    canvas_name != QString::fromUtf8(obs_canvas_get_uuid(canvas)))
+				continue;
 
-		auto source = obs_canvas_get_channel(canvas, 0);
-		if (source && obs_source_get_type(source) == OBS_SOURCE_TYPE_TRANSITION) {
-			obs_source_release(source);
-			source = obs_transition_get_active_source(source);
+			auto source = obs_canvas_get_channel(canvas, 0);
+			if (source && obs_source_get_type(source) == OBS_SOURCE_TYPE_TRANSITION) {
+				auto active_source = obs_transition_get_active_source(source);
+				obs_source_release(source);
+				source = active_source;
+			}
+			if (source) {
+				scene_name = obs_source_get_name(source);
+				scene_uuid = obs_source_get_uuid(source);
+				obs_source_release(source);
+			}
+			found = true;
+			return;
 		}
-		if (source) {
-			obs_data_set_string(response_data, "scene", obs_source_get_name(source));
-			obs_data_set_string(response_data, "scene_uuid", obs_source_get_uuid(source));
-			obs_source_release(source);
-		} else {
-			obs_data_set_string(response_data, "scene", "");
-			obs_data_set_string(response_data, "scene_uuid", "");
-		}
-		obs_data_set_bool(response_data, "success", true);
+	}) || !found) {
+		obs_data_set_string(response_data, "error", "'canvas' not found");
+		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	obs_data_set_bool(response_data, "success", false);
+	obs_data_set_string(response_data, "scene", scene_name.c_str());
+	obs_data_set_string(response_data, "scene_uuid", scene_uuid.c_str());
+	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_get_scenes(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
-	const char *canvas_name = obs_data_get_string(request_data, "canvas");
-	if (canvas_name[0] == '\0') {
+	const auto canvas_name = QString::fromUtf8(obs_data_get_string(request_data, "canvas"));
+	if (canvas_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'canvas' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
 
-	// NOTE: iterating canvas_docks runs on the worker thread and races with UI-thread dock
-	// add/remove (documented race). Scene enumeration below is OBS C API only.
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
+	obs_data_array_t *sa = nullptr;
+	if (!invoke_on_ui_thread([&] {
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name != QString::fromUtf8(obs_canvas_get_name(canvas)) &&
+			    canvas_name != QString::fromUtf8(obs_canvas_get_uuid(canvas)))
+				continue;
 
-		auto sa = obs_data_array_create();
-		obs_canvas_enum_scenes(
-			canvas,
-			[](void *param, obs_source_t *scene) {
-				auto a = (obs_data_array_t *)param;
-				auto s = obs_data_create();
-				obs_data_set_string(s, "name", obs_source_get_name(scene));
-				obs_data_set_string(s, "uuid", obs_source_get_uuid(scene));
-				obs_data_array_push_back(a, s);
-				obs_data_release(s);
-				return true;
-			},
-			sa);
-		obs_data_set_bool(response_data, "success", true);
-		obs_data_set_array(response_data, "scenes", sa);
-		obs_data_array_release(sa);
+			sa = obs_data_array_create();
+			obs_canvas_enum_scenes(
+				canvas,
+				[](void *param, obs_source_t *scene) {
+					auto a = static_cast<obs_data_array_t *>(param);
+					auto s = obs_data_create();
+					obs_data_set_string(s, "name", obs_source_get_name(scene));
+					obs_data_set_string(s, "uuid", obs_source_get_uuid(scene));
+					obs_data_array_push_back(a, s);
+					obs_data_release(s);
+					return true;
+				},
+				sa);
+			return;
+		}
+	}) || !sa) {
+		obs_data_set_string(response_data, "error", "'canvas' not found");
+		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	obs_data_set_string(response_data, "error", "'canvas' not found");
-	obs_data_set_bool(response_data, "success", false);
+	obs_data_set_bool(response_data, "success", true);
+	obs_data_set_array(response_data, "scenes", sa);
+	obs_data_array_release(sa);
 }
 
 void vendor_request_get_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	obs_data_array_t *oa = nullptr;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock)
+			oa = output_dock->GetOutputsArray();
+	}) || !oa) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	// GetOutputsArray() iterates the outputWidgets container and touches Qt (objectName()),
-	// both of which are only safe on the UI thread. This handler runs on the obs-websocket
-	// worker thread, so marshal the read onto the UI thread and block until it completes.
-	// The blocking connection makes the by-reference capture of `oa` safe: the worker thread
-	// stays parked inside invokeMethod until the lambda returns, so the local is still alive.
-	obs_data_array_t *oa = nullptr;
-	QMetaObject::invokeMethod(
-		output_dock, [&] { oa = output_dock->GetOutputsArray(); }, Qt::BlockingQueuedConnection);
 	obs_data_set_bool(response_data, "success", true);
 	obs_data_set_array(response_data, "outputs", oa);
 	obs_data_array_release(oa);
@@ -257,72 +304,108 @@ void vendor_request_stop_output(obs_data_t *request_data, obs_data_t *response_d
 void vendor_request_start_all_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool started = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StartAll", Qt::DirectConnection, Q_ARG(bool, false),
+						  Q_ARG(bool, false));
+			started = true;
+		}
+	}) || !started) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, false), Q_ARG(bool, false));
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_stop_all_outputs(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool stopped = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StopAll", Qt::DirectConnection, Q_ARG(bool, false),
+						  Q_ARG(bool, false));
+			stopped = true;
+		}
+	}) || !stopped) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, false), Q_ARG(bool, false));
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_start_all_streams(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool started = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StartAll", Qt::DirectConnection, Q_ARG(bool, true),
+						  Q_ARG(bool, false));
+			started = true;
+		}
+	}) || !started) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, true), Q_ARG(bool, false));
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_stop_all_streams(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool stopped = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StopAll", Qt::DirectConnection, Q_ARG(bool, true),
+						  Q_ARG(bool, false));
+			stopped = true;
+		}
+	}) || !stopped) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, true), Q_ARG(bool, false));
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_start_all_recordings(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool started = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StartAll", Qt::DirectConnection, Q_ARG(bool, false),
+						  Q_ARG(bool, true));
+			started = true;
+		}
+	}) || !started) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StartAll", Q_ARG(bool, false), Q_ARG(bool, true));
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_stop_all_recordings(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!output_dock) {
+	bool stopped = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock) {
+			QMetaObject::invokeMethod(output_dock, "StopAll", Qt::DirectConnection, Q_ARG(bool, false),
+						  Q_ARG(bool, true));
+			stopped = true;
+		}
+	}) || !stopped) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	QMetaObject::invokeMethod(output_dock, "StopAll", Q_ARG(bool, false), Q_ARG(bool, true));
 	obs_data_set_bool(response_data, "success", true);
 }
 
@@ -372,20 +455,17 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	if (!output_dock) {
+	const auto output = QString::fromUtf8(output_name);
+	const auto chapter_name = QString::fromUtf8(obs_data_get_string(request_data, "chapter_name"));
+	bool result = false;
+	if (!invoke_on_ui_thread([&] {
+		if (output_dock)
+			result = output_dock->AddChapterToOutput(output.toUtf8().constData(), chapter_name.toUtf8().constData());
+	})) {
 		obs_data_set_string(response_data, "error", "Output dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	// AddChapterToOutput() iterates the outputWidgets container and calls Qt methods, so it
-	// must run on the UI thread. We run on the worker thread here, so marshal it across with a
-	// blocking connection (we need the bool result synchronously). By-ref captures stay valid
-	// because the worker blocks until the lambda finishes.
-	const char *chapter_name = obs_data_get_string(request_data, "chapter_name");
-	bool result = false;
-	QMetaObject::invokeMethod(
-		output_dock, [&] { result = output_dock->AddChapterToOutput(output_name, chapter_name); },
-		Qt::BlockingQueuedConnection);
 
 	obs_data_set_bool(response_data, "success", result);
 }
@@ -393,46 +473,46 @@ void vendor_request_add_chapter(obs_data_t *request_data, obs_data_t *response_d
 void vendor_request_get_dock_modes(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!modesTabBar) {
+	obs_data_array_t *modes = nullptr;
+	std::string current;
+	if (!invoke_on_ui_thread([&] {
+		if (!modesTabBar)
+			return;
+		modes = obs_data_array_create();
+		for (int i = 0; i < modesTabBar->count(); i++) {
+			auto mode = obs_data_create();
+			auto d = modesTabBar->tabData(i);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				obs_data_set_string(mode, "name", d.toString().toUtf8().constData());
+				obs_data_set_bool(mode, "fixed", true);
+			} else {
+				obs_data_set_string(mode, "name", modesTabBar->tabText(i).toUtf8().constData());
+				obs_data_set_bool(mode, "fixed", false);
+			}
+			obs_data_array_push_back(modes, mode);
+			obs_data_release(mode);
+		}
+		auto index = modesTabBar->currentIndex();
+		if (index >= 0) {
+			auto d = modesTabBar->tabData(index);
+			current = (!d.isNull() && d.isValid() && !d.toString().isEmpty())
+					  ? d.toString().toStdString()
+					  : modesTabBar->tabText(index).toStdString();
+		}
+	}) || !modes) {
 		obs_data_set_string(response_data, "error", "Modes tab bar not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	auto modes = obs_data_array_create();
-	for (int i = 0; i < modesTabBar->count(); i++) {
-		auto mode = obs_data_create();
-		auto d = modesTabBar->tabData(i);
-		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-			obs_data_set_string(mode, "name", d.toString().toUtf8().constData());
-			obs_data_set_bool(mode, "fixed", true);
-		} else {
-			obs_data_set_string(mode, "name", modesTabBar->tabText(i).toUtf8().constData());
-			obs_data_set_bool(mode, "fixed", false);
-		}
-		obs_data_array_push_back(modes, mode);
-		obs_data_release(mode);
-	}
 	obs_data_set_array(response_data, "modes", modes);
 	obs_data_array_release(modes);
-	auto index = modesTabBar->currentIndex();
-	if (index >= 0) {
-		auto d = modesTabBar->tabData(index);
-		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-			obs_data_set_string(response_data, "current", d.toString().toUtf8().constData());
-		} else {
-			obs_data_set_string(response_data, "current", modesTabBar->tabText(index).toUtf8().constData());
-		}
-	}
+	if (!current.empty())
+		obs_data_set_string(response_data, "current", current.c_str());
 	obs_data_set_bool(response_data, "success", true);
 }
 
 void vendor_request_switch_dock_mode(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
-	if (!modesTabBar) {
-		obs_data_set_string(response_data, "error", "Modes tab bar not available");
-		obs_data_set_bool(response_data, "success", false);
-		return;
-	}
 	auto item = obs_data_item_byname(request_data, "mode");
 	if (!item) {
 		obs_data_set_string(response_data, "error", "'mode' not set");
@@ -441,31 +521,35 @@ void vendor_request_switch_dock_mode(obs_data_t *request_data, obs_data_t *respo
 	}
 	if (obs_data_item_gettype(item) == OBS_DATA_NUMBER) {
 		auto mode = obs_data_item_get_int(item);
-		if (mode >= 0 && mode < modesTabBar->count()) {
-			QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, (int)mode));
+		bool switched = false;
+		if (invoke_on_ui_thread([&] {
+			if (modesTabBar && mode >= 0 && mode < modesTabBar->count()) {
+				modesTabBar->setCurrentIndex(static_cast<int>(mode));
+				switched = true;
+			}
+		}) && switched) {
 			obs_data_item_release(&item);
 			obs_data_set_bool(response_data, "success", true);
 			return;
 		}
 	} else if (obs_data_item_gettype(item) == OBS_DATA_STRING) {
 		auto mode = QString::fromUtf8(obs_data_item_get_string(item));
-		for (int i = 0; i < modesTabBar->count(); i++) {
-			auto d = modesTabBar->tabData(i);
-			if (!d.isNull() && d.isValid() && d.toString() == mode) {
-				if (modesTabBar->currentIndex() != i) {
-					QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, i));
-				}
-				obs_data_item_release(&item);
-				obs_data_set_bool(response_data, "success", true);
+		bool switched = false;
+		if (invoke_on_ui_thread([&] {
+			if (!modesTabBar)
 				return;
-			} else if (modesTabBar->tabText(i) == mode) {
-				if (modesTabBar->currentIndex() != i) {
-					QMetaObject::invokeMethod(modesTabBar, "setCurrentIndex", Q_ARG(int, i));
+			for (int i = 0; i < modesTabBar->count(); i++) {
+				auto d = modesTabBar->tabData(i);
+				if ((!d.isNull() && d.isValid() && d.toString() == mode) || modesTabBar->tabText(i) == mode) {
+					modesTabBar->setCurrentIndex(i);
+					switched = true;
+					return;
 				}
-				obs_data_item_release(&item);
-				obs_data_set_bool(response_data, "success", true);
-				return;
 			}
+		}) && switched) {
+			obs_data_item_release(&item);
+			obs_data_set_bool(response_data, "success", true);
+			return;
 		}
 	}
 	obs_data_set_string(response_data, "error", "'mode' invalid");
@@ -508,14 +592,19 @@ void vendor_request_dock_show(obs_data_t *request_data, obs_data_t *response_dat
 		return;
 	}
 	auto dn = QString::fromUtf8(dock_name);
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	auto docks = main_window->findChildren<QDockWidget *>();
-	for (auto &dock : docks) {
-		if (dock->objectName() == dn) {
-			QMetaObject::invokeMethod(dock, "show");
-			obs_data_set_bool(response_data, "success", true);
-			return;
+	bool shown = false;
+	if (invoke_on_ui_thread([&] {
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		for (auto dock : main_window->findChildren<QDockWidget *>()) {
+			if (dock->objectName() == dn) {
+				dock->show();
+				shown = true;
+				return;
+			}
 		}
+	}) && shown) {
+		obs_data_set_bool(response_data, "success", true);
+		return;
 	}
 	obs_data_set_string(response_data, "error", "'dock' not found");
 	obs_data_set_bool(response_data, "success", false);
@@ -530,14 +619,19 @@ void vendor_request_dock_hide(obs_data_t *request_data, obs_data_t *response_dat
 		return;
 	}
 	auto dn = QString::fromUtf8(dock_name);
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	auto docks = main_window->findChildren<QDockWidget *>();
-	for (auto &dock : docks) {
-		if (dock->objectName() == dn) {
-			QMetaObject::invokeMethod(dock, "hide");
-			obs_data_set_bool(response_data, "success", true);
-			return;
+	bool hidden = false;
+	if (invoke_on_ui_thread([&] {
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		for (auto dock : main_window->findChildren<QDockWidget *>()) {
+			if (dock->objectName() == dn) {
+				dock->hide();
+				hidden = true;
+				return;
+			}
 		}
+	}) && hidden) {
+		obs_data_set_bool(response_data, "success", true);
+		return;
 	}
 	obs_data_set_string(response_data, "error", "'dock' not found");
 	obs_data_set_bool(response_data, "success", false);
@@ -546,18 +640,15 @@ void vendor_request_dock_hide(obs_data_t *request_data, obs_data_t *response_dat
 void vendor_request_get_live_scenes(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
 	UNUSED_PARAMETER(request_data);
-	if (!live_scenes_dock) {
+	obs_data_array_t *sa = nullptr;
+	if (!invoke_on_ui_thread([&] {
+		if (live_scenes_dock)
+			sa = live_scenes_dock->GetLiveScenesArray();
+	}) || !sa) {
 		obs_data_set_string(response_data, "error", "Live Scenes dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	// GetLiveScenesArray() reads UI-thread-mutated dock state, so it must run on the UI thread.
-	// This handler runs on the obs-websocket worker thread; marshal the read across with a
-	// blocking connection so we can return the array synchronously. The by-ref capture of `sa`
-	// is safe because the worker stays blocked until the lambda completes.
-	obs_data_array_t *sa = nullptr;
-	QMetaObject::invokeMethod(
-		live_scenes_dock, [&] { sa = live_scenes_dock->GetLiveScenesArray(); }, Qt::BlockingQueuedConnection);
 	obs_data_set_bool(response_data, "success", true);
 	obs_data_set_array(response_data, "live_scenes", sa);
 	obs_data_array_release(sa);
@@ -571,14 +662,17 @@ void vendor_request_live_scenes_add(obs_data_t *request_data, obs_data_t *respon
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	if (!live_scenes_dock) {
+	auto sn = QString::fromUtf8(scene_name);
+	bool added = false;
+	if (!invoke_on_ui_thread([&] {
+		if (live_scenes_dock)
+			added = live_scenes_dock->AddLiveScene(sn);
+	})) {
 		obs_data_set_string(response_data, "error", "Live Scenes dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	auto sn = QString::fromUtf8(scene_name);
-	QMetaObject::invokeMethod(live_scenes_dock, [sn] { live_scenes_dock->AddLiveScene(sn); });
-	obs_data_set_bool(response_data, "success", true);
+	obs_data_set_bool(response_data, "success", added);
 }
 
 void vendor_request_live_scenes_remove(obs_data_t *request_data, obs_data_t *response_data, void *)
@@ -589,95 +683,101 @@ void vendor_request_live_scenes_remove(obs_data_t *request_data, obs_data_t *res
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	if (!live_scenes_dock) {
+	auto sn = QString::fromUtf8(scene_name);
+	bool removed = false;
+	if (!invoke_on_ui_thread([&] {
+		if (live_scenes_dock)
+			removed = live_scenes_dock->RemoveLiveScene(sn);
+	})) {
 		obs_data_set_string(response_data, "error", "Live Scenes dock not available");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	auto sn = QString::fromUtf8(scene_name);
-	QMetaObject::invokeMethod(live_scenes_dock, [sn] { live_scenes_dock->RemoveLiveScene(sn); });
-	obs_data_set_bool(response_data, "success", true);
+	obs_data_set_bool(response_data, "success", removed);
 }
 
 void vendor_request_dock_show_panel(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
-
-	const char *canvas_name = obs_data_get_string(request_data, "canvas");
-	if (canvas_name[0] == '\0') {
+	const auto canvas_name = QString::fromUtf8(obs_data_get_string(request_data, "canvas"));
+	if (canvas_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'canvas' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	const char *panel_name = obs_data_get_string(request_data, "panel");
-	if (panel_name[0] == '\0') {
+	const auto panel_name = QString::fromUtf8(obs_data_get_string(request_data, "panel"));
+	if (panel_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'panel' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
 
-	// NOTE: iterating canvas_docks / canvas_clone_docks runs on the worker thread and races
-	// with UI-thread dock add/remove (documented race). The SetPanelVisible mutation itself is
-	// already correctly marshaled to the dock's thread via invokeMethod below.
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		auto pn = QString::fromUtf8(panel_name);
-		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, true); });
+	bool found = false;
+	if (invoke_on_ui_thread([&] {
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name == QString::fromUtf8(obs_canvas_get_name(canvas)) ||
+			    canvas_name == QString::fromUtf8(obs_canvas_get_uuid(canvas))) {
+				it->SetPanelVisible(panel_name, true);
+				found = true;
+				return;
+			}
+		}
+		for (const auto &it : canvas_clone_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name == QString::fromUtf8(obs_canvas_get_name(canvas)) ||
+			    canvas_name == QString::fromUtf8(obs_canvas_get_uuid(canvas))) {
+				it->SetPanelVisible(panel_name, true);
+				found = true;
+				return;
+			}
+		}
+	}) && found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
 	}
-	for (const auto &it : canvas_clone_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		auto pn = QString::fromUtf8(panel_name);
-		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, true); });
-		obs_data_set_bool(response_data, "success", true);
-		return;
-	}
-
 	obs_data_set_string(response_data, "error", "'canvas' not found");
 	obs_data_set_bool(response_data, "success", false);
 }
 
 void vendor_request_dock_hide_panel(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
-	const char *canvas_name = obs_data_get_string(request_data, "canvas");
-	if (canvas_name[0] == '\0') {
+	const auto canvas_name = QString::fromUtf8(obs_data_get_string(request_data, "canvas"));
+	if (canvas_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'canvas' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
-	const char *panel_name = obs_data_get_string(request_data, "panel");
-	if (panel_name[0] == '\0') {
+	const auto panel_name = QString::fromUtf8(obs_data_get_string(request_data, "panel"));
+	if (panel_name.isEmpty()) {
 		obs_data_set_string(response_data, "error", "'panel' not set");
 		obs_data_set_bool(response_data, "success", false);
 		return;
 	}
 
-	// NOTE: iterating canvas_docks / canvas_clone_docks runs on the worker thread and races
-	// with UI-thread dock add/remove (documented race). The SetPanelVisible mutation itself is
-	// already correctly marshaled to the dock's thread via invokeMethod below.
-	for (const auto &it : canvas_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		auto pn = QString::fromUtf8(panel_name);
-		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, false); });
+	bool found = false;
+	if (invoke_on_ui_thread([&] {
+		for (const auto &it : canvas_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name == QString::fromUtf8(obs_canvas_get_name(canvas)) ||
+			    canvas_name == QString::fromUtf8(obs_canvas_get_uuid(canvas))) {
+				it->SetPanelVisible(panel_name, false);
+				found = true;
+				return;
+			}
+		}
+		for (const auto &it : canvas_clone_docks) {
+			auto canvas = it->GetCanvas();
+			if (canvas_name == QString::fromUtf8(obs_canvas_get_name(canvas)) ||
+			    canvas_name == QString::fromUtf8(obs_canvas_get_uuid(canvas))) {
+				it->SetPanelVisible(panel_name, false);
+				found = true;
+				return;
+			}
+		}
+	}) && found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
 	}
-	for (const auto &it : canvas_clone_docks) {
-		auto canvas = it->GetCanvas();
-		if (strcmp(obs_canvas_get_name(canvas), canvas_name) != 0 && strcmp(obs_canvas_get_uuid(canvas), canvas_name) != 0)
-			continue;
-		auto pn = QString::fromUtf8(panel_name);
-		QMetaObject::invokeMethod(it, [it, pn] { it->SetPanelVisible(pn, false); });
-		obs_data_set_bool(response_data, "success", true);
-		return;
-	}
-
 	obs_data_set_string(response_data, "error", "'canvas' not found");
 	obs_data_set_bool(response_data, "success", false);
 }
@@ -726,8 +826,7 @@ void vendor_request_get_transitions(obs_data_t *request_data, obs_data_t *respon
 			return;
 		}
 	};
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(main_window, build, Qt::BlockingQueuedConnection);
+	invoke_on_ui_thread(build);
 	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		obs_data_set_array(response_data, "transitions", ta);
@@ -758,9 +857,7 @@ void vendor_request_switch_transition(obs_data_t *request_data, obs_data_t *resp
 	// captures are valid because the worker blocks until the lambda returns.
 	bool found = false;
 	auto tn = QString::fromUtf8(transition_name);
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(
-		main_window,
+	invoke_on_ui_thread(
 		[&] {
 			for (const auto &it : canvas_docks) {
 				auto canvas = it->GetCanvas();
@@ -771,8 +868,7 @@ void vendor_request_switch_transition(obs_data_t *request_data, obs_data_t *resp
 				found = true;
 				return;
 			}
-		},
-		Qt::BlockingQueuedConnection);
+		});
 	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
@@ -807,9 +903,7 @@ void vendor_request_transitions_add(obs_data_t *request_data, obs_data_t *respon
 	// stays owned/alive on the worker (released below); the blocking connection guarantees the
 	// lambda finishes using it before we release. By-ref captures are safe for the same reason.
 	bool found = false;
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(
-		main_window,
+	invoke_on_ui_thread(
 		[&] {
 			for (const auto &it : canvas_docks) {
 				auto canvas = it->GetCanvas();
@@ -820,8 +914,7 @@ void vendor_request_transitions_add(obs_data_t *request_data, obs_data_t *respon
 				found = true;
 				return;
 			}
-		},
-		Qt::BlockingQueuedConnection);
+		});
 	obs_data_release(settings);
 	if (found) {
 		obs_data_set_bool(response_data, "success", true);
@@ -849,9 +942,7 @@ void vendor_request_transitions_remove(obs_data_t *request_data, obs_data_t *res
 	// (UI-thread state) are races, so marshal the lookup + mutation onto the UI thread with a
 	// blocking connection. By-ref captures are valid because the worker blocks until done.
 	bool found = false;
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	QMetaObject::invokeMethod(
-		main_window,
+	invoke_on_ui_thread(
 		[&] {
 			for (const auto &it : canvas_docks) {
 				auto canvas = it->GetCanvas();
@@ -862,8 +953,7 @@ void vendor_request_transitions_remove(obs_data_t *request_data, obs_data_t *res
 				found = true;
 				return;
 			}
-		},
-		Qt::BlockingQueuedConnection);
+		});
 	if (found) {
 		obs_data_set_bool(response_data, "success", true);
 		return;
@@ -881,14 +971,19 @@ void vendor_request_refresh_browser_panel(obs_data_t *request_data, obs_data_t *
 		return;
 	}
 	auto pn = QString::fromUtf8(panel_name);
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	auto bds = main_window->findChildren<BrowserDock *>();
-	for (auto bd : bds) {
-		if (bd->objectName() == pn) {
-			bd->Refresh();
-			obs_data_set_bool(response_data, "success", true);
-			return;
+	bool refreshed = false;
+	if (invoke_on_ui_thread([&] {
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		for (auto bd : main_window->findChildren<BrowserDock *>()) {
+			if (bd->objectName() == pn) {
+				bd->Refresh();
+				refreshed = true;
+				return;
+			}
 		}
+	}) && refreshed) {
+		obs_data_set_bool(response_data, "success", true);
+		return;
 	}
 	obs_data_set_string(response_data, "error", "'panel' not found");
 	obs_data_set_bool(response_data, "success", false);
@@ -903,14 +998,19 @@ void vendor_request_reset_browser_panel(obs_data_t *request_data, obs_data_t *re
 		return;
 	}
 	auto pn = QString::fromUtf8(panel_name);
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	auto bds = main_window->findChildren<BrowserDock *>();
-	for (auto bd : bds) {
-		if (bd->objectName() == pn) {
-			bd->Reset();
-			obs_data_set_bool(response_data, "success", true);
-			return;
+	bool reset = false;
+	if (invoke_on_ui_thread([&] {
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		for (auto bd : main_window->findChildren<BrowserDock *>()) {
+			if (bd->objectName() == pn) {
+				bd->Reset();
+				reset = true;
+				return;
+			}
 		}
+	}) && reset) {
+		obs_data_set_bool(response_data, "success", true);
+		return;
 	}
 	obs_data_set_string(response_data, "error", "'panel' not found");
 	obs_data_set_bool(response_data, "success", false);
@@ -959,4 +1059,23 @@ void load_obs_websocket()
 
 	obs_websocket_vendor_register_request(vendor, "refresh_browser_panel", vendor_request_refresh_browser_panel, nullptr);
 	obs_websocket_vendor_register_request(vendor, "reset_browser_panel", vendor_request_reset_browser_panel, nullptr);
+}
+
+void unload_obs_websocket()
+{
+	if (!vendor)
+		return;
+
+	const char *requests[] = {
+		"version", "get_canvas", "switch_scene", "current_scene", "get_scenes",
+		"get_outputs", "start_output", "stop_output", "start_all_outputs", "stop_all_outputs",
+		"start_all_streams", "stop_all_streams", "start_all_recordings", "stop_all_recordings",
+		"save_backtrack", "add_chapter", "get_dock_modes", "switch_dock_mode", "get_docks",
+		"dock_show", "dock_hide", "get_live_scenes", "live_scenes_add", "live_scenes_remove",
+		"canvas_dock_show_panel", "canvas_dock_hide_panel", "get_transitions", "switch_transition",
+		"transitions_add", "transitions_remove", "refresh_browser_panel", "reset_browser_panel",
+	};
+	for (const auto *request : requests)
+		obs_websocket_vendor_unregister_request(vendor, request);
+	vendor = nullptr;
 }

@@ -28,23 +28,15 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <atomic>
+#include <memory>
 #include <util/dstr.h>
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
 OBS_MODULE_USE_DEFAULT_LOCALE("aitum-stream-suite", "en-US")
 
-// Ownership model for the version-check downloader:
-// The download worker thread (single_file_thread) invokes version_info_downloaded
-// on the WORKER thread. It must never destroy the downloader from inside its own
-// thread, because download_info_destroy() calls pthread_join() on the worker -- a
-// thread joining itself deadlocks/leaks. To make destruction race-free between the
-// worker completing and obs_module_unload running concurrently on the UI thread,
-// the global owner pointer is atomic: whichever path performs the exchange(nullptr)
-// becomes the sole owner and the only one allowed to call download_info_destroy().
-// The worker/callback never frees it; obs_module_unload is the single destroyer and
-// safely joins the (by then finished) worker thread from a DIFFERENT thread.
 std::atomic<download_info_t *> version_download_info{nullptr};
+std::atomic_bool stream_suite_unloading{false};
 obs_data_t *current_profile_config = nullptr;
 QTabBar *modesTabBar = nullptr;
 QToolBar *toolbar = nullptr;
@@ -115,25 +107,39 @@ void AskUpdate()
 	}
 }
 
-// Runs on the download WORKER thread (see single_file_thread). Per the ownership
-// model it only consumes the downloaded data; it must NOT destroy version_download_info
-// here (that would self-join the worker thread). Destruction is deferred to the single
-// owner via the atomic exchange in obs_module_unload.
+static void destroy_version_download_info(void *)
+{
+	if (download_info_t *di = version_download_info.exchange(nullptr))
+		download_info_destroy(di);
+}
+
+static void schedule_version_download_cleanup()
+{
+	// The completion callback runs on the downloader worker. Queue destruction on
+	// the UI thread so download_info_destroy() joins from a different thread. The
+	// queued task cannot run until module load has returned, so the atomic owner is
+	// published before a fast download can claim it.
+	obs_queue_task(OBS_TASK_UI, destroy_version_download_info, nullptr, false);
+}
+
 bool version_info_downloaded(void *param, struct file_download_data *file)
 {
 	UNUSED_PARAMETER(param);
 	if (!file || !file->buffer.num) {
+		schedule_version_download_cleanup();
 		return true;
 	}
 
 	auto d = obs_data_create_from_json((const char *)file->buffer.array);
 	if (!d) {
+		schedule_version_download_cleanup();
 		return true;
 	}
 
 	auto data_obj = obs_data_get_obj(d, "data");
 	obs_data_release(d);
 	if (!data_obj) {
+		schedule_version_download_cleanup();
 		return true;
 	}
 
@@ -159,16 +165,14 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		time_t current_time = time(nullptr);
 		auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
 		if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
-			// We are on the download worker thread here. The UI building is marshalled to
-			// the main thread via QueuedConnection. BlockingQueuedConnection was
-			// used previously and could deadlock during shutdown (worker blocks waiting on a
-			// main thread that is tearing down). Refcounting stays balanced: addref() keeps
-			// "blocks" alive until the queued lambda runs and releases that extra ref at its
-			// end, while the outer get_array() ref is released immediately below.
 			obs_data_array_addref(blocks);
+			auto blocks_ref = std::shared_ptr<obs_data_array_t>(blocks, [](obs_data_array_t *data) {
+				obs_data_array_release(data);
+			});
 			QMetaObject::invokeMethod(
 				toolbar,
-				[blocks] {
+				[blocks_ref] {
+					auto blocks = blocks_ref.get();
 					auto before = studioModeAction;
 					size_t count = obs_data_array_count(blocks);
 					for (size_t i = 0; i < count; i++) {
@@ -225,7 +229,6 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 					QWidget *spacer = new QWidget();
 					spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 					partnerBlockActions.append(toolbar->insertWidget(before, spacer));
-					obs_data_array_release(blocks);
 				},
 				Qt::QueuedConnection);
 		}
@@ -233,8 +236,7 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 	obs_data_array_release(blocks);
 	obs_data_release(data_obj);
 
-	// Intentionally do NOT destroy version_download_info here: this runs on the
-	// worker thread and destruction joins that same thread. obs_module_unload owns teardown.
+	schedule_version_download_cleanup();
 	return true;
 }
 
@@ -1811,6 +1813,7 @@ extern "C" const struct obs_source_info component_info;
 
 bool obs_module_load(void)
 {
+	stream_suite_unloading.store(false);
 	blog(LOG_INFO, "[Aitum Stream Suite] loaded version %s", PROJECT_VERSION);
 
 	obs_register_source(&component_info);
@@ -2254,17 +2257,15 @@ void obs_module_post_load()
 	load_obs_websocket();
 }
 
+void unload_obs_websocket();
+
 void obs_module_unload()
 {
+	stream_suite_unloading.store(true);
+	unload_obs_websocket();
 	obs_frontend_remove_save_callback(save_load, nullptr);
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
-	// Atomically claim sole ownership of the downloader before destroying it. The
-	// exchange guarantees only one path ever frees it; here we run on the UI thread (a
-	// different thread than the worker), so download_info_destroy()'s pthread_join safely
-	// reaps the worker. If something else already claimed it, di is null and we skip.
-	if (download_info_t *di = version_download_info.exchange(nullptr)) {
-		download_info_destroy(di);
-	}
+	destroy_version_download_info(nullptr);
 	if (current_profile_config) {
 		obs_data_release(current_profile_config);
 		current_profile_config = nullptr;

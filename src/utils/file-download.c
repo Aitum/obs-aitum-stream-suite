@@ -123,18 +123,22 @@ static void *single_file_thread(void *data)
 	info->curl = curl_easy_init();
 	if (!info->curl) {
 		warn("Could not initialize Curl");
-		return NULL;
+		goto callback;
 	}
 
 	if (!do_http_request(info, info->url, &response_code))
-		return NULL;
+		goto callback;
 	if (!info->file_data.array || !info->file_data.array[0])
-		return NULL;
+		goto callback;
 
 	download_data.name = info->url;
 	download_data.version = 0;
 	download_data.buffer.da = info->file_data.da;
 	info->callback(info->param, &download_data);
+	return NULL;
+
+callback:
+	info->callback(info->param, NULL);
 	return NULL;
 }
 
