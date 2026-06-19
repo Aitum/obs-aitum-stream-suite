@@ -22,7 +22,7 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	  preview(new OBSQTDisplay(this)),
 	  settings(settings_)
 {
-	pthread_mutex_init(&replace_sources_mutex, nullptr);
+	// replace_sources_mutex is a std::mutex; no manual init/destroy needed.
 	obs_enter_graphics();
 
 	gs_render_start(true);
@@ -322,12 +322,13 @@ CanvasCloneDock::~CanvasCloneDock()
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
 	obs_leave_graphics();
-	pthread_mutex_lock(&replace_sources_mutex);
-	for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
-		obs_weak_source_release(it->second);
-	replace_sources.clear();
-	pthread_mutex_unlock(&replace_sources_mutex);
-	pthread_mutex_destroy(&replace_sources_mutex);
+	// RAII guard for the replace_sources critical section.
+	{
+		std::lock_guard<std::mutex> lock(replace_sources_mutex);
+		for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
+			obs_weak_source_release(it->second);
+		replace_sources.clear();
+	}
 }
 
 void CanvasCloneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
@@ -501,13 +502,16 @@ void CanvasCloneDock::DrawBackdrop(float cx, float cy)
 void CanvasCloneDock::SceneDetectReplacedSource(obs_sceneitem_t *item, bool *change_source)
 {
 	obs_source_t *source = obs_sceneitem_get_source(item);
-	pthread_mutex_lock(&replace_sources_mutex);
-	if (replace_sources.find(source) != replace_sources.end()) {
-		pthread_mutex_unlock(&replace_sources_mutex);
-		*change_source = true;
-		return;
+	// RAII guard scoped exactly to the replace_sources lookup. The early return
+	// on a hit still releases the lock (guard destructor), preserving the
+	// original "unlock-then-return" behavior without manual unlock calls.
+	{
+		std::lock_guard<std::mutex> lock(replace_sources_mutex);
+		if (replace_sources.find(source) != replace_sources.end()) {
+			*change_source = true;
+			return;
+		}
 	}
-	pthread_mutex_unlock(&replace_sources_mutex);
 	obs_scene_t *scene = obs_scene_from_source(source);
 	if (!scene)
 		scene = obs_group_from_source(source);
@@ -538,32 +542,45 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 
 	const char *source_name = obs_source_get_name(source);
 
-	pthread_mutex_lock(&replace_sources_mutex);
-	if (obs_obj_is_private(source) && source_name) {
-		for (auto it : replace_sources) {
-			const char *replace_name = obs_source_get_name(it.first);
-			if (replace_name && strcmp(source_name, replace_name) == 0) {
-				obs_source_t *s = obs_weak_source_get_source(it.second);
+	// When `source` gets swapped for a replacement we must keep a strong ref
+	// alive for the *entire* rest of the function (which keeps using `source`),
+	// otherwise another thread dropping the last ref leaves `source` dangling (UAF).
+	// `replacement` owns that ref via RAII until function exit. The function never
+	// returns `source` itself (it returns `duplicate`, always a fresh ref), so this
+	// owning local does not affect the return-value ownership contract.
+	OBSSourceAutoRelease replacement;
+	// RAII guard scoped to exactly the replace_sources lookup.
+	{
+		std::lock_guard<std::mutex> lock(replace_sources_mutex);
+		if (obs_obj_is_private(source) && source_name) {
+			for (auto it : replace_sources) {
+				const char *replace_name = obs_source_get_name(it.first);
+				if (replace_name && strcmp(source_name, replace_name) == 0) {
+					obs_source_t *s = obs_weak_source_get_source(it.second);
+					if (s) {
+						// Transfer the +1 ref into `replacement` (held until
+						// end of function) instead of releasing it now.
+						replacement = s;
+						source = replacement;
+						source_name = obs_source_get_name(source);
+						break;
+					}
+				}
+			}
+		} else {
+			auto replace = replace_sources.find(source);
+			if (replace != replace_sources.end()) {
+				obs_source_t *s = obs_weak_source_get_source(replace->second);
 				if (s) {
-					source = s;
-					obs_source_release(s);
+					// Transfer the +1 ref into `replacement` (held until
+					// end of function) instead of releasing it now.
+					replacement = s;
+					source = replacement;
 					source_name = obs_source_get_name(source);
-					break;
 				}
 			}
 		}
-	} else {
-		auto replace = replace_sources.find(source);
-		if (replace != replace_sources.end()) {
-			obs_source_t *s = obs_weak_source_get_source(replace->second);
-			if (s) {
-				source = s;
-				obs_source_release(s);
-				source_name = obs_source_get_name(source);
-			}
-		}
 	}
-	pthread_mutex_unlock(&replace_sources_mutex);
 
 	obs_source_t *duplicate = nullptr;
 
@@ -703,13 +720,16 @@ obs_source_t *CanvasCloneDock::DuplicateSource(obs_source_t *source, obs_source_
 				if (!obs_scene_find_source(scene, source_name)) {
 					//item not found in original scene
 					bool found = false;
-					pthread_mutex_lock(&replace_sources_mutex);
-					for (auto it = replace_sources.begin(); !found && it != replace_sources.end(); it++) {
-						if (obs_weak_source_references_source(it->second, source) &&
-						    obs_scene_find_source(scene, obs_source_get_name(it->first)))
-							found = true;
+					// RAII guard scoped to the replace_sources scan.
+					{
+						std::lock_guard<std::mutex> lock(replace_sources_mutex);
+						for (auto it = replace_sources.begin(); !found && it != replace_sources.end();
+						     it++) {
+							if (obs_weak_source_references_source(it->second, source) &&
+							    obs_scene_find_source(scene, obs_source_get_name(it->first)))
+								found = true;
+						}
 					}
-					pthread_mutex_unlock(&replace_sources_mutex);
 					if (!found)
 						obs_sceneitem_remove(item);
 				}
@@ -927,11 +947,13 @@ void CanvasCloneDock::LoadReplacements()
 {
 	auto clone_name = obs_data_get_string(settings, "clone");
 	auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
-	pthread_mutex_lock(&replace_sources_mutex);
-	for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
-		obs_weak_source_release(it->second);
-	replace_sources.clear();
-	pthread_mutex_unlock(&replace_sources_mutex);
+	// RAII guard for the replace_sources reset critical section.
+	{
+		std::lock_guard<std::mutex> lock(replace_sources_mutex);
+		for (auto it = replace_sources.begin(); it != replace_sources.end(); it++)
+			obs_weak_source_release(it->second);
+		replace_sources.clear();
+	}
 	obs_data_array_t *arr = obs_data_get_array(settings, "replace_sources");
 	size_t count = obs_data_array_count(arr);
 	for (size_t i = 0; i < count; i++) {
@@ -966,9 +988,9 @@ void CanvasCloneDock::LoadReplacements()
 		if (!dst)
 			dst = obs_get_source_by_name(dst_name);
 		if (src && dst && src != dst) {
-			pthread_mutex_lock(&replace_sources_mutex);
+			// RAII guard for the single-entry insert critical section.
+			std::lock_guard<std::mutex> lock(replace_sources_mutex);
 			replace_sources[src] = obs_source_get_weak_source(dst);
-			pthread_mutex_unlock(&replace_sources_mutex);
 		}
 		obs_source_release(src);
 		obs_source_release(dst);
@@ -988,16 +1010,19 @@ void CanvasCloneDock::source_remove(void *param, calldata_t *cd)
 {
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
 	auto this_ = (CanvasCloneDock *)param;
-	pthread_mutex_lock(&this_->replace_sources_mutex);
-	for (auto it = this_->replace_sources.begin(); it != this_->replace_sources.end();) {
-		if (it->first == source || obs_weak_source_references_source(it->second, source)) {
-			obs_weak_source_release(it->second);
-			it = this_->replace_sources.erase(it);
-		} else {
-			++it;
+	// RAII guard scoped exactly to the erase-matching-entries critical
+	// section; RemoveSource() below must run without the lock held.
+	{
+		std::lock_guard<std::mutex> lock(this_->replace_sources_mutex);
+		for (auto it = this_->replace_sources.begin(); it != this_->replace_sources.end();) {
+			if (it->first == source || obs_weak_source_references_source(it->second, source)) {
+				obs_weak_source_release(it->second);
+				it = this_->replace_sources.erase(it);
+			} else {
+				++it;
+			}
 		}
 	}
-	pthread_mutex_unlock(&this_->replace_sources_mutex);
 	this_->RemoveSource(QString::fromUtf8(obs_source_get_name(source)));
 }
 

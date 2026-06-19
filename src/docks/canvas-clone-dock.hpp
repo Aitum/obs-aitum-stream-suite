@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QFrame>
 #include <QSplitter>
+#include <mutex>
 #include <util/threading.h>
 
 class CanvasCloneDock : public QFrame {
@@ -28,7 +29,9 @@ private:
 	std::list<OBSSource> scene_cache;
 
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
-	pthread_mutex_t replace_sources_mutex;
+	// Use std::mutex so every critical section can be guarded by an RAII
+	// std::lock_guard; avoids deadlocks on future early-return/throw.
+	std::mutex replace_sources_mutex;
 
 	obs_source_t *DuplicateSource(obs_source_t *source, obs_source_t *current);
 	void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
