@@ -27,13 +27,24 @@
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QToolBar>
+#include <atomic>
 #include <util/dstr.h>
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
 OBS_MODULE_USE_DEFAULT_LOCALE("aitum-stream-suite", "en-US")
 
-download_info_t *version_download_info = nullptr;
+// Ownership model for the version-check downloader:
+// The download worker thread (single_file_thread) invokes version_info_downloaded
+// on the WORKER thread. It must never destroy the downloader from inside its own
+// thread, because download_info_destroy() calls pthread_join() on the worker -- a
+// thread joining itself deadlocks/leaks. To make destruction race-free between the
+// worker completing and obs_module_unload running concurrently on the UI thread,
+// the global owner pointer is atomic: whichever path performs the exchange(nullptr)
+// becomes the sole owner and the only one allowed to call download_info_destroy().
+// The worker/callback never frees it; obs_module_unload is the single destroyer and
+// safely joins the (by then finished) worker thread from a DIFFERENT thread.
+std::atomic<download_info_t *> version_download_info{nullptr};
 obs_data_t *current_profile_config = nullptr;
 QTabBar *modesTabBar = nullptr;
 QToolBar *toolbar = nullptr;
@@ -104,6 +115,10 @@ void AskUpdate()
 	}
 }
 
+// Runs on the download WORKER thread (see single_file_thread). Per the ownership
+// model it only consumes the downloaded data; it must NOT destroy version_download_info
+// here (that would self-join the worker thread). Destruction is deferred to the single
+// owner via the atomic exchange in obs_module_unload.
 bool version_info_downloaded(void *param, struct file_download_data *file)
 {
 	UNUSED_PARAMETER(param);
@@ -113,20 +128,12 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 
 	auto d = obs_data_create_from_json((const char *)file->buffer.array);
 	if (!d) {
-		if (version_download_info) {
-			download_info_destroy(version_download_info);
-			version_download_info = nullptr;
-		}
 		return true;
 	}
 
 	auto data_obj = obs_data_get_obj(d, "data");
 	obs_data_release(d);
 	if (!data_obj) {
-		if (version_download_info) {
-			download_info_destroy(version_download_info);
-			version_download_info = nullptr;
-		}
 		return true;
 	}
 
@@ -152,6 +159,12 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		time_t current_time = time(nullptr);
 		auto partnerBlockTime = (time_t)config_get_int(obs_frontend_get_user_config(), "Aitum", "partner_block");
 		if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
+			// We are on the download worker thread here. The UI building is marshalled to
+			// the main thread via QueuedConnection. BlockingQueuedConnection was
+			// used previously and could deadlock during shutdown (worker blocks waiting on a
+			// main thread that is tearing down). Refcounting stays balanced: addref() keeps
+			// "blocks" alive until the queued lambda runs and releases that extra ref at its
+			// end, while the outer get_array() ref is released immediately below.
 			obs_data_array_addref(blocks);
 			QMetaObject::invokeMethod(
 				toolbar,
@@ -214,16 +227,14 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 					partnerBlockActions.append(toolbar->insertWidget(before, spacer));
 					obs_data_array_release(blocks);
 				},
-				Qt::BlockingQueuedConnection);
+				Qt::QueuedConnection);
 		}
 	}
 	obs_data_array_release(blocks);
 	obs_data_release(data_obj);
 
-	if (version_download_info) {
-		download_info_destroy(version_download_info);
-		version_download_info = nullptr;
-	}
+	// Intentionally do NOT destroy version_download_info here: this runs on the
+	// worker thread and destruction joins that same thread. obs_module_unload owns teardown.
 	return true;
 }
 
@@ -1529,8 +1540,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		load_current_profile_config();
 		auto scene = obs_frontend_get_current_scene();
 		if (scene) {
-			QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
-						  Q_ARG(OBSSource, OBSSource(scene)));
+			// Guard properties_dock; an early event can precede dock construction.
+			if (properties_dock)
+				QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+							  Q_ARG(OBSSource, OBSSource(scene)));
 			obs_source_release(scene);
 		}
 		if (!newer_version_available.isEmpty()) {
@@ -1575,31 +1588,43 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 			},
 			nullptr, false);
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED) {
-		if (!studioModeAction->isChecked()) {
+		// frontend_event is registered before the docks/actions are constructed, so an
+		// early event can fire while these globals are still null. Guard every dereference.
+		if (studioModeAction && !studioModeAction->isChecked()) {
 			studioModeAction->setChecked(true);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED) {
-		if (studioModeAction->isChecked()) {
+		if (studioModeAction && studioModeAction->isChecked()) {
 			studioModeAction->setChecked(false);
 		}
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED) {
-		output_dock->UpdateMainVirtualCameraStatus(true);
+		if (output_dock)
+			output_dock->UpdateMainVirtualCameraStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED) {
-		output_dock->UpdateMainVirtualCameraStatus(false);
+		if (output_dock)
+			output_dock->UpdateMainVirtualCameraStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING || event == OBS_FRONTEND_EVENT_STREAMING_STARTED) {
-		output_dock->UpdateMainStreamStatus(true);
+		if (output_dock)
+			output_dock->UpdateMainStreamStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING || event == OBS_FRONTEND_EVENT_STREAMING_STOPPED) {
-		output_dock->UpdateMainStreamStatus(false);
+		if (output_dock)
+			output_dock->UpdateMainStreamStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STARTING || event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
-		output_dock->UpdateMainRecordingStatus(true);
+		if (output_dock)
+			output_dock->UpdateMainRecordingStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
-		output_dock->UpdateMainRecordingStatus(false);
+		if (output_dock)
+			output_dock->UpdateMainRecordingStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED) {
-		output_dock->UpdateMainBacktrackStatus(true);
+		if (output_dock)
+			output_dock->UpdateMainBacktrackStatus(true);
 	} else if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
-		output_dock->UpdateMainBacktrackStatus(false);
+		if (output_dock)
+			output_dock->UpdateMainBacktrackStatus(false);
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
-		QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
+		// live_scenes_dock may not be constructed yet for early events.
+		if (live_scenes_dock)
+			QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
 		}
@@ -1617,8 +1642,10 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 
 			auto scene = obs_frontend_get_current_scene();
 			if (scene) {
-				QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
-							  Q_ARG(OBSSource, OBSSource(scene)));
+				// Guard properties_dock before dereferencing.
+				if (properties_dock)
+					QMetaObject::invokeMethod(properties_dock, "SceneChanged", Qt::QueuedConnection,
+								  Q_ARG(OBSSource, OBSSource(scene)));
 				obs_source_release(scene);
 			}
 		}
@@ -2231,9 +2258,12 @@ void obs_module_unload()
 {
 	obs_frontend_remove_save_callback(save_load, nullptr);
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
-	if (version_download_info) {
-		download_info_destroy(version_download_info);
-		version_download_info = nullptr;
+	// Atomically claim sole ownership of the downloader before destroying it. The
+	// exchange guarantees only one path ever frees it; here we run on the UI thread (a
+	// different thread than the worker), so download_info_destroy()'s pthread_join safely
+	// reaps the worker. If something else already claimed it, di is null and we skip.
+	if (download_info_t *di = version_download_info.exchange(nullptr)) {
+		download_info_destroy(di);
 	}
 	if (current_profile_config) {
 		obs_data_release(current_profile_config);
@@ -2253,9 +2283,11 @@ void obs_module_unload()
 	obs_frontend_remove_dock("AitumStreamSuiteInfo");
 	obs_frontend_remove_dock("AitumStreamSuitePortal");
 
-	if (output_dock) {
-		delete output_dock;
-	}
+	// Do NOT delete output_dock manually. Docks registered with
+	// obs_frontend_add_dock_by_id are owned by OBS, which destroys the widget during
+	// obs_frontend_remove_dock("AitumStreamSuiteOutput") above. A manual delete here would
+	// be a double free. Just drop our dangling pointer for safety.
+	output_dock = nullptr;
 	for (auto &it : empty_docks) {
 		obs_frontend_remove_dock(it->parentWidget()->objectName().toUtf8().constData());
 	}
