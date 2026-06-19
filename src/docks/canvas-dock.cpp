@@ -121,8 +121,14 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			obs_data_set_int(settings, "height", canvas_height);
 		}
 	}
-	auto sh = obs_canvas_get_signal_handler(canvas);
-	signal_handler_connect(sh, "source_add", source_add, this);
+	// Guard the signal-handler connect with `if (canvas)`. When
+	// obs_frontend_add_canvas() fails above it returns null, and calling
+	// obs_canvas_get_signal_handler(nullptr) would be a null deref. Every
+	// other canvas access in this init block is already guarded the same way.
+	if (canvas) {
+		auto sh = obs_canvas_get_signal_handler(canvas);
+		signal_handler_connect(sh, "source_add", source_add, this);
+	}
 
 	LoadUI();
 }
@@ -1169,6 +1175,17 @@ CanvasDock::~CanvasDock()
 	gs_vertexbuffer_destroy(rectFill);
 	gs_vertexbuffer_destroy(circleFill);
 	obs_leave_graphics();
+	// Disconnect the "source_add" handler before releasing our canvas ref. The
+	// handler was connected with `this` as the opaque param, but the canvas can
+	// outlive this dock (the frontend holds its own ref via obs_frontend_add_canvas,
+	// and canvas removal happens on other paths). If we don't disconnect here, a
+	// later "source_add" signal would invoke source_add() on a freed `this` ->
+	// use-after-free. Guard on `canvas` since it may be null and disconnect while
+	// it is still valid.
+	if (canvas) {
+		auto sh = obs_canvas_get_signal_handler(canvas);
+		signal_handler_disconnect(sh, "source_add", source_add, this);
+	}
 	obs_canvas_release(canvas);
 
 	obs_source_t *oldTransition = obs_weak_source_get_source(source);
