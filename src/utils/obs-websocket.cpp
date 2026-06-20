@@ -885,6 +885,10 @@ void unload_obs_websocket()
 	if (!vendor) {
 		return;
 	}
+	if (!obs_get_module("obs-websocket")) {
+		vendor = nullptr;
+		return;
+	}
 	obs_websocket_vendor_unregister_request(vendor, "version");
 	obs_websocket_vendor_unregister_request(vendor, "get_canvas");
 	obs_websocket_vendor_unregister_request(vendor, "switch_scene");
