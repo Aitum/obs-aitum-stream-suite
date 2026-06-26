@@ -3265,6 +3265,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	transformMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.EditTransform")),
 				 [this, sceneItem] {
 					 const auto mainDialog = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+					 if (!mainDialog) {
+						 return;
+					 }
 					 auto transformDialog = mainDialog->findChild<QDialog *>("OBSBasicTransform");
 					 if (!transformDialog) {
 						 // make sure there is an item selected on the main canvas before starting the transform dialog

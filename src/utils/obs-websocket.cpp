@@ -460,6 +460,9 @@ void vendor_request_get_docks(obs_data_t *request_data, obs_data_t *response_dat
 		[](void *param) {
 			auto da = static_cast<obs_data_array_t *>(param);
 			auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!main_window) {
+				return;
+			}
 			auto docks = main_window->findChildren<QDockWidget *>();
 			for (auto &dock : docks) {
 				auto di = obs_data_create();
@@ -486,6 +489,11 @@ void vendor_request_dock_show(obs_data_t *request_data, obs_data_t *response_dat
 	}
 	auto dn = QString::fromUtf8(dock_name);
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		obs_data_set_string(response_data, "error", "Main window not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
 	auto docks = main_window->findChildren<QDockWidget *>();
 	for (auto &dock : docks) {
 		if (dock->objectName() == dn) {
@@ -508,6 +516,11 @@ void vendor_request_dock_hide(obs_data_t *request_data, obs_data_t *response_dat
 	}
 	auto dn = QString::fromUtf8(dock_name);
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		obs_data_set_string(response_data, "error", "Main window not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
 	auto docks = main_window->findChildren<QDockWidget *>();
 	for (auto &dock : docks) {
 		if (dock->objectName() == dn) {
@@ -801,6 +814,11 @@ void vendor_request_refresh_browser_panel(obs_data_t *request_data, obs_data_t *
 	}
 	auto pn = QString::fromUtf8(panel_name);
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		obs_data_set_string(response_data, "error", "Main window not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
 	auto bds = main_window->findChildren<BrowserDock *>();
 	for (auto bd : bds) {
 		if (bd->objectName() == pn) {
@@ -823,6 +841,11 @@ void vendor_request_reset_browser_panel(obs_data_t *request_data, obs_data_t *re
 	}
 	auto pn = QString::fromUtf8(panel_name);
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		obs_data_set_string(response_data, "error", "Main window not available");
+		obs_data_set_bool(response_data, "success", false);
+		return;
+	}
 	auto bds = main_window->findChildren<BrowserDock *>();
 	for (auto bd : bds) {
 		if (bd->objectName() == pn) {

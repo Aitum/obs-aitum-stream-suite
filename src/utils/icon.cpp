@@ -7,18 +7,27 @@
 QIcon GetSceneIcon()
 {
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return QIcon();
+	}
 	return main_window->property("sceneIcon").value<QIcon>();
 }
 
 QIcon GetGroupIcon()
 {
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return QIcon();
+	}
 	return main_window->property("groupIcon").value<QIcon>();
 }
 
 QIcon GetIconFromType(enum obs_icon_type icon_type)
 {
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return QIcon();
+	}
 
 	switch (icon_type) {
 	case OBS_ICON_TYPE_IMAGE:

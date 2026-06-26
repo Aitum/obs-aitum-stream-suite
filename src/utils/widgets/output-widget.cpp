@@ -382,6 +382,9 @@ void OutputWidget::replay_saved(void *data, calldata_t *calldata)
 		calldata_free(&cd);
 		if (!path.isEmpty()) {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!main_window) {
+				return;
+			}
 			QMetaObject::invokeMethod(main_window, "RecordingFileChanged", Q_ARG(QString, path));
 		}
 	});

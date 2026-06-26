@@ -84,6 +84,9 @@ void AskUpdate()
 	}
 
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 
 	QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("Updater.Title")),
 		       QString::fromUtf8(obs_frontend_get_locale_string("Updater.Text")) + " " +
@@ -244,6 +247,9 @@ void save_dock_state(QString mode)
 		return;
 	}
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 	auto state = main_window->saveState();
 	auto b64 = state.toBase64();
 	auto state_chars = b64.constData();
@@ -275,6 +281,9 @@ void reset_live_dock_state()
 {
 	//Shows activity feeds, chat (multi-chat), Game capture change dock, main scenes quick switch dock, canvas previews, multi-stream dock. Hides scene list or sources or anything related to actually making a stream setup and not actually being live
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
 	QMetaObject::invokeMethod(main_window, "on_sideDocks_toggled", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
@@ -448,6 +457,9 @@ void reset_live_dock_state()
 void reset_build_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
 	QMetaObject::invokeMethod(main_window, "on_sideDocks_toggled", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
@@ -609,6 +621,9 @@ void reset_build_dock_state()
 void reset_design_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 	QMetaObject::invokeMethod(main_window, "on_resetDocks_triggered", Q_ARG(bool, true));
 	auto d = main_window->findChild<QDockWidget *>(QStringLiteral("controlsDock"));
 	if (d) {
@@ -704,6 +719,9 @@ void load_dock_state(QString mode)
 	loaded_docks.clear();
 	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		if (!main_window) {
+			return;
+		}
 		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
 
 		auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
@@ -799,6 +817,9 @@ void reset_canvas_dock_state(QString name)
 		}
 	}
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
 	bool main = false;
 	if (!d && name == "Main") {
 		d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
@@ -956,6 +977,9 @@ void create_new_dock_mode(const char *name)
 void load_canvas(bool check_new_canvas)
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}	
 	auto canvas = obs_data_get_array(current_profile_config, "canvas");
 	auto canvas_count = obs_data_array_count(canvas);
 	for (size_t i = 0; i < canvas_count;) {
@@ -1207,11 +1231,14 @@ void load_current_profile_config()
 		blog(LOG_WARNING, "[Aitum Stream Suite] No configuration file loaded");
 		if (modesTabBar->count() <= (int)fixed_tabs.size()) {
 			auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-			auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-			if (main_dock) {
-				main_dock->setVisible(true);
-				main_dock->setFloating(false);
-				main_window->addDockWidget(Qt::TopDockWidgetArea, main_dock);
+			if (main_window) {
+				auto main_dock =
+					main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+				if (main_dock) {
+					main_dock->setVisible(true);
+					main_dock->setFloating(false);
+					main_window->addDockWidget(Qt::TopDockWidgetArea, main_dock);
+				}
 			}
 			modesTab = "";
 			auto tn = QString::fromUtf8(obs_module_text("User"));
@@ -1507,6 +1534,9 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		finished_loading = true;
 		if (restart) {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!main_window) {
+				return;
+			}
 			QTimer::singleShot(2000, main_window, [main_window] {
 				auto dialogs = main_window->findChildren<QDialog *>();
 				for (auto dialog : dialogs) {
@@ -1858,6 +1888,9 @@ bool obs_module_load(void)
 	auto addModeAction =
 		toolbar->addAction(QIcon(":/res/images/plus.svg"), QString::fromUtf8(obs_module_text("AddDockMode")), [] {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!main_window) {
+				return;
+			}
 			std::string name = obs_module_text("DockMode");
 			if (NameDialog::AskForName(main_window, QString::fromUtf8(obs_module_text("DockMode")), name)) {
 				if (name.empty()) {
@@ -1986,6 +2019,9 @@ bool obs_module_load(void)
 		menu.addSeparator();
 		menu.addAction(QString::fromUtf8(obs_module_text("AddEmptyDock")), [] {
 			const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!main_window) {
+				return;
+			}
 			std::string name = obs_module_text("EmptyDock");
 			if (NameDialog::AskForName(main_window, QString::fromUtf8(obs_module_text("EmptyDockName")), name)) {
 				//break;
@@ -2173,6 +2209,9 @@ void TabToolBar::resizeEvent(QResizeEvent *event)
 	load_dock_state_timer.stop();
 	if (!isFloating()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		if (!main_window) {
+			return;
+		}	
 		auto docks = main_window->findChildren<QDockWidget *>();
 		QList<QString> current_docks;
 		for (auto &dock : docks) {
