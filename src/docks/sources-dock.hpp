@@ -29,6 +29,7 @@ private slots:
 	void ReorderSources(OBSScene scene);
 	void AddSourceFromAction();
 	void AddSourceToScene(OBSSource s);
+	void OpenSourceProjector();
 public:
 	SourcesDock(QWidget *parent = nullptr);
 	~SourcesDock();

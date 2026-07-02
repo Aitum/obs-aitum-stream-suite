@@ -68,15 +68,20 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 			signal_handler_connect(sh, "transition_stop", transition_action, this);
 		}
 		if (scene && scene != current) {
-			auto mc = obs_get_main_canvas();
-			if (c == mc) {
-				obs_frontend_set_current_scene(scene);
-			} else if (parent) {
-				obs_transition_start(parent, OBS_TRANSITION_MODE_AUTO, 0, scene);
+			if (canvasDock) {
+				canvasDock->SwitchScene(QString::fromUtf8(obs_source_get_name(scene)));
 			} else {
-				obs_canvas_set_channel(c, 0, scene);
+				auto mc = obs_get_main_canvas();
+				if (c == mc) {
+					obs_frontend_set_current_scene(scene);
+				} else if (parent) {
+					obs_transition_start(parent, OBS_TRANSITION_MODE_AUTO, 0, scene);
+				} else {
+					obs_canvas_set_channel(c, 0, scene);
+				}
+
+				obs_canvas_release(mc);
 			}
-			obs_canvas_release(mc);
 		}
 		obs_source_release(current);
 		obs_source_release(parent);
@@ -204,12 +209,14 @@ void ScenesDock::handleFocusChange(QWidget *old, QWidget *now)
 			if (!canvas) {
 				return;
 			}
+			canvasDock = nullptr;
 			SwitchToCanvas(canvas);
 			obs_canvas_release(canvas);
 			return;
 		}
 		auto canvas_dock = dynamic_cast<CanvasDock *>(parent);
 		if (canvas_dock) {
+			canvasDock = canvas_dock;
 			SwitchToCanvas(canvas_dock->GetCanvas());
 			return;
 		}
@@ -277,33 +284,53 @@ void ScenesDock::SwitchToCanvas(obs_canvas_t *c)
 				return true;
 			},
 			this);
+
+		UpdateLinkedScenes();
 	}
-	auto current_scene = obs_canvas_get_channel(c, 0);
-	obs_source_t *parent = nullptr;
-	while (current_scene && obs_source_get_type(current_scene) == OBS_SOURCE_TYPE_TRANSITION) {
-		obs_source_release(parent);
-		parent = current_scene;
-		current_scene = obs_transition_get_active_source(parent);
+	UpdateCurrentScene();
+}
+
+void ScenesDock::UpdateLinkedScenes()
+{
+	for (int i = 0; i < sceneList->count(); i++) {
+		auto item = sceneList->item(i);
+		if (!item) {
+			continue;
+		}
+		item->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 	}
-	if (parent && obs_source_get_type(parent) == OBS_SOURCE_TYPE_TRANSITION) {
-		signal_handler_t *sh = obs_source_get_signal_handler(parent);
-		signal_handler_disconnect(sh, "transition_start", transition_action, this);
-		signal_handler_disconnect(sh, "transition_video_stop", transition_action, this);
-		signal_handler_disconnect(sh, "transition_stop", transition_action, this);
-		signal_handler_connect(sh, "transition_start", transition_action, this);
-		signal_handler_connect(sh, "transition_video_stop", transition_action, this);
-		signal_handler_connect(sh, "transition_stop", transition_action, this);
+	auto c = obs_weak_canvas_get_canvas(canvas);
+	auto cn = obs_canvas_get_name(c);
+	obs_canvas_release(c);
+	struct obs_frontend_source_list scenes = {};
+	obs_frontend_get_scenes(&scenes);
+	for (size_t i = 0; i < scenes.sources.num; i++) {
+		obs_source_t *src = scenes.sources.array[i];
+		obs_data_t *settings = obs_source_get_settings(src);
+		auto c = obs_data_get_array(settings, "canvas");
+		if (c) {
+			const auto count = obs_data_array_count(c);
+			for (size_t j = 0; j < count; j++) {
+				auto item = obs_data_array_item(c, j);
+				if (!item) {
+					continue;
+				}
+				if (strcmp(obs_data_get_string(item, "name"), cn) == 0) {
+					auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+					auto sil = sceneList->findItems(sn, Qt::MatchExactly);
+					for (auto &si : sil) {
+						si->setIcon(QIcon(":/aitum/media/linked.svg"));
+					}
+				}
+				obs_data_release(item);
+			}
+
+			obs_data_array_release(c);
+		}
+
+		obs_data_release(settings);
 	}
-	obs_source_release(parent);
-	if (!current_scene) {
-		return;
-	}
-	auto items = sceneList->findItems(QString::fromUtf8(obs_source_get_name(current_scene)), Qt::MatchExactly);
-	obs_source_release(current_scene);
-	if (items.isEmpty()) {
-		return;
-	}
-	sceneList->setCurrentItem(items.first());
+	obs_frontend_source_list_free(&scenes);
 }
 
 void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
@@ -509,7 +536,10 @@ void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 #else
 				connect(checkBox, &QCheckBox::stateChanged, [this, src, checkBox] {
 #endif
-				//SetLinkedScene(src, checkBox->isChecked() ? sceneList->currentItem()->text() : "");
+				if (canvasDock)
+					canvasDock->SetLinkedScene(src,
+								   checkBox->isChecked() ? sceneList->currentItem()->text() : "");
+				UpdateLinkedScenes();
 			});
 			auto *checkableAction = new QWidgetAction(linkedScenesMenu);
 			checkableAction->setDefaultWidget(checkBox);
@@ -751,7 +781,7 @@ void ScenesDock::channel_change(void *data, calldata_t *cd)
 	if (calldata_int(cd, "channel") != 0) {
 		return;
 	}
-	QMetaObject::invokeMethod(self, [self] { self->UpdateCurrentScene(); }, Qt::QueuedConnection);	
+	QMetaObject::invokeMethod(self, [self] { self->UpdateCurrentScene(); }, Qt::QueuedConnection);
 }
 
 void ScenesDock::UpdateCurrentScene()
@@ -794,8 +824,23 @@ void ScenesDock::UpdateCurrentScene()
 	sceneList->setCurrentItem(items.first());
 }
 
-void ScenesDock::transition_action(void *data, calldata_t *cd) {
+void ScenesDock::transition_action(void *data, calldata_t *cd)
+{
 	UNUSED_PARAMETER(cd);
 	auto self = (ScenesDock *)data;
 	QMetaObject::invokeMethod(self, [self] { self->UpdateCurrentScene(); }, Qt::QueuedConnection);
+}
+
+void ScenesDock::FinishedLoading()
+{
+	if (canvas) {
+		return;
+	}
+	auto mc = obs_get_main_canvas();
+	if (!mc) {
+		return;
+	}
+	canvasDock = nullptr;
+	SwitchToCanvas(mc);
+	obs_canvas_release(mc);
 }

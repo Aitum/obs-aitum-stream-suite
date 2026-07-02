@@ -6,6 +6,7 @@
 class ScenesDock : public QFrame {
 	Q_OBJECT
 private:
+	CanvasDock *canvasDock = nullptr;
 	obs_weak_canvas_t *canvas = nullptr;
 	obs_weak_source_t *transition = nullptr;
 	QListWidget *sceneList;
@@ -19,6 +20,7 @@ private:
 	void AddScene(QString duplicate = "", bool ask_name = true);
 	void RemoveCurrentScene();
 	void UpdateCurrentScene();
+	void UpdateLinkedScenes();
 
 	static void scene_add(void *data, calldata_t *cd);
 	static void scene_remove(void *data, calldata_t *cd);
@@ -28,6 +30,7 @@ private:
 
 private slots:
 	void handleFocusChange(QWidget *old, QWidget *now);
+	void FinishedLoading();
 
 public:
 	ScenesDock(QWidget *parent = nullptr);

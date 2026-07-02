@@ -6186,17 +6186,11 @@ void CanvasDock::reset_live_state()
 
 void CanvasDock::reset_build_state()
 {
-	auto w = width();
-	auto h = height();
 	canvas_split->restorePanelOrder(panel_split ? "panelSplit,canvasPreview" : "sourcesGroup,canvasPreview");
 	if (panel_split) {
 		panel_split->restorePanelOrder("scenesGroup,sourcesGroup,transitionsGroup");
 	}
-	if (w > h) {
-		canvas_split->setSizes({w / 3, w * 2 / 3});
-	} else {
-		canvas_split->setSizes({h / 3, h * 2 / 3});
-	}
+	canvas_split->setSizes({0, 1});
 	if (panel_split) {
 		panel_split->setSizes({1, 1, 1});
 	}

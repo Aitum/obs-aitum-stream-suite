@@ -473,12 +473,20 @@ void reset_build_dock_state()
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
 	if (d) {
+		d->setVisible(false);
+	}
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteScenes"));
+	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
 		main_window->addDockWidget(Qt::LeftDockWidgetArea, d);
 	}
 
 	d = main_window->findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+	if (d) {
+		d->setVisible(false);
+	}
+	d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteSources"));
 	if (d) {
 		d->setVisible(true);
 		d->setFloating(false);
@@ -1568,6 +1576,9 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 							  Q_ARG(OBSSource, OBSSource(scene)));
 			}
 			obs_source_release(scene);
+		}
+		if (scenes_dock) {
+			QMetaObject::invokeMethod(scenes_dock, "FinishedLoading", Qt::QueuedConnection);
 		}
 		if (!newer_version_available.isEmpty()) {
 			AskUpdate();

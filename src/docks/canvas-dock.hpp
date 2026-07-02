@@ -48,6 +48,7 @@ class CanvasDock : public QFrame {
 private:
 	friend class CanvasCloneDock;
 	friend class OBSProjector;
+	friend class ScenesDock;
 	friend class SourcesDock;
 	std::string canvas_name;
 	SwitchingSplitter *canvas_split = nullptr;

@@ -419,3 +419,20 @@ void SourcesDock::AddSourceToScene(OBSSource source)
 	obs_scene_add(obs_scene_from_source(s), source);
 	obs_source_release(s);
 }
+
+void SourcesDock::OpenSourceProjector() {
+	int monitor = sender()->property("monitor").toInt();
+	if (monitor > 9 || monitor > QGuiApplication::screens().size() - 1) {
+		return;
+	}
+	OBSSceneItem item = GetCurrentSceneItem();
+	if (!item) {
+		return;
+	}
+
+	obs_source_t *open_source = obs_sceneitem_get_source(item);
+	if (!open_source) {
+		return;
+	}
+	obs_frontend_open_projector("Source", monitor, nullptr, obs_source_get_name(open_source));
+}
