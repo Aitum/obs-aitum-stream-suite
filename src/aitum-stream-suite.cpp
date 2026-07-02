@@ -8,6 +8,8 @@
 #include "docks/live-scenes-dock.hpp"
 #include "docks/output-dock.hpp"
 #include "docks/properties-dock.hpp"
+#include "docks/scenes-dock.hpp"
+#include "docks/sources-dock.hpp"
 #include "docks/stats-dock.hpp"
 #include "docks/transform-dock.hpp"
 #include "utils/file-download.h"
@@ -50,6 +52,8 @@ TransformDock *transform_dock = nullptr;
 LiveScenesDock *live_scenes_dock = nullptr;
 CanvasDock *component_dock = nullptr;
 StatsDock *stats_dock = nullptr;
+ScenesDock *scenes_dock = nullptr;
+SourcesDock *sources_dock = nullptr;
 
 QString newer_version_available;
 
@@ -2164,6 +2168,10 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteCapture", obs_module_text("AitumStreamSuiteCapture"), capture_dock);
 	stats_dock = new StatsDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteStats", obs_module_text("AitumStreamSuiteStats"), stats_dock);
+	scenes_dock = new ScenesDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteScenes", obs_module_text("AitumStreamSuiteScenes"), scenes_dock);
+	sources_dock = new SourcesDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteSources", obs_module_text("AitumStreamSuiteSources"), sources_dock);
 
 	std::string url = "https://api.aitum.tv/plugin/streamsuite";
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
@@ -2311,6 +2319,8 @@ void obs_module_unload()
 	obs_frontend_remove_dock("AitumStreamSuiteLiveScenes");
 	obs_frontend_remove_dock("AitumStreamSuiteCapture");
 	obs_frontend_remove_dock("AitumStreamSuiteStats");
+	obs_frontend_remove_dock("AitumStreamSuiteScenes");
+	obs_frontend_remove_dock("AitumStreamSuiteSources");
 
 	obs_frontend_remove_dock("AitumStreamSuiteChat");
 	obs_frontend_remove_dock("AitumStreamSuiteActivity");

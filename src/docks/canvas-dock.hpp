@@ -48,6 +48,7 @@ class CanvasDock : public QFrame {
 private:
 	friend class CanvasCloneDock;
 	friend class OBSProjector;
+	friend class SourcesDock;
 	std::string canvas_name;
 	SwitchingSplitter *canvas_split = nullptr;
 	SwitchingSplitter *panel_split = nullptr;
@@ -125,7 +126,7 @@ private:
 	std::unique_ptr<OBSEventFilter> eventFilter;
 	OBSEventFilter *BuildEventFilter();
 	void LoadUI();
-	void LoadProjectors(obs_data_array_t* pa);
+	void LoadProjectors(obs_data_array_t *pa);
 	bool HandleMousePressEvent(QMouseEvent *event);
 	bool HandleMouseReleaseEvent(QMouseEvent *event);
 	bool HandleMouseMoveEvent(QMouseEvent *event);
@@ -150,7 +151,7 @@ private:
 	void ClampAspect(vec3 &tl, vec3 &br, vec2 &size, const vec2 &baseSize);
 	vec3 CalculateStretchPos(const vec3 &tl, const vec3 &br);
 
-	obs_scene_item *GetSelectedItem(obs_scene_t *scene = nullptr);
+	static obs_scene_item *GetSelectedItem(obs_scene_t *scene);
 	QColor GetSelectionColor() const;
 	QColor GetCropColor() const;
 	QColor GetHoverColor() const;
@@ -177,14 +178,13 @@ private:
 	obs_source_t *GetTransition(const char *transition_name);
 	bool SwapTransition(obs_source_t *transition);
 	void ShowSourcesContextMenu(obs_sceneitem_t *item);
-	void AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem);
-	void AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem);
-	QMenu *CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t *sceneItem);
+	static void AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem);
+	static void AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem, OBSScene scene);
+	static QMenu *CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t *sceneItem);
 
-	QMenu *CreateAddSourcePopupMenu();
-	void LoadSourceTypeMenu(QMenu *menu, const char *type);
-	void AddSourceToScene(obs_source_t *source);
-	void AddSourceTypeToMenu(QMenu *popup, const char *source_type, const char *name);
+	static QMenu *CreateAddSourcePopupMenu(QWidget *parent);
+	static void LoadSourceTypeMenu(QMenu *menu, const char *type);
+	static void AddSourceTypeToMenu(QMenu *popup, const char *source_type, const char *name);
 	void ShowScenesContextMenu(QListWidgetItem *widget_item);
 	void SetGridMode(bool checked);
 	bool IsGridMode();
@@ -199,7 +199,7 @@ private:
 		Vertical,
 		Horizontal,
 	};
-	void CenterSelectedItems(CenterType centerType);
+	static void CenterSelectedItems(CenterType centerType, obs_scene_t *scene);
 	void DeleteProjector(OBSProjector *projector);
 	OBSProjector *OpenProjector(int monitor);
 	static void AddProjectorMenuMonitors(QMenu *parent, QObject *target, const char *slot);
@@ -261,6 +261,7 @@ private:
 	static std::string backup_scene(obs_scene_t *scene);
 private slots:
 	void AddSourceFromAction();
+	void AddSourceToScene(OBSSource source);
 	void SceneAdded(const QString name);
 	void SceneRemoved(const QString name);
 	void AddSceneItem(OBSSceneItem item, bool no_select = false);

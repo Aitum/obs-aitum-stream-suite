@@ -114,6 +114,7 @@ class SourceTreeModel : public QAbstractListModel {
 	friend class SourceTree;
 	friend class SourceTreeItem;
 	friend class CanvasDock;
+	friend class SourcesDock;
 
 	SourceTree *st;
 	QVector<OBSSceneItem> items;
@@ -162,6 +163,7 @@ class SourceTree : public QListView {
 	friend class SourceTreeModel;
 	friend class SourceTreeItem;
 	friend class CanvasDock;
+	friend class SourcesDock;
 
 	bool textPrepared = false;
 	QStaticText textNoSources;

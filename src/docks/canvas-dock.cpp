@@ -3,6 +3,7 @@
 #include "../utils/icon.hpp"
 #include "../utils/widgets/source-tree.hpp"
 #include "canvas-dock.hpp"
+#include "sources-dock.hpp"
 #include <QComboBox>
 #include <QDockWidget>
 #include <QGroupBox>
@@ -376,7 +377,7 @@ void CanvasDock::LoadUI()
 
 	QAction *deleteAction = new QAction(preview);
 	connect(deleteAction, &QAction::triggered, [this]() {
-		obs_sceneitem_t *sceneItem = GetSelectedItem();
+		obs_sceneitem_t *sceneItem = GetSelectedItem(scene);
 		if (!sceneItem) {
 			return;
 		}
@@ -604,12 +605,12 @@ void CanvasDock::LoadUI()
 
 	auto toolbar = new QToolBar();
 	toolbar->setContentsMargins(0, 0, 0, 0);
-	toolbar->setObjectName(QStringLiteral("scenesToolbar"));
+	toolbar->setObjectName(QStringLiteral("sourcesToolbar"));
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setFloatable(false);
 	auto a = toolbar->addAction(QIcon(QString::fromUtf8(":/res/images/plus.svg")),
 				    QString::fromUtf8(obs_frontend_get_locale_string("AddSource")), [this] {
-					    const auto menu = CreateAddSourcePopupMenu();
+					    const auto menu = CreateAddSourcePopupMenu(this);
 					    menu->exec(QCursor::pos());
 				    });
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
@@ -1437,7 +1438,7 @@ void CanvasDock::DrawSpacingHelpers(obs_scene_t *s, float x, float y, float cx, 
 		return;
 	}
 
-	OBSSceneItem item = GetSelectedItem();
+	OBSSceneItem item = GetSelectedItem(scene);
 	if (!item) {
 		return;
 	}
@@ -1635,7 +1636,7 @@ obs_scene_item *CanvasDock::GetSelectedItem(obs_scene_t *s)
 	SceneFindBoxData sfbd(pos, pos);
 
 	if (!s) {
-		s = this->scene;
+		return nullptr;
 	}
 	obs_scene_enum_items(s, FindSelected, &sfbd);
 
@@ -2451,8 +2452,6 @@ void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 	if (!source || obs_weak_source_references_source(source, oldSource)) {
 		obs_weak_source_release(source);
 		source = obs_source_get_weak_source(s);
-		//if (view)
-		//	obs_view_set_source(view, 0, s);
 		if (canvas) {
 			obs_canvas_set_channel(canvas, 0, s);
 		}
@@ -2492,8 +2491,6 @@ void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 			} else {
 				obs_weak_source_release(source);
 				source = obs_source_get_weak_source(s);
-				//if (view)
-				//	obs_view_set_source(view, 0, s);
 				if (canvas) {
 					obs_canvas_set_channel(canvas, 0, s);
 				}
@@ -2502,8 +2499,6 @@ void CanvasDock::SwitchScene(const QString &scene_name, bool transition)
 		} else {
 			obs_weak_source_release(source);
 			source = obs_source_get_weak_source(s);
-			//if (view)
-			//	obs_view_set_source(view, 0, s);
 			if (canvas) {
 				obs_canvas_set_channel(canvas, 0, s);
 			}
@@ -2618,8 +2613,6 @@ bool CanvasDock::SwapTransition(obs_source_t *newTransition)
 		}
 		obs_weak_source_release(source);
 		source = obs_source_get_weak_source(newTransition);
-		//if (view)
-		//	obs_view_set_source(view, 0, newTransition);
 		if (canvas) {
 			obs_canvas_set_channel(canvas, 0, newTransition);
 		}
@@ -2634,8 +2627,6 @@ bool CanvasDock::SwapTransition(obs_source_t *newTransition)
 	obs_transition_swap_begin(newTransition, oldTransition);
 	obs_weak_source_release(source);
 	source = obs_source_get_weak_source(newTransition);
-	//if (view)
-	//	obs_view_set_source(view, 0, newTransition);
 	if (canvas) {
 		obs_canvas_set_channel(canvas, 0, newTransition);
 	}
@@ -2652,7 +2643,7 @@ void CanvasDock::transition_override_stop(void *data, calldata_t *)
 	QMetaObject::invokeMethod(dock, "SwitchBackToSelectedTransition", Qt::QueuedConnection);
 }
 
-QMenu *CanvasDock::CreateAddSourcePopupMenu()
+QMenu *CanvasDock::CreateAddSourcePopupMenu(QWidget *parent)
 {
 	const char *unversioned_type;
 	const char *type;
@@ -2660,7 +2651,7 @@ QMenu *CanvasDock::CreateAddSourcePopupMenu()
 	bool foundDeprecated = false;
 	size_t idx = 0;
 
-	QMenu *popup = new QMenu(QString::fromUtf8(obs_frontend_get_locale_string("Add")), this);
+	QMenu *popup = new QMenu(QString::fromUtf8(obs_frontend_get_locale_string("Add")), parent);
 	QMenu *deprecated = new QMenu(QString::fromUtf8(obs_frontend_get_locale_string("Deprecated")), popup);
 
 	while (obs_enum_input_types2(idx++, &type, &unversioned_type)) {
@@ -2715,12 +2706,14 @@ void CanvasDock::check_descendant(obs_source_t *parent, obs_source_t *child, voi
 bool CanvasDock::add_sources_of_type_to_menu(void *param, obs_source_t *source)
 {
 	QMenu *menu = static_cast<QMenu *>(param);
-	auto parent = qobject_cast<QMenu *>(menu->parent());
-	auto a = parent && !parent->menuAction()->data().isNull() ? parent->menuAction() : menu->menuAction();
-	while (parent && qobject_cast<QMenu *>(parent->parent())) {
-		parent = qobject_cast<QMenu *>(parent->parent());
+	auto parentMenu = qobject_cast<QMenu *>(menu->parent());
+	auto a = parentMenu && !parentMenu->menuAction()->data().isNull() ? parentMenu->menuAction() : menu->menuAction();
+	QObject *parent = menu->parent();
+	auto pm = qobject_cast<QMenu *>(parent);
+	while (pm) {
+		parent = pm->parent();
+		pm = qobject_cast<QMenu *>(parent);
 	}
-	CanvasDock *cd = static_cast<CanvasDock *>(parent ? parent->parent() : menu->parent());
 	auto t = a->data().toString();
 	auto idUtf8 = t.toUtf8();
 	const char *id = idUtf8.constData();
@@ -2735,11 +2728,25 @@ bool CanvasDock::add_sources_of_type_to_menu(void *param, obs_source_t *source)
 			}
 		}
 		auto na = new QAction(name, menu);
-		connect(na, &QAction::triggered, cd, [cd, source] { cd->AddSourceToScene(source); }, Qt::QueuedConnection);
+		connect(
+			na, &QAction::triggered, parent,
+			[parent, source] { QMetaObject::invokeMethod(parent, "AddSourceToScene", Q_ARG(OBSSource, source)); },
+			Qt::QueuedConnection);
 		menu->insertAction(after, na);
-		struct descendant_info info = {false, cd->source, obs_scene_get_source(cd->scene)};
-		obs_source_enum_full_tree(source, check_descendant, &info);
-		na->setEnabled(!info.exists);
+		auto cd = qobject_cast<CanvasDock *>(parent);
+		if (cd) {
+			struct descendant_info info = {false, cd->source, obs_scene_get_source(cd->scene)};
+			obs_source_enum_full_tree(source, check_descendant, &info);
+			na->setEnabled(!info.exists);
+		}
+		auto sd = qobject_cast<SourcesDock *>(parent);
+		if (sd) {
+			auto s = obs_weak_source_get_source(sd->scene);
+			struct descendant_info info = {false, sd->scene, s};
+			obs_source_enum_full_tree(source, check_descendant, &info);
+			na->setEnabled(!info.exists);
+			obs_source_release(s);
+		}
 	}
 	return true;
 }
@@ -2772,8 +2779,16 @@ void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 
 		auto popupItem = new QAction(QString::fromUtf8(obs_frontend_get_locale_string("New")), menu);
 		popupItem->setData(QString::fromUtf8(type));
-		connect(popupItem, SIGNAL(triggered(bool)), this, SLOT(AddSourceFromAction()));
-
+		QObject *parent = menu->parent();
+		auto pm = qobject_cast<QMenu *>(parent);
+		while (pm) {
+			parent = pm->parent();
+			pm = qobject_cast<QMenu *>(parent);
+		}
+		connect(
+			popupItem, &QAction::triggered, parent,
+			[parent] { QMetaObject::invokeMethod(parent, SLOT(AddSourceFromAction())); }, Qt::QueuedConnection);
+		
 		QList<QAction *> actions = menu->actions();
 		QAction *first = actions.size() ? actions.first() : nullptr;
 		menu->insertAction(first, popupItem);
@@ -2781,7 +2796,7 @@ void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 	}
 }
 
-void CanvasDock::AddSourceToScene(obs_source_t *s)
+void CanvasDock::AddSourceToScene(OBSSource s)
 {
 	obs_scene_add(scene, s);
 }
@@ -2800,7 +2815,7 @@ void CanvasDock::AddSourceTypeToMenu(QMenu *popup, const char *source_type, cons
 	popupItem->setData(QString::fromUtf8(source_type));
 	QMenu *menu = new QMenu(popup);
 	popupItem->setMenu(menu);
-	QObject::connect(menu, &QMenu::aboutToShow, [this, menu, source_type] { LoadSourceTypeMenu(menu, source_type); });
+	QObject::connect(menu, &QMenu::aboutToShow, [menu, source_type] { LoadSourceTypeMenu(menu, source_type); });
 	QList<QAction *> actions = popup->actions();
 	QAction *after = nullptr;
 	for (QAction *menuAction : actions) {
@@ -3129,8 +3144,8 @@ void CanvasDock::SetLinkedScene(obs_source_t *scene_, const QString &linkedScene
 void CanvasDock::ShowSourcesContextMenu(obs_sceneitem_t *item)
 {
 	auto menu = QMenu(this);
-	menu.addMenu(CreateAddSourcePopupMenu());
-	AddCopyPasteMenuItems(&menu, item);
+	menu.addMenu(CreateAddSourcePopupMenu(this));
+	AddCopyPasteMenuItems(&menu, item, scene);
 	if (item) {
 		AddSceneItemMenuItems(&menu, item);
 	}
@@ -3139,7 +3154,13 @@ void CanvasDock::ShowSourcesContextMenu(obs_sceneitem_t *item)
 
 void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 {
-	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Rename")), [this, sceneItem] {
+	QObject *parent = popup->parent();
+	auto pm = qobject_cast<QMenu *>(parent);
+	while (pm) {
+		parent = pm->parent();
+		pm = qobject_cast<QMenu *>(parent);
+	}
+	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Rename")), [parent, sceneItem] {
 		obs_source_t *item_source = obs_source_get_ref(obs_sceneitem_get_source(sceneItem));
 		if (!item_source) {
 			return;
@@ -3149,7 +3170,8 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		obs_source_t *s = nullptr;
 		do {
 			obs_source_release(s);
-			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SourceName")), name)) {
+			if (!NameDialog::AskForName(qobject_cast<QWidget *>(parent),
+						    QString::fromUtf8(obs_module_text("SourceName")), name)) {
 				break;
 			}
 			s = canvas ? obs_canvas_get_source_by_name(canvas, name.c_str()) : obs_get_source_by_name(name.c_str());
@@ -3162,7 +3184,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	});
 	popup->addAction(
 		//removeButton->icon(),
-		QString::fromUtf8(obs_frontend_get_locale_string("Remove")), this, [sceneItem] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Remove")), parent, [sceneItem] {
 			auto scene = obs_sceneitem_get_scene(sceneItem);
 			if (!scene) {
 				return;
@@ -3188,7 +3210,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	popup->addSeparator();
 	auto orderMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order")));
 	orderMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveUp")), this, [sceneItem] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveUp")), parent, [sceneItem] {
 			if (!sceneItem) {
 				return;
 			}
@@ -3206,7 +3228,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 							  undo_json.c_str(), redo_json.c_str(), false);
 		});
 	orderMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveDown")), this, [sceneItem] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveDown")), parent, [sceneItem] {
 			if (!sceneItem) {
 				return;
 			}
@@ -3225,7 +3247,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		});
 	orderMenu->addSeparator();
 	orderMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveToTop")), this, [sceneItem] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveToTop")), parent, [sceneItem] {
 			if (!sceneItem) {
 				return;
 			}
@@ -3243,7 +3265,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 							  undo_json.c_str(), redo_json.c_str(), false);
 		});
 	orderMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveToBottom")), this, [sceneItem] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Order.MoveToBottom")), parent, [sceneItem] {
 			if (!sceneItem) {
 				return;
 			}
@@ -3262,42 +3284,41 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		});
 
 	auto transformMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform")));
-	transformMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.EditTransform")),
-				 [this, sceneItem] {
-					 const auto mainDialog = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-					 if (!mainDialog) {
-						 return;
-					 }
-					 auto transformDialog = mainDialog->findChild<QDialog *>("OBSBasicTransform");
-					 if (!transformDialog) {
-						 // make sure there is an item selected on the main canvas before starting the transform dialog
-						 const auto currentScene = obs_frontend_preview_program_mode_active()
-										   ? obs_frontend_get_current_preview_scene()
-										   : obs_frontend_get_current_scene();
-						 auto selected = GetSelectedItem(obs_scene_from_source(currentScene));
-						 if (!selected) {
-							 obs_scene_enum_items(
-								 obs_scene_from_source(currentScene),
-								 [](obs_scene_t *, obs_sceneitem_t *item, void *) {
-									 obs_sceneitem_select(item, true);
-									 return false;
-								 },
-								 nullptr);
-						 }
-						 obs_source_release(currentScene);
-						 QMetaObject::invokeMethod(mainDialog, "on_actionEditTransform_triggered");
-						 transformDialog = mainDialog->findChild<QDialog *>("OBSBasicTransform");
-					 }
-					 if (!transformDialog) {
-						 return;
-					 }
-					 QMetaObject::invokeMethod(
-						 transformDialog,
-						 obs_get_version() >= MAKE_SEMANTIC_VERSION(32, 1, 0) ? "setItemQt" : "SetItemQt",
-						 Q_ARG(OBSSceneItem, OBSSceneItem(sceneItem)));
-				 });
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.ResetTransform")), this,
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.EditTransform")), [sceneItem] {
+			const auto mainDialog = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (!mainDialog) {
+				return;
+			}
+			auto transformDialog = mainDialog->findChild<QDialog *>("OBSBasicTransform");
+			if (!transformDialog) {
+				// make sure there is an item selected on the main canvas before starting the transform dialog
+				const auto currentScene = obs_frontend_preview_program_mode_active()
+								  ? obs_frontend_get_current_preview_scene()
+								  : obs_frontend_get_current_scene();
+				auto selected = GetSelectedItem(obs_scene_from_source(currentScene));
+				if (!selected) {
+					obs_scene_enum_items(
+						obs_scene_from_source(currentScene),
+						[](obs_scene_t *, obs_sceneitem_t *item, void *) {
+							obs_sceneitem_select(item, true);
+							return false;
+						},
+						nullptr);
+				}
+				obs_source_release(currentScene);
+				QMetaObject::invokeMethod(mainDialog, "on_actionEditTransform_triggered");
+				transformDialog = mainDialog->findChild<QDialog *>("OBSBasicTransform");
+			}
+			if (!transformDialog) {
+				return;
+			}
+			QMetaObject::invokeMethod(transformDialog,
+						  obs_get_version() >= MAKE_SEMANTIC_VERSION(32, 1, 0) ? "setItemQt" : "SetItemQt",
+						  Q_ARG(OBSSceneItem, OBSSceneItem(sceneItem)));
+		});
+	transformMenu->addAction(
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.ResetTransform")), parent,
 		[sceneItem] {
 			if (!sceneItem) {
 				return;
@@ -3332,7 +3353,8 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		});
 	transformMenu->addSeparator();
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CW")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CW")), parent, [sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			float rotation = 90.0f;
 			obs_scene_enum_items(scene, RotateSelectedSources, &rotation);
@@ -3345,7 +3367,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CCW")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate90CCW")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			float rotation = -90.0f;
 			obs_scene_enum_items(scene, RotateSelectedSources, &rotation);
@@ -3358,7 +3382,8 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate180")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.Rotate180")), parent, [sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			float rotation = 180.0f;
 			obs_scene_enum_items(scene, RotateSelectedSources, &rotation);
@@ -3372,7 +3397,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		});
 	transformMenu->addSeparator();
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipHorizontal")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipHorizontal")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			vec2 scale;
 			vec2_set(&scale, -1.0f, 1.0f);
@@ -3386,7 +3413,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipVertical")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FlipVertical")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			vec2 scale;
 			vec2_set(&scale, 1.0f, -1.0f);
@@ -3401,7 +3430,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 		});
 	transformMenu->addSeparator();
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FitToScreen")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.FitToScreen")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			obs_bounds_type boundsType = OBS_BOUNDS_SCALE_INNER;
 			obs_scene_enum_items(scene, CenterAlignSelectedItems, &boundsType);
@@ -3414,7 +3445,9 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.StretchToScreen")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.StretchToScreen")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
 			obs_bounds_type boundsType = OBS_BOUNDS_STRETCH;
 			obs_scene_enum_items(scene, CenterAlignSelectedItems, &boundsType);
@@ -3427,9 +3460,11 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.CenterToScreen")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.CenterToScreen")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
-			CenterSelectedItems(CenterType::Scene);
+			CenterSelectedItems(CenterType::Scene, scene);
 			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
 			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.Center"))
 						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
@@ -3439,9 +3474,11 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.VerticalCenter")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.VerticalCenter")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
-			CenterSelectedItems(CenterType::Vertical);
+			CenterSelectedItems(CenterType::Vertical, scene);
 			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
 			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.VCenter"))
 						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
@@ -3451,9 +3488,11 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 				obs_data_get_json(rwrapper), false);
 		});
 	transformMenu->addAction(
-		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.HorizontalCenter")), this, [this] {
+		QString::fromUtf8(obs_frontend_get_locale_string("Basic.MainMenu.Edit.Transform.HorizontalCenter")), parent,
+		[sceneItem] {
+			auto scene = obs_sceneitem_get_scene(sceneItem);
 			OBSDataAutoRelease wrapper = obs_scene_save_transform_states(scene, false);
-			CenterSelectedItems(CenterType::Horizontal);
+			CenterSelectedItems(CenterType::Horizontal, scene);
 			OBSDataAutoRelease rwrapper = obs_scene_save_transform_states(scene, false);
 			auto undoName = QString::fromUtf8(obs_frontend_get_locale_string("Undo.Transform.HCenter"))
 						.arg(QString::fromUtf8(obs_source_get_name(obs_scene_get_source(scene))));
@@ -3467,27 +3506,27 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 
 	obs_scale_type scaleFilter = obs_sceneitem_get_scale_filter(sceneItem);
 	auto scaleMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering")));
-	auto a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Disable")), this,
+	auto a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Disable")), parent,
 				      [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_DISABLE); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_DISABLE);
-	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Point")), this,
+	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Point")), parent,
 				 [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_POINT); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_POINT);
-	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Bilinear")), this,
+	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Bilinear")), parent,
 				 [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_BILINEAR); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_BILINEAR);
-	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Bicubic")), this,
+	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Bicubic")), parent,
 				 [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_BICUBIC); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_BICUBIC);
-	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Lanczos")), this,
+	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Lanczos")), parent,
 				 [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_LANCZOS); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_LANCZOS);
-	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Area")), this,
+	a = scaleMenu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("ScaleFiltering.Area")), parent,
 				 [sceneItem] { obs_sceneitem_set_scale_filter(sceneItem, OBS_SCALE_AREA); });
 	a->setCheckable(true);
 	a->setChecked(scaleFilter == OBS_SCALE_AREA);
@@ -3503,7 +3542,7 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 
 	for (int i = OBS_BLEND_NORMAL; i <= OBS_BLEND_DARKEN; i++) {
 		a = blendingMenu->addAction(
-			QString::fromUtf8(obs_frontend_get_locale_string(blendingModes[(enum obs_blending_type)i])), this,
+			QString::fromUtf8(obs_frontend_get_locale_string(blendingModes[(enum obs_blending_type)i])), parent,
 			[sceneItem, i] {
 				if (!sceneItem) {
 					return;
@@ -3532,18 +3571,18 @@ void CanvasDock::AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	popup->addSeparator();
 
 	auto projectorMenu = popup->addMenu(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Open.Source")));
-	AddProjectorMenuMonitors(projectorMenu, this, SLOT(OpenSourceProjector()));
+	AddProjectorMenuMonitors(projectorMenu, parent, SLOT(OpenSourceProjector()));
 	a = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Projector.Window")));
-	connect(a, &QAction::triggered, this, &CanvasDock::OpenSourceProjector);
+	connect(a, &QAction::triggered, parent, [parent] { QMetaObject::invokeMethod(parent, "OpenSourceProjector"); });
 	a->setProperty("monitor", -1);
 
 	obs_source_t *s = obs_sceneitem_get_source(sceneItem);
-	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Screenshot.Source")), this,
+	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Screenshot.Source")), parent,
 			 [s] { obs_frontend_take_source_screenshot(s); });
 	popup->addSeparator();
-	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Filters")), this,
+	popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Filters")), parent,
 			 [s] { obs_frontend_open_source_filters(s); });
-	a = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Properties")), this,
+	a = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Properties")), parent,
 			     [s] { obs_frontend_open_source_properties(s); });
 	a->setEnabled(obs_source_configurable(s));
 }
@@ -3553,12 +3592,12 @@ static void (*obs_frontend_copy_sceneitem_func)(obs_sceneitem_t *item) = nullptr
 static bool (*obs_frontend_can_paste_sceneitem_func)(bool duplicate) = nullptr;
 static void (*obs_frontend_paste_sceneitem_func)(obs_scene_t *scene, bool duplicate) = nullptr;
 
-void CanvasDock::AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem)
+void CanvasDock::AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem, OBSScene scene)
 {
 	if (!copy_save_functions) {
 		copy_save_functions = true;
 		if (obs_get_version() < MAKE_SEMANTIC_VERSION(32, 2, 0)) {
-			//return;
+			return;
 		}
 
 #ifdef __APPLE__
@@ -3575,16 +3614,16 @@ void CanvasDock::AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem)
 	}
 	if (obs_frontend_copy_sceneitem_func) {
 		auto copyAction = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Copy")),
-						   [this, sceneItem] { obs_frontend_copy_sceneitem_func(sceneItem); });
+						   [sceneItem] { obs_frontend_copy_sceneitem_func(sceneItem); });
 		copyAction->setEnabled(sceneItem != nullptr);
 	}
 	if (obs_frontend_can_paste_sceneitem_func && obs_frontend_paste_sceneitem_func) {
 		auto pasteAction = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("PasteReference")),
-						    [this] { obs_frontend_paste_sceneitem_func(scene, false); });
+						    [scene] { obs_frontend_paste_sceneitem_func(scene, false); });
 		pasteAction->setEnabled(obs_frontend_can_paste_sceneitem_func(false));
 
 		pasteAction = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("PasteDuplicate")),
-					       [this] { obs_frontend_paste_sceneitem_func(scene, true); });
+					       [scene] { obs_frontend_paste_sceneitem_func(scene, true); });
 		pasteAction->setEnabled(obs_frontend_can_paste_sceneitem_func(true));
 	}
 }
@@ -3798,14 +3837,14 @@ QMenu *CanvasDock::CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t 
 	menu->addAction(durationAction);
 	if (curId && obs_is_source_configurable(curId)) {
 		menu->addSeparator();
-		menu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Properties")), this,
+		menu->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Properties")), menu,
 				[curTransition] { obs_frontend_open_source_properties(curTransition); });
 	}
 
 	return menu;
 }
 
-void CanvasDock::CenterSelectedItems(CenterType centerType)
+void CanvasDock::CenterSelectedItems(CenterType centerType, obs_scene_t *scene)
 {
 	std::vector<obs_sceneitem_t *> items;
 	obs_scene_enum_items(scene, GetSelectedItemsWithSize, &items);
@@ -3838,13 +3877,9 @@ void CanvasDock::CenterSelectedItems(CenterType centerType)
 
 	// Get coordinates of screen center
 	vec3 screenCenter;
-	if (settings) {
-		vec3_set(&screenCenter, float(canvas_width), float(canvas_height), 0.0f);
-	} else {
-		obs_source_t *scene_source = obs_scene_get_source(scene);
-		vec3_set(&screenCenter, float(obs_source_get_width(scene_source)), float(obs_source_get_height(scene_source)),
-			 0.0f);
-	}
+
+	obs_source_t *scene_source = obs_scene_get_source(scene);
+	vec3_set(&screenCenter, float(obs_source_get_width(scene_source)), float(obs_source_get_height(scene_source)), 0.0f);
 
 	vec3_mulf(&screenCenter, &screenCenter, 0.5f);
 
@@ -4601,12 +4636,12 @@ bool CanvasDock::HandleMouseReleaseEvent(QMouseEvent *event)
 					obs_source_release(s);
 				});
 
-		popup.addMenu(CreateAddSourcePopupMenu());
+		popup.addMenu(CreateAddSourcePopupMenu(this));
 
 		popup.addSeparator();
 
-		OBSSceneItem sceneItem = GetSelectedItem();
-		AddCopyPasteMenuItems(&popup, sceneItem);
+		OBSSceneItem sceneItem = GetSelectedItem(scene);
+		AddCopyPasteMenuItems(&popup, sceneItem, scene);
 		if (sceneItem) {
 			AddSceneItemMenuItems(&popup, sceneItem);
 		}
@@ -6277,7 +6312,7 @@ void CanvasDock::OpenSourceProjector()
 	if (monitor > 9 || monitor > QGuiApplication::screens().size() - 1) {
 		return;
 	}
-	OBSSceneItem item = GetSelectedItem();
+	OBSSceneItem item = GetSelectedItem(scene);
 	if (!item) {
 		return;
 	}
