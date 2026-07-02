@@ -1,6 +1,7 @@
 #pragma once
 #include <QFrame>
 #include <QListWidget>
+#include <QDockWidget>
 #include <obs.h>
 
 class ScenesDock : public QFrame {
@@ -30,6 +31,7 @@ private:
 
 private slots:
 	void handleFocusChange(QWidget *old, QWidget *now);
+	void handleTabifiedDockWidgetActivated(QDockWidget *dockWidget);
 	void FinishedLoading();
 
 public:

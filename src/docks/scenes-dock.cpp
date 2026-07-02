@@ -12,6 +12,8 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidgetAction>
+#include <QMainWindow>
+#include <QDockWidget>
 #include <src/utils/obs-websocket-api.h>
 
 extern obs_websocket_vendor vendor;
@@ -34,6 +36,8 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 		[this](const QPoint &pos) { ShowScenesContextMenu(sceneList->itemAt(pos)); });
 
 	connect((QApplication *)QApplication::instance(), &QApplication::focusChanged, this, &ScenesDock::handleFocusChange);
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	connect(main_window, &QMainWindow::tabifiedDockWidgetActivated, this, &ScenesDock::handleTabifiedDockWidgetActivated);
 
 	connect(sceneList, &QListWidget::currentItemChanged, [this]() {
 		const auto item = sceneList->currentItem();
@@ -199,12 +203,32 @@ void ScenesDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	sceneList->blockSignals(false);
 }
 
+void ScenesDock::handleTabifiedDockWidgetActivated(QDockWidget *dockWidget)
+{
+	if (dockWidget->objectName() == "AitumStreamSuiteMainCanvas" || dockWidget->objectName() == "previewDock") {
+		auto canvas = obs_get_main_canvas();
+		if (!canvas) {
+			return;
+		}
+		canvasDock = nullptr;
+		SwitchToCanvas(canvas);
+		obs_canvas_release(canvas);
+		return;
+	}
+	auto canvas_dock = dynamic_cast<CanvasDock *>(dockWidget->widget());
+	if (canvas_dock) {
+		canvasDock = canvas_dock;
+		SwitchToCanvas(canvas_dock->GetCanvas());
+		return;
+	}
+}
+
 void ScenesDock::handleFocusChange(QWidget *old, QWidget *now)
 {
 	UNUSED_PARAMETER(old);
 	auto parent = now;
 	while (parent != nullptr) {
-		if (parent->objectName() == "AitumStreamSuiteMainCanvas") {
+		if (parent->objectName() == "AitumStreamSuiteMainCanvas" || parent->objectName() == "previewDock") {
 			auto canvas = obs_get_main_canvas();
 			if (!canvas) {
 				return;
@@ -220,7 +244,6 @@ void ScenesDock::handleFocusChange(QWidget *old, QWidget *now)
 			SwitchToCanvas(canvas_dock->GetCanvas());
 			return;
 		}
-
 		parent = parent->parentWidget();
 	}
 }
@@ -495,6 +518,26 @@ void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		obs_source_release(source);
 		obs_data_set_string(ps, "transition", "");
 	});
+
+	if (curTransition && strlen(curTransition)) {
+		auto a2 = tom->addAction(QString::fromUtf8(curTransition));
+		a2->setCheckable(true);
+		a2->setChecked(true);
+		connect(a, &QAction::triggered, [this, scene_name, scene_uuid, a2] {
+			auto source = obs_get_source_by_uuid(scene_uuid.c_str());
+			if (!source) {
+				auto c = obs_weak_canvas_get_canvas(canvas);
+				if (!c) {
+					return;
+				}
+				source = obs_canvas_get_source_by_name(c, scene_name.c_str());
+				obs_canvas_release(c);
+			}
+			OBSDataAutoRelease ps = obs_source_get_private_settings(source);
+			obs_source_release(source);
+			obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
+		});
+	}
 
 	/* for (auto t : transitions) {
 		const char *name = obs_source_get_name(t);

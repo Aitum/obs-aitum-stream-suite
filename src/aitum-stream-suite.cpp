@@ -1246,6 +1246,9 @@ void load_current_profile_config()
 			if (main_window) {
 				auto main_dock =
 					main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+				if (!main_dock) {
+					main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+				}
 				if (main_dock) {
 					main_dock->setVisible(true);
 					main_dock->setFloating(false);

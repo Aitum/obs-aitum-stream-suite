@@ -1,12 +1,13 @@
 #include "../dialogs/name-dialog.hpp"
-#include "sources-dock.hpp"
 #include "canvas-dock.hpp"
+#include "sources-dock.hpp"
 #include <obs-module.h>
-#include <QVBoxLayout>
-#include <QToolBar>
+#include <QGuiApplication>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QMenu>
+#include <QToolBar>
+#include <QVBoxLayout>
 
 SourcesDock::SourcesDock(QWidget *parent) : QFrame(parent)
 {
