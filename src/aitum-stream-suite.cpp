@@ -58,9 +58,6 @@ SourcesDock *sources_dock = nullptr;
 QString newer_version_available;
 
 QTimer load_dock_state_timer;
-
-static constexpr const char *AITUM_THEME_ID = "com.obsproject.Aitum.Original";
-static constexpr const char *AITUM_GLASS_THEME_ID = "com.obsproject.Aitum.Glass";
 QList<QString> loaded_docks;
 
 extern std::list<CanvasDock *> canvas_docks;
@@ -1873,15 +1870,10 @@ bool obs_module_load(void)
 	if (user_config) {
 		if (!config_get_bool(user_config, "Aitum", "ThemeSet")) {
 			auto theme = config_get_string(user_config, "Appearance", "Theme");
-			const bool has_glass_theme = os_file_exists("data/obs-studio/themes/Aitum_Glass") ||
-						     os_file_exists("../../data/obs-studio/themes/Aitum_Glass");
-			const bool has_aitum_theme = os_file_exists("data/obs-studio/themes/Aitum") ||
-						    os_file_exists("../../data/obs-studio/themes/Aitum");
-			if ((!theme || strcmp(theme, AITUM_GLASS_THEME_ID) != 0) && has_glass_theme) {
-				config_set_string(user_config, "Appearance", "Theme", AITUM_GLASS_THEME_ID);
-				restart = true;
-			} else if ((!theme || strcmp(theme, AITUM_THEME_ID) != 0) && has_aitum_theme) {
-				config_set_string(user_config, "Appearance", "Theme", AITUM_THEME_ID);
+			if ((!theme || strcmp(theme, "com.obsproject.Aitum.Original") != 0) &&
+			    (os_file_exists("data/obs-studio/themes/Aitum") ||
+			     os_file_exists("../../data/obs-studio/themes/Aitum"))) {
+				config_set_string(user_config, "Appearance", "Theme", "com.obsproject.Aitum.Original");
 				restart = true;
 			}
 			config_set_bool(user_config, "BasicWindow", "VerticalVolControl", true);
@@ -1889,7 +1881,7 @@ bool obs_module_load(void)
 			config_save_safe(user_config, "tmp", "bak");
 		}
 		const char *theme = config_get_string(user_config, "Appearance", "Theme");
-		if (theme && (strcmp(theme, AITUM_THEME_ID) == 0 || strcmp(theme, AITUM_GLASS_THEME_ID) == 0)) {
+		if (theme && strcmp(theme, "com.obsproject.Aitum.Original") == 0) {
 			main_window->setContentsMargins(10, 10, 10, 10);
 		}
 	}

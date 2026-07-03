@@ -298,4 +298,4 @@ If alpha is used, it must not be required for contrast. Test text against the wo
 - It has AA-compliant text contrast for normal production use.
 - Keyboard focus is consistently visible.
 - OBS/Aitum status states are faster to scan than in a purely decorative glass theme.
-- New installs and first-run setup select `com.obsproject.Aitum.Glass` when the theme is available, with fallback to the original Aitum theme for partial/legacy packages.
+- The theme is added as a separate selectable option; existing first-run and installer defaults stay on `com.obsproject.Aitum.Original`.
