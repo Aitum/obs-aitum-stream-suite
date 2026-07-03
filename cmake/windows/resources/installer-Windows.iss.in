@@ -100,14 +100,14 @@ Type: files; Name: "{app}\obs-plugins\64bit\aitum-multistream.dll"
 Type: files; Name: "{app}\obs-plugins\64bit\aitum-multistream.pdb"
 
 [Ini]
-filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
-filename: {commonappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
-filename: {userappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
-filename: {userappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
-filename: {localappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
-filename: {localappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Components: "AitumStreamSuite\Theme"
-filename: {app}\config\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
-filename: {app}\config\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Original; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
+filename: {commonappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Components: "AitumStreamSuite\Theme"
+filename: {commonappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Components: "AitumStreamSuite\Theme"
+filename: {userappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
+filename: {userappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Flags: createkeyifdoesntexist;  Components: "AitumStreamSuite\Theme"
+filename: {localappdata}\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Components: "AitumStreamSuite\Theme"
+filename: {localappdata}\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Components: "AitumStreamSuite\Theme"
+filename: {app}\config\obs-studio\global.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
+filename: {app}\config\obs-studio\user.ini; section: Appearance; key: Theme; string: com.obsproject.Aitum.Glass; Flags: createkeyifdoesntexist; Components: "AitumStreamSuite\Theme"
 
 [Icons]
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
