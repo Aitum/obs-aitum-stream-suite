@@ -2787,8 +2787,7 @@ void CanvasDock::LoadSourceTypeMenu(QMenu *menu, const char *type)
 		}
 		connect(
 			popupItem, &QAction::triggered, parent,
-			[parent] { QMetaObject::invokeMethod(parent, SLOT(AddSourceFromAction())); }, Qt::QueuedConnection);
-		
+			[parent] { QMetaObject::invokeMethod(parent, "AddSourceFromAction"); }, Qt::QueuedConnection);
 		QList<QAction *> actions = menu->actions();
 		QAction *first = actions.size() ? actions.first() : nullptr;
 		menu->insertAction(first, popupItem);
