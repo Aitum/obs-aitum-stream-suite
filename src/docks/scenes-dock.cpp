@@ -77,7 +77,11 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 			} else {
 				auto mc = obs_get_main_canvas();
 				if (c == mc) {
-					obs_frontend_set_current_scene(scene);
+					if (obs_frontend_preview_program_mode_active()) {
+						obs_frontend_set_current_preview_scene(scene);
+					} else {
+						obs_frontend_set_current_scene(scene);
+					}
 				} else if (parent) {
 					obs_transition_start(parent, OBS_TRANSITION_MODE_AUTO, 0, scene);
 				} else {
@@ -519,43 +523,89 @@ void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 		obs_data_set_string(ps, "transition", "");
 	});
 
-	if (curTransition && strlen(curTransition)) {
-		auto a2 = tom->addAction(QString::fromUtf8(curTransition));
-		a2->setCheckable(true);
-		a2->setChecked(true);
-		connect(a, &QAction::triggered, [this, scene_name, scene_uuid, a2] {
-			auto source = obs_get_source_by_uuid(scene_uuid.c_str());
-			if (!source) {
-				auto c = obs_weak_canvas_get_canvas(canvas);
-				if (!c) {
-					return;
-				}
-				source = obs_canvas_get_source_by_name(c, scene_name.c_str());
-				obs_canvas_release(c);
+	if (canvasDock) {
+		for (auto t : canvasDock->transitions) {
+			const char *name = obs_source_get_name(t);
+			bool match = (name && curTransition && strcmp(name, curTransition) == 0);
+
+			if (!name || !*name) {
+				name = obs_frontend_get_locale_string("None");
 			}
-			OBSDataAutoRelease ps = obs_source_get_private_settings(source);
-			obs_source_release(source);
-			obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
-		});
-	}
 
-	/* for (auto t : transitions) {
-		const char *name = obs_source_get_name(t);
-		bool match = (name && curTransition && strcmp(name, curTransition) == 0);
-
-		if (!name || !*name) {
-			name = obs_frontend_get_locale_string("None");
+			auto a2 = tom->addAction(QString::fromUtf8(name));
+			a2->setCheckable(true);
+			a2->setChecked(match);
+			connect(a2, &QAction::triggered, [this, scene_name, scene_uuid, a2] {
+				auto source = obs_get_source_by_uuid(scene_uuid.c_str());
+				if (!source) {
+					auto c = obs_weak_canvas_get_canvas(canvas);
+					if (!c) {
+						return;
+					}
+					source = obs_canvas_get_source_by_name(c, scene_name.c_str());
+					obs_canvas_release(c);
+				}
+				OBSDataAutoRelease ps = obs_source_get_private_settings(source);
+				obs_source_release(source);
+				obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
+			});
 		}
+	} else {
+		auto c = obs_weak_canvas_get_canvas(canvas);
+		auto mc = obs_get_main_canvas();
+		if (c && c == mc) {
+			struct obs_frontend_source_list transitions = {};
+			obs_frontend_get_transitions(&transitions);
+			for (size_t i = 0; i < transitions.sources.num; i++) {
+				obs_source_t *transition = transitions.sources.array[i];
+				const char *name = obs_source_get_name(transition);
+				bool match = (name && curTransition && strcmp(name, curTransition) == 0);
 
-		auto a2 = tom->addAction(QString::fromUtf8(name));
-		a2->setCheckable(true);
-		a2->setChecked(match);
-		connect(a, &QAction::triggered, [this, scene_name, a2] {
-			OBSSourceAutoRelease source = obs_canvas_get_source_by_name(canvas, scene_name.c_str());
-			OBSDataAutoRelease ps = obs_source_get_private_settings(source);
-			obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
-		});
-	}*/
+				if (!name || !*name) {
+					name = obs_frontend_get_locale_string("None");
+				}
+
+				auto a2 = tom->addAction(QString::fromUtf8(name));
+				a2->setCheckable(true);
+				a2->setChecked(match);
+				connect(a2, &QAction::triggered, this, [this, scene_name, scene_uuid, a2] {
+					auto source = obs_get_source_by_uuid(scene_uuid.c_str());
+					if (!source) {
+						auto c = obs_weak_canvas_get_canvas(canvas);
+						if (!c) {
+							return;
+						}
+						source = obs_canvas_get_source_by_name(c, scene_name.c_str());
+						obs_canvas_release(c);
+					}
+					OBSDataAutoRelease ps = obs_source_get_private_settings(source);
+					obs_source_release(source);
+					obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
+				});
+			}
+			obs_frontend_source_list_free(&transitions);
+		} else if (curTransition && strlen(curTransition)) {
+			auto a2 = tom->addAction(QString::fromUtf8(curTransition));
+			a2->setCheckable(true);
+			a2->setChecked(true);
+			connect(a2, &QAction::triggered, [this, scene_name, scene_uuid, a2] {
+				auto source = obs_get_source_by_uuid(scene_uuid.c_str());
+				if (!source) {
+					auto c = obs_weak_canvas_get_canvas(canvas);
+					if (!c) {
+						return;
+					}
+					source = obs_canvas_get_source_by_name(c, scene_name.c_str());
+					obs_canvas_release(c);
+				}
+				OBSDataAutoRelease ps = obs_source_get_private_settings(source);
+				obs_source_release(source);
+				obs_data_set_string(ps, "transition", a2->text().toUtf8().constData());
+			});
+		}
+		obs_canvas_release(c);
+		obs_canvas_release(mc);
+	}
 
 	QWidgetAction *durationAction = new QWidgetAction(tom);
 	durationAction->setDefaultWidget(duration);
@@ -563,75 +613,82 @@ void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	tom->addSeparator();
 	tom->addAction(durationAction);
 
-	auto linkedScenesMenu = menu.addMenu(QString::fromUtf8(obs_module_text("LinkedScenes")));
-	connect(linkedScenesMenu, &QMenu::aboutToShow, [linkedScenesMenu, this] {
-		linkedScenesMenu->clear();
-		struct obs_frontend_source_list scenes = {};
-		obs_frontend_get_scenes(&scenes);
-		for (size_t i = 0; i < scenes.sources.num; i++) {
-			obs_source_t *src = scenes.sources.array[i];
-			obs_data_t *settings = obs_source_get_settings(src);
+	if (canvasDock) {
 
-			auto name = QString::fromUtf8(obs_source_get_name(src));
-			auto *checkBox = new QCheckBox(name, linkedScenesMenu);
+		auto linkedScenesMenu = menu.addMenu(QString::fromUtf8(obs_module_text("LinkedScenes")));
+		connect(linkedScenesMenu, &QMenu::aboutToShow, [linkedScenesMenu, this] {
+			linkedScenesMenu->clear();
+			struct obs_frontend_source_list scenes = {};
+			obs_frontend_get_scenes(&scenes);
+			for (size_t i = 0; i < scenes.sources.num; i++) {
+				obs_source_t *src = scenes.sources.array[i];
+				obs_data_t *settings = obs_source_get_settings(src);
+
+				auto name = QString::fromUtf8(obs_source_get_name(src));
+				auto *checkBox = new QCheckBox(name, linkedScenesMenu);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-			connect(checkBox, &QCheckBox::checkStateChanged, [this, src, checkBox] {
+				connect(checkBox, &QCheckBox::checkStateChanged, [this, src, checkBox] {
 #else
 				connect(checkBox, &QCheckBox::stateChanged, [this, src, checkBox] {
 #endif
-				if (canvasDock)
-					canvasDock->SetLinkedScene(src,
-								   checkBox->isChecked() ? sceneList->currentItem()->text() : "");
-				UpdateLinkedScenes();
-			});
-			auto *checkableAction = new QWidgetAction(linkedScenesMenu);
-			checkableAction->setDefaultWidget(checkBox);
-			linkedScenesMenu->addAction(checkableAction);
+					if (canvasDock)
+						canvasDock->SetLinkedScene(
+							src, checkBox->isChecked() ? sceneList->currentItem()->text() : "");
+					UpdateLinkedScenes();
+				});
+				auto *checkableAction = new QWidgetAction(linkedScenesMenu);
+				checkableAction->setDefaultWidget(checkBox);
+				linkedScenesMenu->addAction(checkableAction);
 
-			auto cc = obs_weak_canvas_get_canvas(canvas);
-			auto c = obs_data_get_array(settings, "canvas");
-			if (c) {
-				const auto count = obs_data_array_count(c);
+				auto cc = obs_weak_canvas_get_canvas(canvas);
+				auto c = obs_data_get_array(settings, "canvas");
+				if (c) {
+					const auto count = obs_data_array_count(c);
 
-				for (size_t j = 0; j < count; j++) {
-					auto item = obs_data_array_item(c, j);
-					if (!item)
-						continue;
-					if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(cc)) == 0) {
-						auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
-						if (sn == sceneList->currentItem()->text()) {
-							checkBox->setChecked(true);
+					for (size_t j = 0; j < count; j++) {
+						auto item = obs_data_array_item(c, j);
+						if (!item)
+							continue;
+						if (strcmp(obs_data_get_string(item, "name"), obs_canvas_get_name(cc)) == 0) {
+							auto sn = QString::fromUtf8(obs_data_get_string(item, "scene"));
+							if (sn == sceneList->currentItem()->text()) {
+								checkBox->setChecked(true);
+							}
 						}
+						obs_data_release(item);
 					}
-					obs_data_release(item);
+
+					obs_data_array_release(c);
 				}
+				obs_canvas_release(cc);
 
-				obs_data_array_release(c);
+				obs_data_release(settings);
 			}
-			obs_canvas_release(cc);
+			obs_frontend_source_list_free(&scenes);
+		});
 
-			obs_data_release(settings);
-		}
-		obs_frontend_source_list_free(&scenes);
-	});
+		menu.addAction(QString::fromUtf8(obs_module_text("OnMainCanvas")), [this, scene_name, scene_uuid] {
+			auto s = obs_get_source_by_uuid(scene_uuid.c_str());
+			if (!s) {
+				auto c = obs_weak_canvas_get_canvas(canvas);
+				if (!c) {
+					return;
+				}
+				s = obs_canvas_get_source_by_name(c, scene_name.c_str());
+				obs_canvas_release(c);
+			}
+			if (!s) {
+				return;
+			}
 
-	/* menu.addAction(QString::fromUtf8(obs_module_text("OnMainCanvas")), [this] {
-		auto item = sceneList->currentItem();
-		if (!item) {
-			return;
-		}
-		auto s = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
-		if (!s) {
-			return;
-		}
-
-		if (obs_frontend_preview_program_mode_active()) {
-			obs_frontend_set_current_preview_scene(s);
-		} else {
-			obs_frontend_set_current_scene(s);
-		}
-		obs_source_release(s);
-	});*/
+			if (obs_frontend_preview_program_mode_active()) {
+				obs_frontend_set_current_preview_scene(s);
+			} else {
+				obs_frontend_set_current_scene(s);
+			}
+			obs_source_release(s);
+		});
+	}
 
 	a = menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("ShowInMultiview")),
 			   [this, scene_name, scene_uuid](bool checked) {
