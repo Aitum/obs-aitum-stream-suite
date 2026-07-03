@@ -85,6 +85,25 @@ function(target_install_resources target)
       VERBATIM
     )
   endif()
+
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/theme")
+    install(
+      DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/theme/"
+      DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/obs/obs-studio/themes
+      USE_SOURCE_PERMISSIONS
+    )
+
+    add_custom_command(
+      TARGET ${target}
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>/data/obs-studio/themes"
+      COMMAND
+        "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/theme"
+        "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>/data/obs-studio/themes"
+      COMMENT "Copy OBS themes to rundir"
+      VERBATIM
+    )
+  endif()
 endfunction()
 
 # Helper function to add a specific resource to a bundle

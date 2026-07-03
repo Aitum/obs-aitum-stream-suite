@@ -1,0 +1,7 @@
+@OBSThemeMeta {
+    name: 'Glass';
+    id: 'com.obsproject.Aitum.Glass.Default';
+    extends: 'com.obsproject.Aitum.Glass';
+    author: 'Aitum + Codex';
+    dark: 'true';
+}
