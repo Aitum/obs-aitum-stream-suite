@@ -89,7 +89,9 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/docks/stats-dock.cpp
   src/docks/stats-dock.hpp
   src/docks/transform-dock.cpp
-  src/docks/transform-dock.hpp)
+  src/docks/transform-dock.hpp
+  src/docks/transitions-dock.cpp
+  src/docks/transitions-dock.hpp)
 
 target_sources(${PROJECT_NAME} PRIVATE
   src/dialogs/config-dialog.cpp

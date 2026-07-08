@@ -12,6 +12,7 @@
 #include "docks/sources-dock.hpp"
 #include "docks/stats-dock.hpp"
 #include "docks/transform-dock.hpp"
+#include "docks/transitions-dock.hpp"
 #include "utils/file-download.h"
 #include "utils/icon.hpp"
 #include "utils/obs-websocket-api.h"
@@ -23,13 +24,14 @@
 #include <QDesktopServices>
 #include <QDockWidget>
 #include <QMainWindow>
+#include <QMap>
 #include <QMenu>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QToolBar>
-#include <QMap>
 #include <util/dstr.h>
 
 OBS_DECLARE_MODULE()
@@ -55,6 +57,7 @@ CanvasDock *component_dock = nullptr;
 StatsDock *stats_dock = nullptr;
 ScenesDock *scenes_dock = nullptr;
 SourcesDock *sources_dock = nullptr;
+TransitionsDock *transitions_dock = nullptr;
 
 QString newer_version_available;
 
@@ -435,7 +438,7 @@ void reset_build_dock_state()
 		{QStringLiteral("AitumStreamSuiteScenes"), Qt::LeftDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteSources"), Qt::LeftDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteFilters"), Qt::LeftDockWidgetArea},
-		{QStringLiteral("transitionsDock"), Qt::LeftDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteTransitions"), Qt::LeftDockWidgetArea},
 
 		{QStringLiteral("AitumStreamSuiteMainCanvas"), Qt::TopDockWidgetArea},
 		{QStringLiteral("previewDock"), Qt::TopDockWidgetArea},
@@ -612,6 +615,7 @@ void load_dock_state(QString mode)
 			}
 		}
 	}
+	QList<QDockWidget *> visible_canvas_docks;
 	loaded_docks.clear();
 	if (!state.empty()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -625,6 +629,9 @@ void load_dock_state(QString mode)
 			d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
 		}
 		if (d) {
+			if (d->isVisible()) {
+				visible_canvas_docks.append(d);
+			}
 			if (!main_restored && !d->isVisibleTo(main_window)) {
 				bool canvas_mode = false;
 				for (auto it : canvas_docks) {
@@ -670,9 +677,17 @@ void load_dock_state(QString mode)
 		}
 	}
 	for (const auto &it : canvas_docks) {
+		auto dw = qobject_cast<QDockWidget *>(it->parentWidget());
+		if (dw && dw->isVisible()) {
+			visible_canvas_docks.append(dw);
+		}
 		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 	}
 	for (const auto &it : canvas_clone_docks) {
+		auto dw = qobject_cast<QDockWidget *>(it->parentWidget());
+		if (dw && dw->isVisible()) {
+			visible_canvas_docks.append(dw);
+		}
 		QMetaObject::invokeMethod(it, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
 	}
 	if (component_dock) {
@@ -680,6 +695,10 @@ void load_dock_state(QString mode)
 	}
 	if (stats_dock) {
 		QMetaObject::invokeMethod(stats_dock, "LoadMode", Qt::QueuedConnection, Q_ARG(QString, mode));
+	}
+	if (scenes_dock && !visible_canvas_docks.isEmpty()) {
+		QMetaObject::invokeMethod(scenes_dock, "UpdateCanvasFromDockList",
+					  Q_ARG(QList<QDockWidget *>, visible_canvas_docks));
 	}
 }
 
@@ -715,7 +734,10 @@ void reset_canvas_dock_state(QString name)
 	}
 
 	QMap<QString, enum Qt::DockWidgetArea> allow_docks = {
+		{QStringLiteral("AitumStreamSuiteScenes"), Qt::LeftDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteSources"), Qt::LeftDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteFilters"), Qt::LeftDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteTransitions"), Qt::LeftDockWidgetArea},
 
 		{QStringLiteral("AitumStreamSuiteProperties"), Qt::RightDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteTransform"), Qt::RightDockWidgetArea},
@@ -724,13 +746,7 @@ void reset_canvas_dock_state(QString name)
 	if (main) {
 		allow_docks.insert(QStringLiteral("AitumStreamSuiteMainCanvas"), Qt::TopDockWidgetArea);
 		allow_docks.insert(QStringLiteral("previewDock"), Qt::TopDockWidgetArea);
-		allow_docks.insert(QStringLiteral("scenesDock"), Qt::LeftDockWidgetArea);
-		allow_docks.insert(QStringLiteral("sourcesDock"), Qt::LeftDockWidgetArea);
 		allow_docks.insert(QStringLiteral("SceneNotesDock"), Qt::BottomDockWidgetArea);
-		allow_docks.insert(QStringLiteral("transitionsDock"), Qt::LeftDockWidgetArea);
-	} else {
-		allow_docks.insert(QStringLiteral("AitumStreamSuiteScenes"), Qt::LeftDockWidgetArea);
-		allow_docks.insert(QStringLiteral("AitumStreamSuiteSources"), Qt::LeftDockWidgetArea);
 	}
 
 	auto docks = main_window->findChildren<QDockWidget *>();
@@ -1515,9 +1531,19 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 				obs_frontend_remove_dock(dock->objectName().toUtf8().constData());
 			}
 		}
+	} else if (event == OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED) {
+		if (transitions_dock) {
+			QMetaObject::invokeMethod(transitions_dock, "TransitionDurationChanged", Qt::QueuedConnection);
+		}
+	} else if (event == OBS_FRONTEND_EVENT_TRANSITION_CHANGED) {
+		if (transitions_dock) {
+			QMetaObject::invokeMethod(transitions_dock, "TransitionChanged", Qt::QueuedConnection);
+		}
+	} else if (event == OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED) {
+		if (transitions_dock) {
+			QMetaObject::invokeMethod(transitions_dock, "TransitionListChanged", Qt::QueuedConnection);
+		}
 	}
-
-	//OBS_FRONTEND_EVENT_PROFILE_RENAMED
 }
 
 class TabToolBar : public QToolBar {
@@ -1989,6 +2015,8 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteScenes", obs_module_text("AitumStreamSuiteScenes"), scenes_dock);
 	sources_dock = new SourcesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteSources", obs_module_text("AitumStreamSuiteSources"), sources_dock);
+	transitions_dock = new TransitionsDock(main_window);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteTransitions", obs_module_text("AitumStreamSuiteTransitions"), transitions_dock);
 
 	std::string url = "https://api.aitum.tv/plugin/streamsuite";
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
@@ -2138,6 +2166,7 @@ void obs_module_unload()
 	obs_frontend_remove_dock("AitumStreamSuiteStats");
 	obs_frontend_remove_dock("AitumStreamSuiteScenes");
 	obs_frontend_remove_dock("AitumStreamSuiteSources");
+	obs_frontend_remove_dock("AitumStreamSuiteTransitions");
 
 	obs_frontend_remove_dock("AitumStreamSuiteChat");
 	obs_frontend_remove_dock("AitumStreamSuiteActivity");

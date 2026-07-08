@@ -2,22 +2,25 @@
 #include "canvas-dock.hpp"
 #include "scenes-dock.hpp"
 #include "sources-dock.hpp"
+#include "transitions-dock.hpp"
 #include <obs-frontend-api.h>
 #include <obs-module.h>
 #include <QApplication>
+#include <QDockWidget>
 #include <QFocusEvent>
+#include <QMainWindow>
 #include <QMenu>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QSpinBox>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidgetAction>
-#include <QMainWindow>
-#include <QDockWidget>
 #include <src/utils/obs-websocket-api.h>
 
 extern obs_websocket_vendor vendor;
 extern SourcesDock *sources_dock;
+extern TransitionsDock *transitions_dock;
 
 ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 {
@@ -267,6 +270,9 @@ void ScenesDock::SwitchToCanvas(obs_canvas_t *c)
 	}
 	obs_canvas_release(orig);
 	canvas = obs_canvas_get_weak_canvas(c);
+	if (transitions_dock) {
+		transitions_dock->SetCanvas(c, canvasDock);
+	}
 	sceneList->clear();
 	if (!canvas) {
 		return;
@@ -882,6 +888,7 @@ void ScenesDock::channel_change(void *data, calldata_t *cd)
 		return;
 	}
 	QMetaObject::invokeMethod(self, [self] { self->UpdateCurrentScene(); }, Qt::QueuedConnection);
+	QMetaObject::invokeMethod(transitions_dock, [] { transitions_dock->UpdateCurrentTransition(); }, Qt::QueuedConnection);
 }
 
 void ScenesDock::UpdateCurrentScene()
@@ -912,7 +919,9 @@ void ScenesDock::UpdateCurrentScene()
 	if (!current_scene) {
 		return;
 	}
-	sources_dock->SetScene(current_scene);
+	if (sources_dock) {
+		sources_dock->SetScene(current_scene);
+	}
 	auto items = sceneList->findItems(QString::fromUtf8(obs_source_get_name(current_scene)), Qt::MatchExactly);
 	obs_source_release(current_scene);
 	if (items.isEmpty()) {
@@ -933,6 +942,31 @@ void ScenesDock::transition_action(void *data, calldata_t *cd)
 
 void ScenesDock::FinishedLoading()
 {
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	QMenu *dockMenu = main_window->menuBar()->findChild<QMenu *>("menuDocks");
+	if (dockMenu) {
+		QMenu *dockSubMenu = nullptr;
+		auto actions = dockMenu->actions();
+		for (qsizetype i = 0; i < actions.count(); ++i) {
+			if (actions[i]->objectName() == "resetDocks") {
+				dockSubMenu = new QMenu(obs_module_text("OriginalDocks"), dockMenu);
+				dockMenu->insertSeparator(actions[i + 1]);
+				dockMenu->insertMenu(actions[i + 1], dockSubMenu);
+				break;
+			}
+		}
+		if (dockSubMenu) {
+			QList<QString> dockNames = {"scenesDock", "sourcesDock", "transitionsDock", "controlsDock"};
+			for (auto &dockName : dockNames) {
+				auto dock = main_window->findChild<QDockWidget *>(dockName);
+				auto dockAction = dock ? dock->toggleViewAction() : nullptr;
+				if (dockAction) {
+					dockMenu->removeAction(dockAction);
+					dockSubMenu->addAction(dockAction);
+				}
+			}
+		}
+	}
 	if (canvas) {
 		return;
 	}
@@ -943,4 +977,27 @@ void ScenesDock::FinishedLoading()
 	canvasDock = nullptr;
 	SwitchToCanvas(mc);
 	obs_canvas_release(mc);
+}
+
+void ScenesDock::UpdateCanvasFromDockList(QList<QDockWidget *> visible_canvas_docks)
+{
+	auto dock_name = visible_canvas_docks.first()->objectName();
+	if (canvasDock){
+		if (!visible_canvas_docks.contains(qobject_cast<QDockWidget *>(canvasDock->parentWidget()))) {
+			handleFocusChange(nullptr, visible_canvas_docks.first()->widget());
+		}
+		return;
+	}
+	
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
+	if (!main_dock) {
+		main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
+	}
+	if (!main_dock) {
+		return;
+	}
+	if (!visible_canvas_docks.contains(main_dock)) {
+		handleFocusChange(nullptr, visible_canvas_docks.first()->widget());
+	}
 }

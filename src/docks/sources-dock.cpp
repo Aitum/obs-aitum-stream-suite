@@ -9,6 +9,8 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+extern SourcesDock *sources_dock;
+
 SourcesDock::SourcesDock(QWidget *parent) : QFrame(parent)
 {
 	setObjectName("AitumStreamSuiteSourcesDock");
@@ -257,6 +259,7 @@ SourcesDock::SourcesDock(QWidget *parent) : QFrame(parent)
 SourcesDock::~SourcesDock()
 {
 	obs_weak_source_release(scene);
+	sources_dock = nullptr;
 }
 
 obs_sceneitem_t *SourcesDock::GetCurrentSceneItem()

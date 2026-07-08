@@ -50,6 +50,7 @@ private:
 	friend class OBSProjector;
 	friend class ScenesDock;
 	friend class SourcesDock;
+	friend class TransitionsDock;
 	std::string canvas_name;
 	SwitchingSplitter *canvas_split = nullptr;
 	SwitchingSplitter *panel_split = nullptr;

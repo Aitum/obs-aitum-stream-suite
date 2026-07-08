@@ -33,6 +33,7 @@ private slots:
 	void handleFocusChange(QWidget *old, QWidget *now);
 	void handleTabifiedDockWidgetActivated(QDockWidget *dockWidget);
 	void FinishedLoading();
+	void UpdateCanvasFromDockList(QList<QDockWidget *> visible_canvas_docks);
 
 public:
 	ScenesDock(QWidget *parent = nullptr);
