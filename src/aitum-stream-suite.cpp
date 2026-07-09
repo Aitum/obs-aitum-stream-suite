@@ -1706,6 +1706,7 @@ bool obs_module_load(void)
 				restart = true;
 			}
 			config_set_bool(user_config, "BasicWindow", "VerticalVolControl", true);
+			config_set_bool(user_config, "BasicWindow", "ShowContextToolbars", false);
 			config_set_bool(user_config, "Aitum", "ThemeSet", true);
 			config_save_safe(user_config, "tmp", "bak");
 		}

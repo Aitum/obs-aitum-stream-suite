@@ -1,13 +1,14 @@
 #include "../dialogs/name-dialog.hpp"
+#include "../utils/widgets/focus-scroll-spinbox.hpp"
 #include "transitions-dock.hpp"
 #include <obs.hpp>
 #include <obs-frontend-api.h>
 #include <obs-module.h>
+#include <QMainWindow>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QMessageBox>
-#include <QMainWindow>
 
 extern TransitionsDock *transitions_dock;
 
@@ -25,9 +26,10 @@ TransitionsDock::TransitionsDock(QWidget *parent) : QFrame(parent)
 	hl->setSpacing(4);
 
 	auto durationLabel = new QLabel(QString::fromUtf8(obs_frontend_get_locale_string("Basic.TransitionDuration")));
-	duration = new QSpinBox();
+	duration = new FocusScrollSpinBox();
 	duration->setMinimum(50);
 	duration->setMaximum(20000);
+	duration->setSingleStep(50);
 	duration->setSuffix(QStringLiteral("ms"));
 	connect(duration, QOverload<int>::of(&QSpinBox::valueChanged), [this](int d) { obs_frontend_set_transition_duration(d); });
 	durationLabel->setBuddy(duration);

@@ -18,6 +18,7 @@ extern "C" {
 #include <QLabel>
 #include <QSpinBox>
 #include <QScrollArea>
+#include "../utils/widgets/focus-scroll-spinbox.hpp"
 
 FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames, obs_data_t *settings)
 	: QDialog(parent),
@@ -362,7 +363,7 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Adv.FFmpeg.MuxerSettings")),
 			   advOutFFMCfg);
 
-	auto advOutFFVBitrate = new QSpinBox;
+	auto advOutFFVBitrate = new FocusScrollSpinBox;
 	advOutFFVBitrate->setSingleStep(50);
 	advOutFFVBitrate->setSuffix(" Kbps");
 	advOutFFVBitrate->setRange(0, 1000000000);
@@ -371,7 +372,7 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.VideoBitrate")),
 			   advOutFFVBitrate);
 
-	auto advOutFFVGOPSize = new QSpinBox;
+	auto advOutFFVGOPSize = new FocusScrollSpinBox;
 	advOutFFVGOPSize->setRange(0, 1000000000);
 	advOutFFVGOPSize->setValue(gopSize);
 	connect(advOutFFVGOPSize, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value) { gopSize = value; });
@@ -442,7 +443,7 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Adv.FFmpeg.VEncoderSettings")),
 			   advOutFFVCfg);
 
-	auto advOutFFABitrate = new QSpinBox;
+	auto advOutFFABitrate = new FocusScrollSpinBox;
 	advOutFFABitrate->setRange(32, 4096);
 	advOutFFABitrate->setSingleStep(16);
 	advOutFFABitrate->setValue(aBitrate);

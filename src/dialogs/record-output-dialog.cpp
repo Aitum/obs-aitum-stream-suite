@@ -11,6 +11,7 @@
 #include <QRegularExpression>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include "../utils/widgets/focus-scroll-spinbox.hpp"
 
 RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames, bool backtrack_)
 	: QDialog(parent),
@@ -123,7 +124,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Format")), fileFormatCombo);
 
-	auto maxTime = new QSpinBox();
+	auto maxTime = new FocusScrollSpinBox();
 	maxTime->setMinimum(0);
 	maxTime->setMaximum(31536000);
 	maxTime->setSuffix(" s");
@@ -131,7 +132,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QStringList _otherNames,
 	if (backtrack)
 		maxTime->setValue(30);
 
-	auto maxSize = new QSpinBox();
+	auto maxSize = new FocusScrollSpinBox();
 	maxSize->setMinimum(0);
 	maxSize->setMaximum(1073741824);
 	maxSize->setSuffix(" MB");
@@ -305,7 +306,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Format")), fileFormatCombo);
 
-	auto maxTime = new QSpinBox();
+	auto maxTime = new FocusScrollSpinBox();
 	maxTime->setMinimum(0);
 	maxTime->setMaximum(31536000);
 	maxTime->setSuffix(" s");
@@ -315,7 +316,7 @@ RecordOutputDialog::RecordOutputDialog(QDialog *parent, QString name, QString pa
 		validateOutputs(confirmButton);
 	});
 
-	auto maxSize = new QSpinBox();
+	auto maxSize = new FocusScrollSpinBox();
 	maxSize->setMinimum(0);
 	maxSize->setMaximum(1073741824);
 	maxSize->setSuffix(" MB");

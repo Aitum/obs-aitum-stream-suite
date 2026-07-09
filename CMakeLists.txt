@@ -116,6 +116,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/alignment-selector.cpp
   src/utils/widgets/capture-widget.cpp
   src/utils/widgets/double-slider.cpp
+  src/utils/widgets/focus-scroll-spinbox.cpp
   src/utils/widgets/hotkey-edit.cpp
   src/utils/widgets/locked-checkbox.cpp
   src/utils/widgets/output-widget.cpp
@@ -137,6 +138,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/alignment-selector.hpp
   src/utils/widgets/capture-widget.hpp
   src/utils/widgets/double-slider.hpp
+  src/utils/widgets/focus-scroll-spinbox.hpp
   src/utils/widgets/hotkey-edit.hpp
   src/utils/widgets/locked-checkbox.hpp
   src/utils/widgets/output-widget.hpp

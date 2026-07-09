@@ -1,6 +1,7 @@
 #include "../utils/icon.hpp"
 #include "../utils/widgets/locked-checkbox.hpp"
 #include "../utils/widgets/visibility-checkbox.hpp"
+#include "../utils/widgets/focus-scroll-spinbox.hpp"
 #include "properties-dock.hpp"
 #include "transform-dock.hpp"
 #include <graphics/matrix4.h>
@@ -618,7 +619,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_2->addWidget(positionXLabel, 1, 0, 1, 1);
 
-	sizeX = new QDoubleSpinBox(transformSettings);
+	sizeX = new FocusScrollDoubleSpinBox(transformSettings);
 	sizeX->setObjectName("sizeX");
 	sizeX->setMinimumSize(QSize(120, 0));
 	sizeX->setMaximumSize(QSize(120, 16777215));
@@ -639,7 +640,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_2->addWidget(label_2, 0, 4, 1, 1);
 
-	positionX = new QDoubleSpinBox(transformSettings);
+	positionX = new FocusScrollDoubleSpinBox(transformSettings);
 	positionX->setObjectName("positionX");
 	positionX->setMinimumSize(QSize(120, 0));
 	positionX->setMaximumSize(QSize(120, 16777215));
@@ -652,7 +653,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_2->addWidget(positionX, 1, 1, 1, 1);
 
-	rotation = new QDoubleSpinBox(transformSettings);
+	rotation = new FocusScrollDoubleSpinBox(transformSettings);
 	rotation->setObjectName("rotation");
 	QSizePolicy sizePolicy1(QSizePolicy::Policy::Maximum, QSizePolicy::Policy::Fixed);
 	sizePolicy1.setHorizontalStretch(0);
@@ -700,7 +701,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_2->addWidget(positionYLabel, 2, 0, 1, 1);
 
-	positionY = new QDoubleSpinBox(transformSettings);
+	positionY = new FocusScrollDoubleSpinBox(transformSettings);
 	positionY->setObjectName("positionY");
 	positionY->setMinimumSize(QSize(120, 0));
 	positionY->setMaximumSize(QSize(120, 16777215));
@@ -713,7 +714,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_2->addWidget(positionY, 2, 1, 1, 1);
 
-	sizeY = new QDoubleSpinBox(transformSettings);
+	sizeY = new FocusScrollDoubleSpinBox(transformSettings);
 	sizeY->setObjectName("sizeY");
 	sizeY->setMinimumSize(QSize(120, 0));
 	sizeY->setMaximumSize(QSize(120, 16777215));
@@ -844,7 +845,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_3->addWidget(boundsHeightLabel, 3, 0, 1, 1);
 
-	boundsWidth = new QDoubleSpinBox(boundsSettings);
+	boundsWidth = new FocusScrollDoubleSpinBox(boundsSettings);
 	boundsWidth->setObjectName("boundsWidth");
 	boundsWidth->setEnabled(false);
 	boundsWidth->setMinimumSize(QSize(120, 0));
@@ -858,7 +859,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout_3->addWidget(boundsWidth, 2, 1, 1, 1);
 
-	boundsHeight = new QDoubleSpinBox(boundsSettings);
+	boundsHeight = new FocusScrollDoubleSpinBox(boundsSettings);
 	boundsHeight->setObjectName("boundsHeight");
 	boundsHeight->setEnabled(false);
 	boundsHeight->setMinimumSize(QSize(120, 0));
@@ -912,7 +913,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout->addWidget(cropRightLabel, 1, 2, 1, 1);
 
-	cropBottom = new QSpinBox(cropSettings);
+	cropBottom = new FocusScrollSpinBox(cropSettings);
 	cropBottom->setObjectName("cropBottom");
 	sizePolicy1.setHeightForWidth(cropBottom->sizePolicy().hasHeightForWidth());
 	cropBottom->setSizePolicy(sizePolicy1);
@@ -929,7 +930,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout->addItem(horizontalSpacer_2, 1, 4, 1, 1);
 
-	cropRight = new QSpinBox(cropSettings);
+	cropRight = new FocusScrollSpinBox(cropSettings);
 	cropRight->setObjectName("cropRight");
 	sizePolicy1.setHeightForWidth(cropRight->sizePolicy().hasHeightForWidth());
 	cropRight->setSizePolicy(sizePolicy1);
@@ -941,7 +942,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout->addWidget(cropRight, 1, 3, 1, 1);
 
-	cropLeft = new QSpinBox(cropSettings);
+	cropLeft = new FocusScrollSpinBox(cropSettings);
 	cropLeft->setObjectName("cropLeft");
 	sizePolicy1.setHeightForWidth(cropLeft->sizePolicy().hasHeightForWidth());
 	cropLeft->setSizePolicy(sizePolicy1);
@@ -961,7 +962,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 
 	gridLayout->addWidget(cropTopLabel, 2, 0, 1, 1);
 
-	cropTop = new QSpinBox(cropSettings);
+	cropTop = new FocusScrollSpinBox(cropSettings);
 	cropTop->setObjectName("cropTop");
 	sizePolicy1.setHeightForWidth(cropTop->sizePolicy().hasHeightForWidth());
 	cropTop->setSizePolicy(sizePolicy1);
@@ -1055,7 +1056,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 	});
 	transitionGridLayout->addWidget(showTransitionProps, 1, 2, 1, 1);
 
-	showTransitionDuration = new QSpinBox(transitionSettings);
+	showTransitionDuration = new FocusScrollSpinBox(transitionSettings);
 	showTransitionDuration->setMinimum(50);
 	showTransitionDuration->setSuffix(" ms");
 	showTransitionDuration->setMaximum(20000);
@@ -1116,7 +1117,7 @@ TransformDock::TransformDock(QWidget *parent) : QFrame(parent)
 	});
 	transitionGridLayout->addWidget(hideTransitionProps, 2, 2, 1, 1);
 
-	hideTransitionDuration = new QSpinBox(transitionSettings);
+	hideTransitionDuration = new FocusScrollSpinBox(transitionSettings);
 	hideTransitionDuration->setMinimum(50);
 	hideTransitionDuration->setSuffix(" ms");
 	hideTransitionDuration->setMaximum(20000);

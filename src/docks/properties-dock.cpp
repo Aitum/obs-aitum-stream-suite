@@ -20,6 +20,7 @@
 #include <src/utils/color.hpp>
 #include <src/utils/widgets/slider-ignore-scroll.hpp>
 #include <src/utils/widgets/double-slider.hpp>
+#include <src/utils/widgets/focus-scroll-spinbox.hpp>
 
 extern FiltersDock *filters_dock;
 extern TransformDock *transform_dock;
@@ -434,7 +435,7 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 		obs_number_type int_type = obs_property_int_type(property);
 		QWidget *widget = nullptr;
 
-		auto spin = new QSpinBox();
+		auto spin = new FocusScrollSpinBox();
 		spin->setEnabled(obs_property_enabled(property));
 		spin->setMinimum(obs_property_int_min(property));
 		spin->setMaximum(obs_property_int_max(property));
@@ -485,7 +486,7 @@ void PropertiesDock::AddProperty(obs_properties_t *properties, obs_property_t *p
 		obs_number_type float_type = obs_property_float_type(property);
 		QWidget *widget = nullptr;
 
-		auto spin = new QDoubleSpinBox();
+		auto spin = new FocusScrollDoubleSpinBox();
 		spin->setEnabled(obs_property_enabled(property));
 		spin->setMinimum(obs_property_float_min(property));
 		spin->setMaximum(obs_property_float_max(property));

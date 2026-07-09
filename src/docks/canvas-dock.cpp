@@ -1,9 +1,13 @@
 #include "../dialogs/name-dialog.hpp"
 #include "../utils/color.hpp"
 #include "../utils/icon.hpp"
+#include "../utils/widgets/focus-scroll-spinbox.hpp"
 #include "../utils/widgets/source-tree.hpp"
 #include "canvas-dock.hpp"
 #include "sources-dock.hpp"
+#include <graphics/matrix4.h>
+#include <obs-frontend-api.h>
+#include <obs-module.h>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QGroupBox>
@@ -19,13 +23,9 @@
 #include <QSplitter>
 #include <QToolBar>
 #include <QWidgetAction>
-
-#include <graphics/matrix4.h>
-#include <obs-frontend-api.h>
-#include <obs-module.h>
+#include <src/utils/obs-websocket-api.h>
 #include <util/dstr.h>
 #include <util/platform.h>
-#include <src/utils/obs-websocket-api.h>
 
 #define HANDLE_RADIUS 4.0f
 #define HELPER_ROT_BREAKPONT 45.0f
@@ -2936,7 +2936,7 @@ void CanvasDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	const char *curTransition = obs_data_get_string(private_settings, "transition");
 	int curDuration = (int)obs_data_get_int(private_settings, "transition_duration");
 
-	QSpinBox *duration = new QSpinBox(tom);
+	QSpinBox *duration = new FocusScrollSpinBox(tom);
 	duration->setMinimum(50);
 	duration->setSuffix(" ms");
 	duration->setMaximum(20000);
@@ -3773,7 +3773,7 @@ QMenu *CanvasDock::CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t 
 		curDuration = obs_frontend_get_transition_duration();
 	}
 
-	QSpinBox *duration = new QSpinBox(menu);
+	QSpinBox *duration = new FocusScrollSpinBox(menu);
 	duration->setMinimum(50);
 	duration->setSuffix(" ms");
 	duration->setMaximum(20000);

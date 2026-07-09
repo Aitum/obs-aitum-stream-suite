@@ -1,9 +1,9 @@
 #include "../version.h"
 #include "config-dialog.hpp"
-#include "obs-module.h"
-#include "stream-output-dialog.hpp"
-#include "record-output-dialog.hpp"
 #include "ffmpeg-output-dialog.hpp"
+#include "obs-module.h"
+#include "record-output-dialog.hpp"
+#include "stream-output-dialog.hpp"
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
@@ -31,6 +31,7 @@
 #include <QUrl>
 #include <src/docks/canvas-dock.hpp>
 #include <src/utils/color.hpp>
+#include <src/utils/widgets/focus-scroll-spinbox.hpp>
 #include <sstream>
 #include <util/config-file.h>
 #include <util/dstr.h>
@@ -1049,7 +1050,7 @@ void OBSBasicSettings::AddProperty(obs_properties_t *properties, obs_property_t 
 			}
 		});
 	} else if (type == OBS_PROPERTY_INT) {
-		auto widget = new QSpinBox();
+		auto widget = new FocusScrollSpinBox();
 		widget->setEnabled(obs_property_enabled(property));
 		widget->setMinimum(obs_property_int_min(property));
 		widget->setMaximum(obs_property_int_max(property));
@@ -1071,7 +1072,7 @@ void OBSBasicSettings::AddProperty(obs_properties_t *properties, obs_property_t 
 			}
 		});
 	} else if (type == OBS_PROPERTY_FLOAT) {
-		auto widget = new QDoubleSpinBox();
+		auto widget = new FocusScrollDoubleSpinBox();
 		widget->setEnabled(obs_property_enabled(property));
 		widget->setMinimum(obs_property_float_min(property));
 		widget->setMaximum(obs_property_float_max(property));
@@ -1950,7 +1951,7 @@ void OBSBasicSettings::LoadOutputLayout(obs_data_t *settings, QFormLayout *outpu
 		auto customDelayLayout = new QFormLayout;
 		customDelayGroup->setLayout(customDelayLayout);
 
-		auto streamDelaySec = new QSpinBox;
+		auto streamDelaySec = new FocusScrollSpinBox;
 		streamDelaySec->setObjectName("streamDelaySec");
 		streamDelaySec->setSuffix(QString::fromUtf8(" s"));
 		streamDelaySec->setMinimum(0);

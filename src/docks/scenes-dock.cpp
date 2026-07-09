@@ -17,6 +17,7 @@
 #include <QVBoxLayout>
 #include <QWidgetAction>
 #include <src/utils/obs-websocket-api.h>
+#include <src/utils/widgets/focus-scroll-spinbox.hpp>
 
 extern obs_websocket_vendor vendor;
 extern SourcesDock *sources_dock;
@@ -489,7 +490,7 @@ void ScenesDock::ShowScenesContextMenu(QListWidgetItem *widget_item)
 	const char *curTransition = obs_data_get_string(private_settings, "transition");
 	int curDuration = (int)obs_data_get_int(private_settings, "transition_duration");
 
-	QSpinBox *duration = new QSpinBox(tom);
+	QSpinBox *duration = new FocusScrollSpinBox(tom);
 	duration->setMinimum(50);
 	duration->setSuffix(" ms");
 	duration->setMaximum(20000);
@@ -944,8 +945,8 @@ void ScenesDock::FinishedLoading()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	QMenu *dockMenu = main_window->menuBar()->findChild<QMenu *>("menuDocks");
+	QMenu *dockSubMenu = nullptr;
 	if (dockMenu) {
-		QMenu *dockSubMenu = nullptr;
 		auto actions = dockMenu->actions();
 		for (qsizetype i = 0; i < actions.count(); ++i) {
 			if (actions[i]->objectName() == "resetDocks") {
@@ -955,16 +956,19 @@ void ScenesDock::FinishedLoading()
 				break;
 			}
 		}
-		if (dockSubMenu) {
-			QList<QString> dockNames = {"scenesDock", "sourcesDock", "transitionsDock", "controlsDock"};
-			for (auto &dockName : dockNames) {
-				auto dock = main_window->findChild<QDockWidget *>(dockName);
-				auto dockAction = dock ? dock->toggleViewAction() : nullptr;
-				if (dockAction) {
-					dockMenu->removeAction(dockAction);
-					dockSubMenu->addAction(dockAction);
-				}
-			}
+	}
+	QList<QString> dockNames = {"scenesDock", "sourcesDock", "transitionsDock", "controlsDock"};
+	for (auto &dockName : dockNames) {
+		auto dock = main_window->findChild<QDockWidget *>(dockName);
+		if (!dock) {
+			continue;
+		}
+		dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable |
+				  QDockWidget::DockWidgetMovable);
+		auto dockAction = dock ? dock->toggleViewAction() : nullptr;
+		if (dockAction && dockSubMenu) {
+			dockMenu->removeAction(dockAction);
+			dockSubMenu->addAction(dockAction);
 		}
 	}
 	if (canvas) {
