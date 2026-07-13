@@ -1496,6 +1496,32 @@ AudioMixer QToolBar QToolButton {
     padding: 3px 3px 0 !important;
 }
 
+.mixer-category {
+    color: var(--text_muted);
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+VolumeName {
+    background: transparent;
+    padding: var(--padding_base) 0;
+    border: 1px solid transparent;
+}
+
+VolumeName QLabel {
+    font-size: var(--font_small);
+}
+
+VolumeName:focus {
+    border: 1px solid var(--button_border_hover);
+}
+
+VolumeName:hover {
+    background: var(--button_bg_hover);
+    border: 1px solid var(--button_border_hover);
+}
+
 VolControl #volLabel {
     padding: var(--padding_base);
     text-align: center;
@@ -1562,6 +1588,18 @@ VolControl #volLabel {
 .btn-monitor.checked:hover {
     background: var(--green3);
     border-color: var(--green1);
+}
+
+/* Toggle hidden button */
+
+.toggle-hidden:checked {
+    background: var(--purple5);
+    border-color: var(--purple3);
+}
+
+.toggle-hidden:disabled {
+    background: transparent;
+    border-color: transparent;
 }
 
 VolControl,
@@ -1699,6 +1737,11 @@ VolumeMeter {
 
 #vVolumeWidgets QPushButton {
     margin: 5px 2px 0;
+}
+
+VolumeControl.volume-hidden .mixer-name,
+VolumeControl.volume-inactive .mixer-name {
+    color: var(--text_muted);
 }
 
 VolumeControl.volume-pinned .mixer-category {
