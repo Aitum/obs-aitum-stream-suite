@@ -196,6 +196,7 @@
     --input_padding: var(--padding_large);
     --input_height: calc(var(--input_height_base) - calc(var(--input_padding) * 2));
     --input_height_half: calc(var(--input_height_base) / 2);
+    --spinbox_width: calc(var(--input_height_base) + calc(var(--input_padding) * 2px));
 
     --input_bg: var(--blueLight);
     --input_bg_hover: var(--grey7);
@@ -1108,6 +1109,7 @@ QDoubleSpinBox {
     border-radius: var(--border_radius);
     padding: var(--input_padding) 0px var(--input_padding) var(--input_padding);
     padding-left: 8px;
+    min-width: var(--spinbox_width);
     max-height: var(--input_height);
 }
 
@@ -1294,6 +1296,19 @@ MuteCheckBox::indicator:hover,
 MuteCheckBox::indicator:focus {
     border-color: var(--button_border);
     background-color: var(--button_bg_hover);
+}
+
+QToolButton:checked,
+.btn-tool:checked {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+}
+
+QToolButton:checked:hover,
+QToolButton:checked:focus,
+.btn-tool:checked:hover,
+.btn-tool:checked:focus {
+    border-color: var(--primary_lighter);
 }
 
 QPushButton::flat {
@@ -1511,6 +1526,17 @@ VolControl #volLabel {
     border-color: var(--yellow1);
 }
 
+.btn-mute.mute-warning {
+    color: var(--yellow1);
+    background: var(--yellow6);
+    qproperty-icon: url(theme:Aitum/unassigned.svg);
+}
+
+.btn-mute.mute-warning.hover,
+.btn-mute.mute-warning:focus {
+    border-color: var(--yellow1);
+}
+
 /* Monitor Button */
 
 .btn-monitor {
@@ -1557,6 +1583,13 @@ VolumeMeter {
     qproperty-magnitudeColor: rgb(0, 0, 0);
     qproperty-majorTickColor: var(--white1);
     qproperty-minorTickColor: var(--grey1);
+
+    qproperty-backgroundNominalColorDisabled: var(--black4);
+    qproperty-backgroundWarningColorDisabled: var(--black5);
+    qproperty-backgroundErrorColorDisabled: var(--black3);
+    qproperty-foregroundNominalColorDisabled: var(--white3);
+    qproperty-foregroundWarningColorDisabled: var(--white3);
+    qproperty-foregroundErrorColorDisabled: var(--white4);
 }
 
 /* Horizontal Mixer */
