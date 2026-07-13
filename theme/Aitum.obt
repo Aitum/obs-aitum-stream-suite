@@ -2444,8 +2444,47 @@ OBSBasicAdvAudio #scrollAreaWidgetContents {
     width:20px;
 }
 
+/* Add Source Dialog */
+SourceSelectButton {
+    background: var(--grey5);
+    padding: var(--padding_base) var(--padding_large);
+    margin: var(--spacing_base);
+    border-radius: var(--border_radius);
+    border: 1px solid var(--grey3);
+    outline: none;
+}
 
+SourceSelectButton QLabel {
+    padding: var(--padding_large) 0;
+    text-align: center;
+}
 
+SourceSelectButton #thumbnail {
+    background: var(--grey6);
+    border-radius: var(--border_radius);
+    padding: 0;
+    margin-top: var(--spacing_base);
+}
+
+SourceSelectButton:hover {
+    background-color: var(--button_bg_hover);
+}
+
+SourceSelectButton:checked {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+}
+
+SourceSelectButton:focus,
+SourceSelectButton:checked:focus {
+    border-color: var(--white3);
+}
+
+SourceSelectButton:pressed,
+SourceSelectButton:pressed:hover {
+    background-color: var(--button_bg_down);
+    border-color: var(--button_border);
+}
 
 /* Top Toolbar */
 QMainWindow>QToolBar{
@@ -2602,6 +2641,275 @@ QMainWindow>QToolBar QTabBar::tab::right {
     padding:10px;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
+}
+
+/* Idian Widgets */
+idian--Group {
+    border-radius: var(--border_radius);
+    font-weight: bold;
+    margin: 0 0 var(--spacing_base);
+    min-width: 300px;
+    max-width: 600px;
+}
+
+idian--Group .header .title {
+    font-weight: bold;
+    padding: var(--padding_large) 0;
+}
+
+idian--Group .header .description {
+    color: var(--text_muted);
+    padding: var(--spacing_small) 0;
+}
+
+idian--PropertiesList {
+    border-width: 0;
+    padding: 0;
+    margin: var(--spacing_base) 0;
+}
+
+idian--Row {
+    background: var(--grey5);
+    margin: 0;
+    padding: var(--action_row_padding) var(--action_row_padding_x);
+}
+
+idian--Row.keyFocus {
+    background: var(--grey4);
+    border: var(--highlight_width) solid var(--grey4);
+}
+
+idian--Row.cursor-pointer.hover {
+    background: var(--grey4);
+    border: var(--highlight_width) solid var(--grey1);
+}
+
+idian--Row.first {
+    border-top-left-radius: var(--border_radius);
+    border-top-right-radius: var(--border_radius);
+}
+
+idian--Row.last {
+    border-bottom-left-radius: var(--border_radius);
+    border-bottom-right-radius: var(--border_radius);
+}
+
+idian--Row > QLabel.description {
+    font-size: var(--font_small);
+    color: var(--text_muted);
+}
+
+idian--ToggleSwitch {
+    qproperty-background: var(--grey6);
+    qproperty-background_hover: var(--grey7);
+    qproperty-background_checked: var(--primary);
+    qproperty-background_checked_hover: var(--primary_light);
+
+    min-width: var(--toggle_width);
+    min-height: var(--toggle_height);
+
+    border-radius: var(--toggle_radius);
+
+    qproperty-handleColor: var(--white1);
+    qproperty-handleSize: var(--toggle_handle);
+
+    border: var(--highlight_width) solid transparent;
+}
+
+idian--ToggleSwitch.hover {
+    border-color: var(--grey4);
+}
+
+idian--ToggleSwitch.checked.hover {
+    border-color: var(--white1);
+}
+
+idian--ToggleSwitch.keyFocus {
+    border-color: var(--highlight_color);
+}
+
+idian--Row idian--ToggleSwitch.hover,
+idian--Row.hover > idian--ToggleSwitch.row-buddy {
+    border-color: var(--grey1);
+}
+
+idian--Row idian--ToggleSwitch.hover.checked,
+idian--Row.hover > idian--ToggleSwitch.checked.row-buddy {
+    border-color: var(--white1);
+}
+
+idian--Row QComboBox {
+    background-color: transparent;
+    min-height: var(--action_row_base);
+    max-height: var(--action_row_base);
+    min-width: var(--action_row_input_width);
+    border: var(--highlight_width) solid transparent;
+    padding: 0;
+    padding-left: var(--padding_xlarge);
+    margin: 0;
+}
+
+idian--Row QComboBox:focus {
+    border-color: transparent;
+}
+
+idian--Row QComboBox.hover {
+    border-color: var(--grey1);
+}
+
+idian--Row QComboBox.keyFocus {
+    border-color: var(--highlight_color);
+}
+
+idian--Row QComboBox::drop-down {
+    border: none;
+}
+
+idian--Row QComboBox::down-arrow {
+    image: url(theme:Dark/collapse.svg);
+}
+
+idian--Row QComboBox QAbstractItemView {
+    outline: none;
+}
+
+idian--Row QComboBox QAbstractItemView::item {
+    background-color: var(--bg_base);
+    padding: var(--padding_base) var(--padding_large);
+}
+
+idian--Row QComboBox QAbstractItemView.hover::item,
+idian--Row QComboBox QAbstractItemView::item:selected {
+    background-color: var(--list_item_bg_selected);
+    padding: var(--padding_base) var(--padding_large);
+}
+
+idian--Row QPushButton,
+idian--Row QSpinBox,
+idian--Row QDoubleSpinBox {
+    margin: 0;
+    padding: var(--padding_base) var(--action_row_padding_x);
+}
+
+idian--PropertiesListSpacer {
+    max-height: var(--spacing_small);
+    min-height: var(--spacing_small);
+    background-color: var(--bg_window);
+}
+
+idian--Row idian--CheckBox {
+    outline: none;
+}
+
+idian--CheckBox::indicator {
+    border: var(--highlight_width) solid transparent;
+    border-radius: var(--border_radius);
+}
+
+idian--CheckBox.keyFocus::indicator,
+idian--Row.hover > idian--CheckBox.row-buddy::indicator {
+    image: url(theme:Yami/checkbox_unchecked_focus.svg);
+}
+
+idian--CheckBox.keyFocus.checked::indicator,
+idian--Row.hover > idian--CheckBox.row-buddy.checked::indicator {
+    image: url(theme:Yami/checkbox_checked_focus.svg);
+}
+
+idian--CheckBox.hover::indicator,
+idian--CheckBox.checked.hover::indicator,
+idian--Row.hover > idian--CheckBox.row-buddy::indicator
+idian--Row.hover > idian--CheckBox.row-buddy.checked::indicator {
+    border-color: var(--grey1);
+}
+
+idian--CheckBox.keyFocus::indicator,
+idian--CheckBox.keyFocus.checked::indicator {
+    border-color: var(--highlight_color);
+}
+
+idian--CollapsibleRow {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+idian--CollapsibleRow.keyFocus {
+    border: var(--highlight_width) solid var(--highlight_color);
+}
+
+idian--CollapsibleRow idian--PropertiesList {
+    border-radius: 0;
+    border-left: 1px solid var(--grey5);
+    border-right: 1px solid var(--grey5);
+    border-bottom: 1px solid var(--grey5);
+    margin: var(--spacing_small) 0px 0px;
+}
+
+idian--CollapsibleRow idian--PropertiesList idian--Row {
+    background-color: var(--grey6);
+    padding-left: var(--action_row_padding_nested);
+}
+
+idian--CollapsibleRow idian--Row.first,
+idian--CollapsibleRow idian--Row.last {
+    border-radius: 0;
+}
+
+idian--CollapsibleRow idian--PropertiesList idian--ToggleSwitch {
+    qproperty-background: var(--grey7);
+    qproperty-background_hover: var(--grey6);
+}
+
+idian--ExpandButton {
+    background: transparent;
+    min-width: var(--action_row_collapse);
+    max-width: var(--action_row_collapse);
+    min-height: var(--action_row_collapse);
+    max-height: var(--action_row_collapse);
+    border: none;
+}
+
+idian--ExpandButton::indicator {
+    background: var(--grey5);
+    border-radius: var(--action_row_collapse_radius);
+    padding: var(--padding_large);
+    image: url(theme:Dark/down.svg);
+    border: var(--highlight_width) solid var(--grey5);
+}
+
+idian--ExpandButton::indicator:checked {
+    image: url(theme:Dark/up.svg);
+}
+
+idian--ExpandButton.keyFocus,
+idian--ExpandButton.keyFocus::indicator {
+    border-color: var(--highlight_color);
+}
+
+idian--RowFrame .btn-frame {
+    background: var(--grey5);
+    padding: var(--action_row_padding) var(--action_row_padding_x);
+}
+
+idian--RowFrame.hover .btn-frame {
+    background: var(--grey4);
+}
+
+idian--RowFrame.hover idian--Row {
+    background: var(--grey4);
+    border: var(--highlight_width) solid var(--grey1);
+    border-right: none;
+}
+
+idian--RowFrame.hover .row-buddy {
+    background: var(--grey4);
+    border: var(--highlight_width) solid var(--grey1);
+    border-left: none;
+}
+
+idian--RowFrame.hover idian--ExpandButton::indicator {
+    border-color: var(--grey1);
 }
 
 AlignmentSelector {
