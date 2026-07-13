@@ -438,13 +438,14 @@ void reset_build_dock_state()
 		{QStringLiteral("AitumStreamSuiteScenes"), Qt::LeftDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteSources"), Qt::LeftDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteFilters"), Qt::LeftDockWidgetArea},
-		{QStringLiteral("AitumStreamSuiteTransitions"), Qt::LeftDockWidgetArea},
 
 		{QStringLiteral("AitumStreamSuiteMainCanvas"), Qt::TopDockWidgetArea},
 		{QStringLiteral("previewDock"), Qt::TopDockWidgetArea},
 
-		{QStringLiteral("AitumStreamSuiteProperties"), Qt::BottomDockWidgetArea},
-		{QStringLiteral("AitumStreamSuiteTransform"), Qt::BottomDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteProperties"), Qt::RightDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteTransform"), Qt::RightDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteTransitions"), Qt::RightDockWidgetArea},
+
 		{QStringLiteral("mixerDock"), Qt::BottomDockWidgetArea},
 		{QStringLiteral("SceneNotesDock"), Qt::BottomDockWidgetArea},
 	};
@@ -488,6 +489,12 @@ void reset_build_dock_state()
 				dock->setVisible(false);
 			}
 		}
+	}
+
+	auto props = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteProperties"));
+	auto transform = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteTransform"));
+	if (props && transform) {
+		main_window->tabifyDockWidget(props, transform);
 	}
 
 	auto mcd = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
