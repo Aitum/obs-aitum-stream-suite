@@ -10,10 +10,13 @@
 #include <QHeaderView>
 #include <set>
 
+class OutputStatsModel;
+
 class StatsDock : public QFrame {
 	Q_OBJECT
 private:
 	QTableView *table = nullptr;
+	OutputStatsModel *model = nullptr;
 
 private slots:
 	void LoadMode(QString mode);

@@ -20,7 +20,7 @@ StatsDock::StatsDock(QWidget *parent) : QFrame(parent)
 	table->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	table->setSortingEnabled(true);
 
-	auto model = new OutputStatsModel([this]() { return isVisible(); });
+	model = new OutputStatsModel([this]() { return isVisible(); });
 	model->setGraphWidthFunc([this](int i) { return table->columnWidth(i); });
 	auto proxyModel = new QSortFilterProxyModel(this);
 	proxyModel->setSourceModel(model);
@@ -78,7 +78,9 @@ StatsDock::StatsDock(QWidget *parent) : QFrame(parent)
 	layout->addWidget(table);
 }
 
-StatsDock::~StatsDock() {}
+StatsDock::~StatsDock() {
+	delete model;
+}
 
 void StatsDock::LoadMode(QString mode)
 {
@@ -122,7 +124,9 @@ OutputStatsModel::OutputStatsModel(std::function<bool()> isActiveFunc, QObject *
 	updateTimer.start();
 }
 
-OutputStatsModel::~OutputStatsModel() {}
+OutputStatsModel::~OutputStatsModel() {
+	updateTimer.stop();
+}
 
 int OutputStatsModel::rowCount(const QModelIndex &) const
 {
