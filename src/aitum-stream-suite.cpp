@@ -32,6 +32,7 @@
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QToolBar>
+#include <random>
 #include <util/dstr.h>
 
 OBS_DECLARE_MODULE()
@@ -69,6 +70,7 @@ extern std::list<CanvasCloneDock *> canvas_clone_docks;
 extern obs_websocket_vendor vendor;
 
 std::list<QFrame *> empty_docks;
+std::vector<std::tuple<std::string, std::string, std::string>> extensions = {};
 
 extern QWidget *aitumSettingsWidget;
 
@@ -229,6 +231,43 @@ bool version_info_downloaded(void *param, struct file_download_data *file)
 		}
 	}
 	obs_data_array_release(blocks);
+	obs_data_array_t *ea = obs_data_get_array(data_obj, "extensions");
+	size_t ec = obs_data_array_count(ea);
+	if (ec > 0) {
+		extensions.clear();
+		for (size_t i = 0; i < ec; i++) {
+			obs_data_t *extension = obs_data_array_item(ea, i);
+			extensions.push_back({obs_data_get_string(extension, "name"), obs_data_get_string(extension, "title"),
+					      obs_data_get_string(extension, "url")});
+			obs_data_release(extension);
+		}
+		for (int i = 0; i < modesTabBar->count(); ++i) {
+			if (modesTabBar->tabData(i) == QString::fromUtf8("Extensions")) {
+				modesTabBar->setTabVisible(i, true);
+				break;
+			}
+		}
+	}
+	obs_data_array_release(ea);
+
+	if (obs_data_get_bool(data_obj, "show_overlays")) {
+		for (int i = 0; i < modesTabBar->count(); ++i) {
+			if (modesTabBar->tabData(i) == QString::fromUtf8("Overlays")) {
+				modesTabBar->setTabVisible(i, true);
+
+				break;
+			}
+		}
+		QMetaObject::invokeMethod(toolbar, [] {
+			auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			obs_frontend_add_dock_by_id("AitumStreamSuiteOverlays", obs_module_text("AitumStreamSuiteOverlays"),
+						    new BrowserDock("overlays", "https://chat.aitumsuite.tv/overlays",
+								    main_window));
+			obs_frontend_add_dock_by_id("AitumStreamSuiteSelect", obs_module_text("AitumStreamSuiteSelect"),
+						    new BrowserDock("select", "https://chat.aitumsuite.tv/select", main_window));
+		});
+	}
+
 	obs_data_release(data_obj);
 
 	if (version_download_info) {
@@ -445,6 +484,7 @@ void reset_build_dock_state()
 		{QStringLiteral("AitumStreamSuiteProperties"), Qt::RightDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteTransform"), Qt::RightDockWidgetArea},
 		{QStringLiteral("AitumStreamSuiteTransitions"), Qt::RightDockWidgetArea},
+		{QStringLiteral("AitumStreamSuiteSelect"), Qt::RightDockWidgetArea},
 
 		{QStringLiteral("mixerDock"), Qt::BottomDockWidgetArea},
 		{QStringLiteral("SceneNotesDock"), Qt::BottomDockWidgetArea},
@@ -495,6 +535,10 @@ void reset_build_dock_state()
 	auto transform = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteTransform"));
 	if (props && transform) {
 		main_window->tabifyDockWidget(props, transform);
+		auto select = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteSelect"));
+		if (select) {
+			main_window->tabifyDockWidget(props, select);
+		}
 	}
 
 	auto mcd = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
@@ -587,10 +631,111 @@ void reset_design_dock_state()
 	save_dock_state(QString::fromStdString("Design"));
 }
 
-std::vector<std::tuple<std::string, void (*)(void), QString>> fixed_tabs = {
-	{"Live", reset_live_dock_state, QString::fromUtf8("📡")},
-	{"Build", reset_build_dock_state, QString::fromUtf8("🔨")}};
-//,{"Design", reset_design_dock_state, QString::fromUtf8("🎨")}};
+void reset_overlays_dock_state()
+{
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	auto docks = main_window->findChildren<QDockWidget *>();
+	QDockWidget *od = nullptr;
+	for (auto &d : docks) {
+		if (d->objectName() == QStringLiteral("AitumStreamSuiteOverlays")) {
+			d->setVisible(true);
+			od = d;
+		} else {
+			d->setVisible(false);
+		}
+	}
+	if (!od) {
+		od = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteOverlays"));
+	}
+	if (!od) {
+		return;
+	}
+	od->setVisible(true);
+	od->setFloating(false);
+	if (main_window->dockWidgetArea(od) != Qt::TopDockWidgetArea) {
+		main_window->addDockWidget(Qt::TopDockWidgetArea, od);
+	}
+	QMetaObject::invokeMethod(
+		main_window,
+		[main_window, od] {
+			auto cw = main_window->centralWidget();
+			if (cw && cw->height() > 10 && cw->width() > 10) {
+				main_window->resizeDocks({od}, {main_window->height()}, Qt::Vertical);
+			}
+		},
+		Qt::QueuedConnection);
+}
+
+void reset_extensions_dock_state()
+{
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	auto docks = main_window->findChildren<QDockWidget *>();
+	for (auto &d : docks) {
+		bool found = false;
+		for (auto &e : extensions) {
+			if (d->objectName() == QString::fromStdString(std::get<0>(e).c_str())) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			d->setVisible(false);
+		}
+	}
+	std::shuffle(extensions.begin(), extensions.end(), std::default_random_engine());
+	bool resize = false;
+	QList<QDockWidget *> extension_docks;
+	QList<int> extension_dock_sizes;
+	for (auto &e : extensions) {
+		auto name = QString::fromStdString(std::get<0>(e));
+		auto title = QString::fromStdString(std::get<1>(e));
+		auto d = main_window->findChild<QDockWidget *>(name);
+		if (!d) {
+			d = new QDockWidget(title, main_window);
+			d->setObjectName(name);
+			auto bd = new BrowserDock(std::get<0>(e).c_str(), std::get<2>(e).c_str(), d);
+			d->setWidget(bd);
+			//obs_frontend_add_dock_by_id(std::get<0>(e).c_str(), std::get<1>(e).c_str(), bd);
+			obs_frontend_add_custom_qdock(std::get<0>(e).c_str(), d);
+			//d = main_window->findChild<QDockWidget *>(name);
+			d->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+		}
+		d->setVisible(true);
+		d->setFloating(false);
+		if (main_window->dockWidgetArea(d) != Qt::TopDockWidgetArea) {
+			main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+			resize = true;
+		}
+		extension_docks.append(d);
+		extension_dock_sizes.append(1);
+	}
+	if (extension_docks.isEmpty()) {
+		return;
+	}
+	if (resize) {
+		main_window->resizeDocks(extension_docks, extension_dock_sizes, Qt::Horizontal);
+	}
+	QMetaObject::invokeMethod(
+		main_window,
+		[main_window, extension_docks] {
+			auto cw = main_window->centralWidget();
+			if (cw && cw->height() > 10 && cw->width() > 10) {
+				QList<int> extension_dock_sizes;
+				for (auto i = 0; i < extension_docks.count(); ++i) {
+					extension_dock_sizes.append(main_window->height());
+				}
+				main_window->resizeDocks(extension_docks, extension_dock_sizes, Qt::Vertical);
+			}
+		},
+		Qt::QueuedConnection);
+}
+
+std::vector<std::tuple<std::string, void (*)(void), QString, bool>> fixed_tabs = {
+	{"Live", reset_live_dock_state, QString::fromUtf8("📡"), false},
+	{"Build", reset_build_dock_state, QString::fromUtf8("🔨"), false},
+	{"Overlays", reset_overlays_dock_state, QString::fromUtf8("✨"), true},
+	{"Extensions", reset_extensions_dock_state, QString::fromUtf8("🔌"), true}};
+//,{"Design", reset_design_dock_state, QString::fromUtf8("🎨"), false}};
 
 static bool scene_collection_changing = false;
 
@@ -612,14 +757,18 @@ void load_dock_state(QString mode)
 		setting_name = "dock_state_main_restored_" + mode.toLower().toStdString();
 		main_restored = obs_data_get_bool(current_profile_config, setting_name.c_str());
 	}
-	if (state.empty()) {
-		for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
-			auto name = std::get<0>(*it);
-			auto translated = obs_module_text(name.c_str());
-			if ((translated && mode == translated) || mode == QString::fromStdString(name)) {
+	void (*reset_func)(void) = nullptr;
+	for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
+		auto name = std::get<0>(*it);
+		auto translated = obs_module_text(name.c_str());
+		if ((translated && mode == translated) || mode == QString::fromStdString(name)) {
+			if (std::get<3>(*it)) {
+				reset_func = std::get<1>(*it);
+			} else if (state.empty()) {
 				std::get<1> (*it)();
 				return;
 			}
+			break;
 		}
 	}
 	QList<QDockWidget *> visible_canvas_docks;
@@ -706,6 +855,9 @@ void load_dock_state(QString mode)
 	if (scenes_dock && !visible_canvas_docks.isEmpty()) {
 		QMetaObject::invokeMethod(scenes_dock, "UpdateCanvasFromDockList",
 					  Q_ARG(QList<QDockWidget *>, visible_canvas_docks));
+	}
+	if (reset_func) {
+		reset_func();
 	}
 }
 
@@ -1299,6 +1451,8 @@ void unload_browser_panels()
 	obs_frontend_remove_dock("AitumStreamSuiteActivity");
 	obs_frontend_remove_dock("AitumStreamSuiteInfo");
 	obs_frontend_remove_dock("AitumStreamSuitePortal");
+	obs_frontend_remove_dock("AitumStreamSuiteOverlays");
+	obs_frontend_remove_dock("AitumStreamSuiteSelect");
 }
 
 static bool all_string_settings_the_same(obs_data_t *settings_a, obs_data_t *settings_b)
@@ -1441,6 +1595,17 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 					OBS_TASK_UI,
 					[](void *) {
 						unload_browser_panels();
+						const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+						for (auto &e : extensions) {
+							auto d = main_window ? main_window->findChild<QDockWidget *>(
+										       QString::fromStdString(std::get<0>(e)))
+									     : nullptr;
+							obs_frontend_remove_dock(std::get<0>(e).c_str());
+							if (d) {
+								main_window->removeDockWidget(d);
+								d->deleteLater();
+							}
+						}
 						DestroyPanelCookieManager();
 						if (cef) {
 							delete cef;
@@ -1738,6 +1903,7 @@ bool obs_module_load(void)
 		auto index = modesTabBar->addTab(QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
 		modesTabBar->setTabData(index, QString::fromUtf8(std::get<0>(it).c_str()));
 		modesTabBar->setTabIcon(index, generateEmojiQIcon(std::get<2>(it), modesTabBar->palette().color(QPalette::Text)));
+		modesTabBar->setTabVisible(index, !std::get<3>(it));
 	}
 	toolbar->addWidget(modesTabBar);
 	auto addModeAction =
@@ -2024,7 +2190,8 @@ bool obs_module_load(void)
 	sources_dock = new SourcesDock(main_window);
 	obs_frontend_add_dock_by_id("AitumStreamSuiteSources", obs_module_text("AitumStreamSuiteSources"), sources_dock);
 	transitions_dock = new TransitionsDock(main_window);
-	obs_frontend_add_dock_by_id("AitumStreamSuiteTransitions", obs_module_text("AitumStreamSuiteTransitions"), transitions_dock);
+	obs_frontend_add_dock_by_id("AitumStreamSuiteTransitions", obs_module_text("AitumStreamSuiteTransitions"),
+				    transitions_dock);
 
 	std::string url = "https://api.aitum.tv/plugin/streamsuite";
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
@@ -2180,6 +2347,8 @@ void obs_module_unload()
 	obs_frontend_remove_dock("AitumStreamSuiteActivity");
 	obs_frontend_remove_dock("AitumStreamSuiteInfo");
 	obs_frontend_remove_dock("AitumStreamSuitePortal");
+	obs_frontend_remove_dock("AitumStreamSuiteSelect");
+	obs_frontend_remove_dock("AitumStreamSuiteOverlays");
 
 	if (output_dock) {
 		delete output_dock;
