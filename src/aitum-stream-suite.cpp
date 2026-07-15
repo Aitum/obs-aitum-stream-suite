@@ -773,8 +773,8 @@ void load_dock_state(QString mode)
 	}
 	QList<QDockWidget *> visible_canvas_docks;
 	loaded_docks.clear();
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	if (!state.empty()) {
-		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		if (!main_window) {
 			return;
 		}
@@ -858,6 +858,22 @@ void load_dock_state(QString mode)
 	}
 	if (reset_func) {
 		reset_func();
+	} else if (main_window && !visible_canvas_docks.empty()) {
+		auto fd = visible_canvas_docks.first();
+		QMetaObject::invokeMethod(
+			main_window,
+			[main_window, fd] {
+				auto cw = main_window->centralWidget();
+				if (cw && cw->height() > 10 && cw->width() > 10) {
+					auto area = main_window->dockWidgetArea(fd);
+					if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
+						main_window->resizeDocks({fd}, {fd->height() + cw->height()}, Qt::Vertical);
+					} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
+						main_window->resizeDocks({fd}, {fd->width() + cw->width()}, Qt::Horizontal);
+					}
+				}
+			},
+			Qt::QueuedConnection);
 	}
 }
 
