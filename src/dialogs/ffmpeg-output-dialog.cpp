@@ -1,7 +1,115 @@
 #include "ffmpeg-output-dialog.hpp"
 extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
+typedef enum {
+	AV_CLASS_CATEGORY_NA = 0,
+	AV_CLASS_CATEGORY_INPUT,
+	AV_CLASS_CATEGORY_OUTPUT,
+	AV_CLASS_CATEGORY_MUXER,
+	AV_CLASS_CATEGORY_DEMUXER,
+	AV_CLASS_CATEGORY_ENCODER,
+	AV_CLASS_CATEGORY_DECODER,
+	AV_CLASS_CATEGORY_FILTER,
+	AV_CLASS_CATEGORY_BITSTREAM_FILTER,
+	AV_CLASS_CATEGORY_SWSCALER,
+	AV_CLASS_CATEGORY_SWRESAMPLER,
+	AV_CLASS_CATEGORY_DEVICE_VIDEO_OUTPUT = 40,
+	AV_CLASS_CATEGORY_DEVICE_VIDEO_INPUT,
+	AV_CLASS_CATEGORY_DEVICE_AUDIO_OUTPUT,
+	AV_CLASS_CATEGORY_DEVICE_AUDIO_INPUT,
+	AV_CLASS_CATEGORY_DEVICE_OUTPUT,
+	AV_CLASS_CATEGORY_DEVICE_INPUT,
+	AV_CLASS_CATEGORY_NB ///< not part of ABI/API
+} AVClassCategory;
+
+typedef struct AVClass {
+	const char *class_name;
+	const char *(*item_name)(void *ctx);
+	const struct AVOption *option;
+	int version;
+	int log_level_offset_offset;
+	int parent_log_context_offset;
+	AVClassCategory category;
+	AVClassCategory (*get_category)(void *ctx);
+	int (*query_ranges)(struct AVOptionRanges **, void *obj, const char *key, int flags);
+	void *(*child_next)(void *obj, void *prev);
+	const struct AVClass *(*child_class_iterate)(void **iter);
+} AVClass;
+
+enum AVCodecID {
+	AV_CODEC_ID_NONE,
+};
+
+struct AVCodecTag;
+
+typedef struct AVOutputFormat {
+	const char *name;
+	const char *long_name;
+	const char *mime_type;
+	const char *extensions;        /**< comma-separated filename extensions */
+	enum AVCodecID audio_codec;    /**< default audio codec */
+	enum AVCodecID video_codec;    /**< default video codec */
+	enum AVCodecID subtitle_codec; /**< default subtitle codec */
+	int flags;
+	const struct AVCodecTag *const *codec_tag;
+	const AVClass *priv_class; ///< AVClass for the private context
+} AVOutputFormat;
+
+#ifdef __GNUC__
+#define AV_GCC_VERSION_AT_LEAST(x, y) (__GNUC__ > (x) || __GNUC__ == (x) && __GNUC_MINOR__ >= (y))
+#define AV_GCC_VERSION_AT_MOST(x, y)  (__GNUC__ < (x) || __GNUC__ == (x) && __GNUC_MINOR__ <= (y))
+#else
+#define AV_GCC_VERSION_AT_LEAST(x, y) 0
+#define AV_GCC_VERSION_AT_MOST(x, y)  0
+#endif
+
+#if AV_GCC_VERSION_AT_LEAST(3, 1)
+#define attribute_deprecated __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define attribute_deprecated __declspec(deprecated)
+#else
+#define attribute_deprecated
+#endif
+
+typedef struct AVRational {
+	int num; ///< Numerator
+	int den; ///< Denominator
+} AVRational;
+
+typedef struct AVProfile {
+	int profile;
+	const char *name; ///< short name for the profile
+} AVProfile;
+
+enum AVMediaType {
+	AVMEDIA_TYPE_UNKNOWN = -1, ///< Usually treated as AVMEDIA_TYPE_DATA
+	AVMEDIA_TYPE_VIDEO,
+	AVMEDIA_TYPE_AUDIO,
+	AVMEDIA_TYPE_DATA, ///< Opaque data information usually continuous
+	AVMEDIA_TYPE_SUBTITLE,
+	AVMEDIA_TYPE_ATTACHMENT, ///< Opaque data information usually sparse
+	AVMEDIA_TYPE_NB
+};
+
+typedef struct AVCodec {
+	const char *name;
+	const char *long_name;
+	enum AVMediaType type;
+	enum AVCodecID id;
+	int capabilities;
+	uint8_t max_lowres;                                          ///< maximum value for lowres supported by the decoder
+	attribute_deprecated const AVRational *supported_framerates; ///< @deprecated use avcodec_get_supported_config()
+	attribute_deprecated const void *pix_fmts;     ///< @deprecated use avcodec_get_supported_config()
+	attribute_deprecated const int *supported_samplerates;       ///< @deprecated use avcodec_get_supported_config()
+	attribute_deprecated const void *sample_fmts; ///< @deprecated use avcodec_get_supported_config()
+	const AVClass *priv_class;                                   ///< AVClass for the private context
+	const AVProfile *profiles; ///< array of recognized profiles, or NULL if unknown, array is terminated by {AV_PROFILE_UNKNOWN}
+	const char *wrapper_name;
+} AVCodec;
+
+const AVOutputFormat *(*av_muxer_iterate)(void **opaque) = NULL;
+unsigned int (*av_codec_get_tag)(const struct AVCodecTag *const *tags, enum AVCodecID id) = NULL;
+const AVCodec *(*av_codec_iterate)(void **opaque) = NULL;
+int (*av_codec_is_encoder)(const AVCodec *codec) = NULL;
 }
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -19,6 +127,7 @@ extern "C" {
 #include <QSpinBox>
 #include <QScrollArea>
 #include "../utils/widgets/focus-scroll-spinbox.hpp"
+#include <util/platform.h>
 
 FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames, obs_data_t *settings)
 	: QDialog(parent),
@@ -60,7 +169,8 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	setContentsMargins(0, 0, 0, 0);
 	setMinimumSize(400, 120);
 
-	auto confirmButton = new QPushButton(QString::fromUtf8(obs_module_text(settings ? "SaveFfmpegOutput" : "CreateFfmpegOutput")));
+	auto confirmButton =
+		new QPushButton(QString::fromUtf8(obs_module_text(settings ? "SaveFfmpegOutput" : "CreateFfmpegOutput")));
 	confirmButton->setEnabled(false);
 
 	auto formLayout = new QFormLayout;
@@ -114,8 +224,9 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 		const QString dir = QFileDialog::getExistingDirectory(
 			this, QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Simple.SavePath")),
 			advOutFFRecPath->text(), QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-		if (dir.isEmpty())
+		if (dir.isEmpty()) {
 			return;
+		}
 		advOutFFRecPath->setText(dir);
 		path = dir;
 		validateOutputs(confirmButton);
@@ -131,8 +242,9 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 
 	QStringList specList =
 		QString::fromUtf8(obs_frontend_get_locale_string("FilenameFormatting.completer")).split(QRegularExpression("\n"));
-	if (filenameFormat.isEmpty())
+	if (filenameFormat.isEmpty()) {
 		filenameFormat = specList.first() + " " + outputName;
+	}
 
 	filenameFormatEdit->setText(filenameFormat);
 
@@ -183,32 +295,60 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	auto advOutFFFormat = new QComboBox(this);
 	advOutFFFormat->blockSignals(true);
 
-	void *i = 0;
-	const AVOutputFormat *output_format;
-	while ((output_format = av_muxer_iterate(&i)) != nullptr) {
-		if (output_format->priv_class && (output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_VIDEO_OUTPUT ||
-						  output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_AUDIO_OUTPUT ||
-						  output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_OUTPUT))
-			continue;
+	if (!av_muxer_iterate || !av_codec_get_tag) {
+		void *handle = nullptr;
+#ifdef __APPLE__
+		handle = os_dlopen("avformat-62.dylib");
+		if (!handle) {
+			handle = os_dlopen("avformat-61.dylib");
+		}
+#endif
+		if (!handle) {
+			handle = os_dlopen("avformat-62");
+		}
+		if (!handle) {
+			handle = os_dlopen("avformat-61");
+		}
+		if (handle) {
+			av_muxer_iterate = (const AVOutputFormat *(*)(void **opaque))os_dlsym(handle, "av_muxer_iterate");
+			av_codec_get_tag = (unsigned int (*)(const struct AVCodecTag *const *tags,
+							     enum AVCodecID id))os_dlsym(handle, "av_codec_get_tag");
+			os_dlclose(handle);
+		}
+	}
+	if (av_muxer_iterate) {
+		void *i = 0;
+		const AVOutputFormat *output_format;
+		while ((output_format = av_muxer_iterate(&i)) != nullptr) {
+			if (output_format->priv_class &&
+			    (output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_VIDEO_OUTPUT ||
+			     output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_AUDIO_OUTPUT ||
+			     output_format->priv_class->category == AV_CLASS_CATEGORY_DEVICE_OUTPUT)) {
+				continue;
+			}
 
-		bool audio = output_format->audio_codec != AV_CODEC_ID_NONE;
-		bool video = output_format->video_codec != AV_CODEC_ID_NONE;
+			bool audio = output_format->audio_codec != AV_CODEC_ID_NONE;
+			bool video = output_format->video_codec != AV_CODEC_ID_NONE;
 
-		if (!audio && !video)
-			continue;
-		QString itemText = QString::fromUtf8(output_format->name);
-		if (audio ^ video)
-			itemText += QString(" (%1)").arg(audio ? QString::fromUtf8(obs_frontend_get_locale_string(
-									 "Basic.Settings.Output.Adv.FFmpeg.FormatAudio"))
-							       : QString::fromUtf8(obs_frontend_get_locale_string(
-									 "Basic.Settings.Output.Adv.FFmpeg.FormatVideo")));
-		advOutFFFormat->addItem(itemText,
-					QVariant::fromValue(std::tuple<std::string, std::string, std::string, std::string,
-								       AVCodecID, AVCodecID, const struct AVCodecTag *const *>(
-						output_format->name, output_format->mime_type ? output_format->mime_type : "",
-						output_format->long_name ? output_format->long_name : "",
-						output_format->extensions ? output_format->extensions : "",
-						output_format->audio_codec, output_format->video_codec, output_format->codec_tag)));
+			if (!audio && !video) {
+				continue;
+			}
+			QString itemText = QString::fromUtf8(output_format->name);
+			if (audio ^ video) {
+				itemText += QString(" (%1)").arg(audio ? QString::fromUtf8(obs_frontend_get_locale_string(
+										 "Basic.Settings.Output.Adv.FFmpeg.FormatAudio"))
+								       : QString::fromUtf8(obs_frontend_get_locale_string(
+										 "Basic.Settings.Output.Adv.FFmpeg.FormatVideo")));
+			}
+			advOutFFFormat->addItem(
+				itemText,
+				QVariant::fromValue(std::tuple<std::string, std::string, std::string, std::string, AVCodecID,
+							       AVCodecID, const struct AVCodecTag *const *>(
+					output_format->name, output_format->mime_type ? output_format->mime_type : "",
+					output_format->long_name ? output_format->long_name : "",
+					output_format->extensions ? output_format->extensions : "", output_format->audio_codec,
+					output_format->video_codec, output_format->codec_tag)));
+		}
 	}
 
 	advOutFFFormat->model()->sort(0);
@@ -251,8 +391,9 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 			mimeType = std::get<1>(formatTuple);
 			extension = std::get<3>(formatTuple);
 			auto n = extension.find(',');
-			if (n != std::string::npos)
+			if (n != std::string::npos) {
 				extension = extension.substr(0, n);
+			}
 
 			advOutFFFormatDesc->setText(QString::fromUtf8(std::get<2>(formatTuple).c_str()));
 
@@ -264,54 +405,84 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 			QString defaultVideoCodecName;
 			QString currentAudioCodecName;
 			QString currentVideoCodecName;
-			const AVCodec *codec;
-			void *i = 0;
-			while ((codec = av_codec_iterate(&i)) != nullptr) {
-				// Not an encoding codec
-				if (!av_codec_is_encoder(codec))
-					continue;
-				// check if codec is compatible with the selected format
-				if (!ignoreCompat && !av_codec_get_tag(codec_tag, codec->id))
-					continue;
-
-				if (codec->type == AVMEDIA_TYPE_VIDEO) {
-					QString codecName;
-					if (codec->long_name) {
-						codecName = QString("%1 - %2").arg(QString::fromUtf8(codec->name),
-										   QString::fromUtf8(codec->long_name));
-					} else {
-						codecName = QString::fromUtf8(codec->name);
-					}
-					if (defaultVideoCodecName.isEmpty() && codec->id == default_video_codec) {
-						codecName += QString(" (%1)").arg(QString::fromUtf8(obs_frontend_get_locale_string(
-							"Basic.Settings.Output.Adv.FFmpeg.AVEncoderDefault")));
-						defaultVideoCodecName = codecName;
-					}
-					if (currentVideoCodecName.isEmpty() && !vEncoder.empty() && vEncoder == codec->name) {
-						currentVideoCodecName = codecName;
-					}
-					advOutFFVEncoder->addItem(codecName, QVariant::fromValue(std::tuple<std::string, int>(
-										     codec->name, codec->id)));
-				} else if (codec->type == AVMEDIA_TYPE_AUDIO) {
-					QString codecName;
-					if (codec->long_name) {
-						codecName = QString("%1 - %2").arg(QString::fromUtf8(codec->name),
-										   QString::fromUtf8(codec->long_name));
-					} else {
-						codecName = QString::fromUtf8(codec->name);
-					}
-					if (defaultAudioCodecName.isEmpty() && codec->id == default_audio_codec) {
-						codecName += QString(" (%1)").arg(QString::fromUtf8(obs_frontend_get_locale_string(
-							"Basic.Settings.Output.Adv.FFmpeg.AVEncoderDefault")));
-						defaultAudioCodecName = codecName;
-					}
-					if (currentAudioCodecName.isEmpty() && !aEncoder.empty() && aEncoder == codec->name) {
-						currentAudioCodecName = codecName;
-					}
-					advOutFFAEncoder->addItem(codecName, QVariant::fromValue(std::tuple<std::string, int>(
-										     codec->name, codec->id)));
+			if (!av_codec_iterate || !av_codec_is_encoder) {
+				void *handle = nullptr;
+#ifdef __APPLE__
+				handle = os_dlopen("avcodec-62.dylib");
+				if (!handle) {
+					handle = os_dlopen("avcodec-61.dylib");
+				}
+#endif
+				if (!handle) {
+					handle = os_dlopen("avcodec-62");
+				}
+				if (!handle) {
+					handle = os_dlopen("avcodec-61");
+				}
+				if (handle) {
+					av_codec_iterate = (const AVCodec *(*)(void **opaque))os_dlsym(handle, "av_codec_iterate");
+					av_codec_is_encoder =
+						(int (*)(const AVCodec *codec))os_dlsym(handle, "av_codec_is_encoder");
+					os_dlclose(handle);
 				}
 			}
+			if (av_codec_iterate && av_codec_is_encoder && av_codec_get_tag) {
+				const AVCodec *codec;
+				void *i = 0;
+				while ((codec = av_codec_iterate(&i)) != nullptr) {
+					// Not an encoding codec
+					if (!av_codec_is_encoder(codec))
+						continue;
+					// check if codec is compatible with the selected format
+					if (!ignoreCompat && !av_codec_get_tag(codec_tag, codec->id))
+						continue;
+
+					if (codec->type == AVMEDIA_TYPE_VIDEO) {
+						QString codecName;
+						if (codec->long_name) {
+							codecName = QString("%1 - %2").arg(QString::fromUtf8(codec->name),
+											   QString::fromUtf8(codec->long_name));
+						} else {
+							codecName = QString::fromUtf8(codec->name);
+						}
+						if (defaultVideoCodecName.isEmpty() && codec->id == default_video_codec) {
+							codecName += QString(" (%1)").arg(
+								QString::fromUtf8(obs_frontend_get_locale_string(
+									"Basic.Settings.Output.Adv.FFmpeg.AVEncoderDefault")));
+							defaultVideoCodecName = codecName;
+						}
+						if (currentVideoCodecName.isEmpty() && !vEncoder.empty() &&
+						    vEncoder == codec->name) {
+							currentVideoCodecName = codecName;
+						}
+						advOutFFVEncoder->addItem(
+							codecName,
+							QVariant::fromValue(std::tuple<std::string, int>(codec->name, codec->id)));
+					} else if (codec->type == AVMEDIA_TYPE_AUDIO) {
+						QString codecName;
+						if (codec->long_name) {
+							codecName = QString("%1 - %2").arg(QString::fromUtf8(codec->name),
+											   QString::fromUtf8(codec->long_name));
+						} else {
+							codecName = QString::fromUtf8(codec->name);
+						}
+						if (defaultAudioCodecName.isEmpty() && codec->id == default_audio_codec) {
+							codecName += QString(" (%1)").arg(
+								QString::fromUtf8(obs_frontend_get_locale_string(
+									"Basic.Settings.Output.Adv.FFmpeg.AVEncoderDefault")));
+							defaultAudioCodecName = codecName;
+						}
+						if (currentAudioCodecName.isEmpty() && !aEncoder.empty() &&
+						    aEncoder == codec->name) {
+							currentAudioCodecName = codecName;
+						}
+						advOutFFAEncoder->addItem(
+							codecName,
+							QVariant::fromValue(std::tuple<std::string, int>(codec->name, codec->id)));
+					}
+				}
+			}
+
 			advOutFFAEncoder->model()->sort(0);
 			advOutFFVEncoder->model()->sort(0);
 
@@ -345,8 +516,9 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	advOutFFFormat->setCurrentIndex(0);
 	for (int i = 0; i < advOutFFFormat->count(); i++) {
 		QVariant v = advOutFFFormat->itemData(i);
-		if (v.isNull())
+		if (v.isNull()) {
 			continue;
+		}
 
 		auto formatTuple = v.value<std::tuple<std::string, std::string, std::string, std::string, AVCodecID, AVCodecID,
 						      const struct AVCodecTag *const *>>();
@@ -400,14 +572,16 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 	advOutFFRescale->addItem("720x1280");
 	advOutFFRescale->addItem("1080x1920");
 	advOutFFRescale->addItem("1440x2560");
-	if (scaleWidth > 0 && scaleHeight > 0)
+	if (scaleWidth > 0 && scaleHeight > 0) {
 		advOutFFRescale->setCurrentText(QString("%1x%2").arg(scaleWidth).arg(scaleHeight));
+	}
 
 	connect(advOutFFRescale, &QComboBox::currentTextChanged, [this, advOutFFRescale] {
 		auto text = advOutFFRescale->currentText();
 		auto parts = text.split("x");
-		if (parts.size() != 2)
+		if (parts.size() != 2) {
 			return;
+		}
 		scaleWidth = parts[0].toInt();
 		scaleHeight = parts[1].toInt();
 	});
@@ -427,8 +601,9 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 
 	connect(advOutFFVEncoder, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, advOutFFVEncoder] {
 		auto variant = advOutFFVEncoder->currentData();
-		if (variant.isNull())
+		if (variant.isNull()) {
 			return;
+		}
 		auto codec = variant.value<std::tuple<std::string, int>>();
 		vEncoder = std::get<0>(codec);
 		vEncoderId = std::get<1>(codec);
@@ -458,21 +633,22 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 		auto trackBtn = new QCheckBox(QString::number(i + 1));
 		trackBtn->setChecked((aMixes & (1 << i)) != 0);
 		connect(trackBtn, &QCheckBox::toggled, [this, i](bool checked) {
-			if (checked)
+			if (checked) {
 				aMixes |= (1 << i);
-			else
+			} else {
 				aMixes &= ~(1 << i);
+			}
 		});
 		trackLayout->addWidget(trackBtn);
 	}
 
 	formLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Output.Adv.AudioTrack")), trackLayout);
 
-
 	connect(advOutFFAEncoder, QOverload<int>::of(&QComboBox::currentIndexChanged), [this, advOutFFAEncoder] {
 		auto variant = advOutFFAEncoder->currentData();
-		if (variant.isNull())
+		if (variant.isNull()) {
 			return;
+		}
 		auto codec = variant.value<std::tuple<std::string, int>>();
 		aEncoder = std::get<0>(codec);
 		aEncoderId = std::get<1>(codec);
