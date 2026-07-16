@@ -29,6 +29,7 @@
 #include <QTabWidget>
 #include <QTextEdit>
 #include <QUrl>
+#include <QSignalBlocker>
 #include <src/docks/canvas-dock.hpp>
 #include <src/utils/color.hpp>
 #include <src/utils/widgets/focus-scroll-spinbox.hpp>
@@ -2185,10 +2186,14 @@ bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex
 	if (!videoEncoderIndex || !settings || !outputs)
 		return false;
 
+	const int savedVideoEncoderIndex = (int)obs_data_get_int(settings, "video_encoder_index");
+	QSignalBlocker signalBlocker(videoEncoderIndex);
+
 	videoEncoderIndex->clear();
 
 	auto output_video_encoder = obs_data_get_string(settings, "output_video_encoder");
-	if (output_video_encoder && output_video_encoder[0] != '\0') {
+	if (output_video_encoder && output_video_encoder[0] != '\0' &&
+		strcmp(output_video_encoder, "MainEncoder") != 0) {
 		auto count = obs_data_array_count(outputs);
 		for (size_t i = 0; i < count; i++) {
 			auto output = obs_data_array_item(outputs, i);
@@ -2214,7 +2219,7 @@ bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex
 					}
 					obs_data_array_release(video_encoders);
 					obs_data_release(output);
-					videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+					videoEncoderIndex->setCurrentIndex(savedVideoEncoderIndex);
 					return true;
 				}
 				obs_data_array_release(video_encoders);
@@ -2235,7 +2240,7 @@ bool OBSBasicSettings::UpdateVideoEncoderIndexCombo(QComboBox *videoEncoderIndex
 		}
 		videoEncoderIndex->addItem(QString::number(i + 1) + " " + description);
 	}
-	videoEncoderIndex->setCurrentIndex((int)obs_data_get_int(settings, "video_encoder_index"));
+	videoEncoderIndex->setCurrentIndex(savedVideoEncoderIndex);
 	return true;
 }
 
