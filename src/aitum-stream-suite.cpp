@@ -326,35 +326,79 @@ void fill_central_widget()
 	    cw_pos.y() > main_window->height()) {
 		return;
 	}
-	auto dock_to_size = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-	if (!dock_to_size) {
-		dock_to_size = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
-	}
-	if (!dock_to_size) {
-		auto all_docks = main_window->findChildren<QDockWidget *>();
-		QList<QDockWidget *> visible_docks;
-		QList<QDockWidget *> horizontal_docks;
-		QList<QDockWidget *> vertical_docks;
-		for (auto &dock : all_docks) {
-			if (dock->isVisible()) {
-				auto area = main_window->dockWidgetArea(dock);
-				visible_docks.append(dock);
-				if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
-					vertical_docks.append(dock);
-				} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
-					horizontal_docks.append(dock);
-				}
+	auto all_docks = main_window->findChildren<QDockWidget *>();
+	QList<QDockWidget *> visible_docks;
+	QList<QDockWidget *> left_docks;
+	QList<QDockWidget *> right_docks;
+	QList<QDockWidget *> top_docks;
+	QList<QDockWidget *> bottom_docks;
+
+	for (auto &dock : all_docks) {
+		if (dock->isVisible()) {
+			auto area = main_window->dockWidgetArea(dock);
+			visible_docks.append(dock);
+			if (area == Qt::TopDockWidgetArea) {
+				top_docks.append(dock);
+			} else if (area == Qt::BottomDockWidgetArea) {
+				bottom_docks.append(dock);
+			} else if (area == Qt::LeftDockWidgetArea) {
+				left_docks.append(dock);
+			} else if (area == Qt::RightDockWidgetArea) {
+				right_docks.append(dock);
 			}
 		}
-		if (visible_docks.count() == 1) {
-			dock_to_size = visible_docks.first();
-		} else if (cw->height() > cw->width() && !vertical_docks.isEmpty()) {
-			dock_to_size = vertical_docks.first();
-		} else if (cw->height() < cw->width() && !horizontal_docks.isEmpty()) {
-			dock_to_size = horizontal_docks.first();
-		} else if (!visible_docks.isEmpty()) {
-			dock_to_size = visible_docks.first();
+	}
+	QList<QDockWidget *> can_fill_central;
+	for (auto &dock : visible_docks) {
+		auto area = main_window->dockWidgetArea(dock);
+		if (area == Qt::TopDockWidgetArea) {
+			if ((left_docks.isEmpty() || main_window->corner(Qt::TopLeftCorner) != Qt::TopDockWidgetArea) &&
+			    (right_docks.isEmpty() || main_window->corner(Qt::TopRightCorner) != Qt::TopDockWidgetArea)) {
+				can_fill_central.append(dock);
+			}
+		} else if (area == Qt::BottomDockWidgetArea) {
+			if ((left_docks.isEmpty() || main_window->corner(Qt::BottomLeftCorner) != Qt::BottomDockWidgetArea) &&
+			    (right_docks.isEmpty() || main_window->corner(Qt::BottomRightCorner) != Qt::BottomDockWidgetArea)) {
+				can_fill_central.append(dock);
+			}
+		} else if (area == Qt::LeftDockWidgetArea) {
+			if ((top_docks.isEmpty() || main_window->corner(Qt::TopLeftCorner) != Qt::LeftDockWidgetArea) &&
+			    (bottom_docks.isEmpty() || main_window->corner(Qt::BottomLeftCorner) != Qt::LeftDockWidgetArea)) {
+				can_fill_central.append(dock);
+			}
+		} else if (area == Qt::RightDockWidgetArea) {
+			if ((top_docks.isEmpty() || main_window->corner(Qt::TopRightCorner) != Qt::RightDockWidgetArea) &&
+			    (bottom_docks.isEmpty() || main_window->corner(Qt::BottomRightCorner) != Qt::RightDockWidgetArea)) {
+				can_fill_central.append(dock);
+			}
 		}
+	}
+
+	QDockWidget *dock_to_size = nullptr;
+	if (can_fill_central.count() == 1) {
+		dock_to_size = can_fill_central.first();
+	}else if (visible_docks.count() == 1) {
+		dock_to_size = visible_docks.first();
+	} else if (!top_docks.isEmpty() &&
+		   (left_docks.isEmpty() || main_window->corner(Qt::TopLeftCorner) != Qt::TopDockWidgetArea) &&
+		   (right_docks.isEmpty() || main_window->corner(Qt::TopRightCorner) != Qt::TopDockWidgetArea)) {
+		dock_to_size = top_docks.first();
+	} else if (!left_docks.isEmpty() &&
+		   (bottom_docks.isEmpty() || main_window->corner(Qt::BottomLeftCorner) != Qt::LeftDockWidgetArea) &&
+		   (top_docks.isEmpty() || main_window->corner(Qt::TopLeftCorner) != Qt::LeftDockWidgetArea)) {
+		dock_to_size = left_docks.first();
+	} else if (!bottom_docks.isEmpty() &&
+		   (left_docks.isEmpty() || main_window->corner(Qt::BottomLeftCorner) != Qt::BottomDockWidgetArea) &&
+		   (right_docks.isEmpty() || main_window->corner(Qt::BottomRightCorner) != Qt::BottomDockWidgetArea)) {
+		dock_to_size = bottom_docks.first();
+	} else if (!right_docks.isEmpty() &&
+		   (top_docks.isEmpty() || main_window->corner(Qt::TopRightCorner) != Qt::RightDockWidgetArea) &&
+		   (bottom_docks.isEmpty() || main_window->corner(Qt::BottomRightCorner) != Qt::RightDockWidgetArea)) {
+		dock_to_size = right_docks.first();
+	} else if (!can_fill_central.isEmpty()) {
+		dock_to_size = can_fill_central.first();
+	} else if (!visible_docks.isEmpty()) {
+		dock_to_size = visible_docks.first();
 	}
 	if (!dock_to_size) {
 		return;
@@ -854,32 +898,7 @@ void load_dock_state(QString mode)
 			}
 
 			if (finished_loading) {
-				QMetaObject::invokeMethod(
-					main_window,
-					[main_window, d] {
-						auto cw = main_window->centralWidget();
-						if (!cw) {
-							return;
-						}
-						auto cw_height = cw->height();
-						auto cw_width = cw->width();
-						auto cw_pos = cw->pos();
-						if (cw_height <= 10 || cw_width <= 10) {
-							return;
-						}
-						if (cw_pos.x() <= -cw_width || cw_pos.y() <= -cw_height ||
-						    cw_pos.x() > main_window->width() || cw_pos.y() > main_window->height()) {
-							return;
-						}
-
-						auto area = main_window->dockWidgetArea(d);
-						if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
-							main_window->resizeDocks({d}, {d->height() + cw_height}, Qt::Vertical);
-						} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
-							main_window->resizeDocks({d}, {d->width() + cw_width}, Qt::Horizontal);
-						}
-					},
-					Qt::QueuedConnection);
+				QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
 			}
 		}
 
@@ -916,36 +935,8 @@ void load_dock_state(QString mode)
 	}
 	if (reset_func) {
 		reset_func();
-	} else if (main_window && !visible_canvas_docks.empty()) {
-		auto fd = visible_canvas_docks.first();
-		QMetaObject::invokeMethod(
-			main_window,
-			[main_window, fd] {
-				auto cw = main_window->centralWidget();
-				if (!cw) {
-					return;
-				}
-				auto cw_height = cw->height();
-				auto cw_width = cw->width();
-				auto cw_pos = cw->pos();
-				if (cw_height <= 10 || cw_width <= 10) {
-					return;
-				}
-				if (cw_pos.x() <= -cw_width || cw_pos.y() <= -cw_height || cw_pos.x() > main_window->width() ||
-				    cw_pos.y() > main_window->height()) {
-					return;
-				}
-
-				auto area = main_window->dockWidgetArea(fd);
-				if (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea) {
-					main_window->resizeDocks({fd}, {fd->height() + cw_height}, Qt::Vertical);
-				} else if (area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea) {
-					main_window->resizeDocks({fd}, {fd->width() + cw_width}, Qt::Horizontal);
-				}
-			},
-			Qt::QueuedConnection);
 	} else {
-		QMetaObject::invokeMethod(main_window, [main_window] { fill_central_widget(); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
 	}
 }
 
