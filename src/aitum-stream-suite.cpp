@@ -377,7 +377,7 @@ void fill_central_widget()
 	QDockWidget *dock_to_size = nullptr;
 	if (can_fill_central.count() == 1) {
 		dock_to_size = can_fill_central.first();
-	}else if (visible_docks.count() == 1) {
+	} else if (visible_docks.count() == 1) {
 		dock_to_size = visible_docks.first();
 	} else if (!top_docks.isEmpty() &&
 		   (left_docks.isEmpty() || main_window->corner(Qt::TopLeftCorner) != Qt::TopDockWidgetArea) &&
@@ -936,6 +936,12 @@ void load_dock_state(QString mode)
 	if (reset_func) {
 		reset_func();
 	} else {
+		for (auto &e : extensions) {
+			auto d = main_window->findChild<QDockWidget *>(QString::fromStdString(std::get<0>(e).c_str()));
+			if (d && d->isVisible()) {
+				d->setVisible(false);
+			}
+		}
 		QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
 	}
 }
