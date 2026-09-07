@@ -2310,6 +2310,7 @@ void CanvasDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	}
 	item->setSelected(true);
 	sceneList->blockSignals(false);
+	obs_frontend_save();
 }
 
 QListWidget *CanvasDock::GetGlobalScenesList()

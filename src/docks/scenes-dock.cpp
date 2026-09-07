@@ -214,6 +214,9 @@ void ScenesDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	}
 	item->setSelected(true);
 	sceneList->blockSignals(false);
+	if (canvasDock) {
+		canvasDock->ChangeSceneIndex(relative, offset, invalidIdx);
+	}
 }
 
 void ScenesDock::handleTabifiedDockWidgetActivated(QDockWidget *dockWidget)
@@ -308,7 +311,18 @@ void ScenesDock::SwitchToCanvas(obs_canvas_t *c)
 			sceneList->addItem(sli);
 		}
 		obs_frontend_source_list_free(&scenes);
+	} else if (canvasDock) {
+		sceneList->blockSignals(true);
+		for (int idx = 0; idx < canvasDock->sceneList->count(); idx++) {
+			auto item = canvasDock->sceneList->item(idx);
+			auto sli = new QListWidgetItem(item->text(), sceneList);
+			sli->setData(Qt::UserRole, item->data(Qt::UserRole));
+			sli->setIcon(item->icon());
+			sceneList->addItem(sli);
+		}
+		sceneList->blockSignals(false);
 	} else {
+		sceneList->blockSignals(true);
 		obs_canvas_enum_scenes(
 			c,
 			[](void *param, obs_source_t *scene) {
@@ -319,12 +333,25 @@ void ScenesDock::SwitchToCanvas(obs_canvas_t *c)
 				auto sn = QString::fromUtf8(obs_source_get_name(scene));
 				auto sli = new QListWidgetItem(sn, self->sceneList);
 				sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
-				self->sceneList->addItem(sli);
+				obs_data_t *settings = obs_source_get_settings(scene);
+				const int order = (int)obs_data_get_int(settings, "order");
+				obs_data_release(settings);
+				self->sceneList->insertItem(order, sli);
 				return true;
 			},
 			this);
 
+		for (int idx = 0; idx < sceneList->count(); idx++) {
+			auto item = sceneList->takeItem(idx);
+			auto scene = obs_canvas_get_source_by_name(c, item->text().toUtf8().constData());
+			auto settings = obs_source_get_settings(scene);
+			const int order = (int)obs_data_get_int(settings, "order");
+			sceneList->insertItem(order, item);
+			obs_data_release(settings);
+			obs_source_release(scene);
+		}
 		UpdateLinkedScenes();
+		sceneList->blockSignals(false);
 	}
 	UpdateCurrentScene();
 }
@@ -856,6 +883,9 @@ void ScenesDock::scene_add(void *data, calldata_t *cd)
 	auto sn = QString::fromUtf8(obs_source_get_name(scene));
 	auto sli = new QListWidgetItem(sn, self->sceneList);
 	sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
+	if (self->canvasDock) {
+		sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
+	}
 	self->sceneList->addItem(sli);
 }
 
