@@ -281,9 +281,8 @@ void save_dock_state(QString mode)
 	}
 	auto state = main_window->saveState();
 	auto b64 = state.toBase64();
-	auto state_chars = b64.constData();
 	std::string setting_name = "dock_state_" + mode.toStdString();
-	obs_data_set_string(current_profile_config, setting_name.c_str(), state_chars);
+	obs_data_set_string(current_profile_config, setting_name.c_str(), b64.constData());
 	auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
 	if (!main_dock) {
 		main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
@@ -833,10 +832,9 @@ void load_dock_state(QString mode)
 		return;
 	}
 	scene_collection_changing = false;
-	std::string state;
 	bool main_restored = false;
 	std::string setting_name = "dock_state_" + mode.toStdString();
-	state = obs_data_get_string(current_profile_config, setting_name.c_str());
+	std::string state = obs_data_get_string(current_profile_config, setting_name.c_str());
 	setting_name = "dock_state_main_restored_" + mode.toStdString();
 	main_restored = obs_data_get_bool(current_profile_config, setting_name.c_str());
 	if (state.empty()) {
@@ -2048,6 +2046,11 @@ bool obs_module_load(void)
 				obs_websocket_vendor_emit_event(vendor, "switched_dock_mode", d2);
 				obs_data_release(d2);
 			}
+		}
+		const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		if (main_window && main_window->isMaximized()) {
+			main_window->showNormal();
+			main_window->showMaximized();
 		}
 	});
 
