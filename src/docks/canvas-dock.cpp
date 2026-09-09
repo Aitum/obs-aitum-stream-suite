@@ -3150,6 +3150,7 @@ void CanvasDock::ShowSourcesContextMenu(obs_sceneitem_t *item)
 {
 	auto menu = QMenu(this);
 	menu.addMenu(CreateAddSourcePopupMenu(this));
+	AddGroupMenuItems(sourceList, &menu);
 	AddCopyPasteMenuItems(&menu, item, scene);
 	if (item) {
 		AddSceneItemMenuItems(&menu, item);
@@ -3672,6 +3673,19 @@ void CanvasDock::AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem, OBS
 		pasteAction = popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("PasteDuplicate")),
 					       [scene] { obs_frontend_paste_sceneitem_func(scene, true); });
 		pasteAction->setEnabled(obs_frontend_can_paste_sceneitem_func(true));
+	}
+}
+
+void CanvasDock::AddGroupMenuItems(SourceTree * sl, QMenu * popup)
+{
+	if (sl->MultipleBaseSelected()) {
+		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.GroupItems")), sl,
+				 &SourceTree::GroupSelectedItems);
+		popup->addSeparator();
+	} else if (sl->GroupsSelected()) {
+		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Ungroup")), sl,
+				&SourceTree::UngroupSelectedGroups);
+		popup->addSeparator();
 	}
 }
 
@@ -4688,6 +4702,7 @@ bool CanvasDock::HandleMouseReleaseEvent(QMouseEvent *event)
 		popup.addSeparator();
 
 		OBSSceneItem sceneItem = GetSelectedItem(scene);
+		AddGroupMenuItems(sourceList, &popup);
 		AddCopyPasteMenuItems(&popup, sceneItem, scene);
 		if (sceneItem) {
 			AddSceneItemMenuItems(&popup, sceneItem);

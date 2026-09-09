@@ -182,6 +182,7 @@ private:
 	void ShowSourcesContextMenu(obs_sceneitem_t *item);
 	static void AddSceneItemMenuItems(QMenu *popup, OBSSceneItem sceneItem);
 	static void AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem, OBSScene scene);
+	static void AddGroupMenuItems(SourceTree *sl, QMenu *popup);
 	static QMenu *CreateVisibilityTransitionMenu(bool visible, obs_sceneitem_t *sceneItem);
 
 	static QMenu *CreateAddSourcePopupMenu(QWidget *parent);

@@ -366,6 +366,7 @@ void SourcesDock::ShowSourcesContextMenu(obs_sceneitem_t *item)
 	QMenu menu(this);
 	menu.addMenu(CanvasDock::CreateAddSourcePopupMenu(this));
 	auto s = obs_weak_source_get_source(scene);
+	CanvasDock::AddGroupMenuItems(sourceList, &menu);
 	CanvasDock::AddCopyPasteMenuItems(&menu, item, obs_scene_from_source(s));
 	obs_source_release(s);
 	if (item) {
