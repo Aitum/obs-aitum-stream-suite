@@ -283,6 +283,11 @@ void save_dock_state(QString mode)
 	auto b64 = state.toBase64();
 	std::string setting_name = "dock_state_" + mode.toStdString();
 	obs_data_set_string(current_profile_config, setting_name.c_str(), b64.constData());
+	b64 = main_window->saveGeometry().toBase64();
+	obs_data_set_string(current_profile_config, "main_geometry", b64.constData());
+	auto maximized = main_window->isMaximized();
+	auto minimized = main_window->isMinimized();
+	obs_data_set_string(current_profile_config, "main_state", maximized ? "maximized" : minimized ? "minimized" : "normal");
 	auto main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
 	if (!main_dock) {
 		main_dock = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
@@ -1639,6 +1644,23 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		obs_frontend_source_list_free(&transitions);
 
 		load_current_profile_config();
+		std::string main_geometry = obs_data_get_string(current_profile_config, "main_geometry");
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		if (!main_geometry.empty() && main_window) {
+			main_window->restoreGeometry(QByteArray::fromBase64(main_geometry.c_str()));
+		}
+		std::string main_state = obs_data_get_string(current_profile_config, "main_state");
+		if (!main_state.empty()) {
+			if (main_state == "maximized" && main_window) {
+				main_window->showNormal();
+				main_window->showMaximized();
+			} else if (main_state == "minimized" && main_window) {
+				main_window->showMinimized();
+			} else if (main_state == "normal" && main_window &&
+				   (main_window->isMaximized() || main_window->isMinimized())) {
+				main_window->showNormal();
+			}
+		}
 		auto scene = obs_frontend_get_current_scene();
 		if (scene) {
 			if (properties_dock) {
