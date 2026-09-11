@@ -1157,7 +1157,7 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 
 							for (size_t idx = 0; idx < MAX_OUTPUT_VIDEO_ENCODERS; idx++) {
 								auto enc = obs_output_get_video_encoder2(output, idx);
-								if (enc && obs_encoder_video(enc) == d->second) {
+								if (enc && obs_encoder_parent_video(enc) == d->second) {
 									*d->first = enc;
 									return false;
 								}

@@ -1046,7 +1046,7 @@ void create_new_dock_mode(const char *name)
 		}
 	}
 
-	auto index = modesTabBar->addTab(qname);
+	auto index = modesTabBar->insertTab(modesTabBar->count() - 2, qname);
 	modesTabBar->setCurrentIndex(index);
 	reset_canvas_dock_state(name);
 	save_dock_state(qname);
@@ -1323,7 +1323,7 @@ void load_current_profile_config()
 			}
 			modesTab = "";
 			auto tn = QString::fromUtf8(obs_module_text("User"));
-			auto index = modesTabBar->addTab(tn);
+			auto index = modesTabBar->insertTab(modesTabBar->count() - 2, tn);
 			modesTabBar->setCurrentIndex(index);
 			save_dock_state(tn);
 			save_current_profile_config(true);
@@ -1436,7 +1436,7 @@ void load_current_profile_config()
 					return;
 				}
 			}
-			modesTabBar->addTab(name);
+			modesTabBar->insertTab(modesTabBar->count() - 2, name);
 		},
 		nullptr);
 	if (!first_create) {
@@ -2000,6 +2000,7 @@ bool obs_module_load(void)
 	modesTabBar = new QTabBar();
 	modesTabBar->setContextMenuPolicy(Qt::CustomContextMenu);
 	modesTabBar->setMovable(true);
+	modesTabBar->setElideMode(Qt::ElideRight);
 
 	toolbar = new TabToolBar(modesTabBar);
 	toolbar->setObjectName(QStringLiteral("AitumToolbar"));
@@ -2034,7 +2035,7 @@ bool obs_module_load(void)
 						return;
 					}
 				}
-				auto index = modesTabBar->addTab(QString::fromStdString(name));
+				auto index = modesTabBar->insertTab(modesTabBar->count() - 2, QString::fromStdString(name));
 				modesTabBar->setCurrentIndex(index);
 				save_current_profile_config(true);
 			}
