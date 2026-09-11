@@ -2,6 +2,8 @@
 #include <QVBoxLayout>
 #include <obs-frontend-api.h>
 
+#include <random>
+
 QCef *cef = nullptr;
 QCefCookieManager *panel_cookies = nullptr;
 
@@ -21,6 +23,19 @@ bool load_cef()
 	return cef != nullptr;
 }
 
+static std::string GenId()
+{
+	std::random_device rd;
+	std::mt19937_64 e2(rd());
+	std::uniform_int_distribution<uint64_t> dist(0, 0xFFFFFFFFFFFFFFFF);
+
+	uint64_t id = dist(e2);
+
+	char id_str[20];
+	snprintf(id_str, sizeof(id_str), "%016llX", (unsigned long long)id);
+	return std::string(id_str);
+}
+
 BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : QWidget(parent), url(url_)
 {
 	setMinimumSize(200, 100);
@@ -29,6 +44,10 @@ BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : 
 	load_cef();
 	if (!panel_cookies && cef) {
 		const char *cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
+		if (!cookie_id || cookie_id[0] == '\0') {
+			config_set_string(obs_frontend_get_profile_config(), "Panels", "CookieId", GenId().c_str());
+			cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
+		}
 		if (cookie_id && cookie_id[0] != '\0') {
 			std::string sub_path;
 			sub_path += "obs_profile_cookies/";
