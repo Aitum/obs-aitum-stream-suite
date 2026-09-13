@@ -64,7 +64,7 @@ SourceTreeItem::SourceTreeItem(SourceTree *tree_, OBSSceneItem sceneitem_) : tre
 		else if (strcmp(id, "group") == 0)
 			icon = GetGroupIcon();
 		else
-			icon = GetIconFromType(obs_source_get_icon_type(id));
+			icon = GetIconFromType(obs_source_get_icon_type(id), id);
 
 		QPixmap pixmap = icon.pixmap(QSize(16, 16));
 

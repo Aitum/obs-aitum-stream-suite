@@ -2815,7 +2815,7 @@ void CanvasDock::AddSourceTypeToMenu(QMenu *popup, const char *source_type, cons
 	} else if (strcmp(source_type, "group") == 0) {
 		popupItem->setIcon(GetGroupIcon());
 	} else {
-		popupItem->setIcon(GetIconFromType(obs_source_get_icon_type(source_type)));
+		popupItem->setIcon(GetIconFromType(obs_source_get_icon_type(source_type), source_type));
 	}
 	popupItem->setData(QString::fromUtf8(source_type));
 	QMenu *menu = new QMenu(popup);

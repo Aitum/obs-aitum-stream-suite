@@ -1,8 +1,12 @@
 #include "icon.hpp"
 
-#include<QMainWindow>
-#include <QPainter>
 #include <obs-frontend-api.h>
+#include <QMainWindow>
+#include <QPainter>
+#include <util/platform.h>
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
 
 QIcon GetSceneIcon()
 {
@@ -22,7 +26,12 @@ QIcon GetGroupIcon()
 	return main_window->property("groupIcon").value<QIcon>();
 }
 
-QIcon GetIconFromType(enum obs_icon_type icon_type)
+static bool obs_source_get_dark_icon_func_initialized = false;
+static const char *(*obs_source_get_dark_icon_func)(const char *id) = nullptr;
+static bool obs_source_get_light_icon_func_initialized = false;
+static const char *(*obs_source_get_light_icon_func)(const char *id) = nullptr;
+
+QIcon GetIconFromType(enum obs_icon_type icon_type, const char *id)
 {
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	if (!main_window) {
@@ -55,7 +64,54 @@ QIcon GetIconFromType(enum obs_icon_type icon_type)
 	case OBS_ICON_TYPE_BROWSER:
 		return main_window->property("browserIcon").value<QIcon>();
 	case OBS_ICON_TYPE_CUSTOM:
-		//TODO: Add ability for sources to define custom icons
+		if (!id || !*id) {
+			return main_window->property("defaultIcon").value<QIcon>();
+		}
+		if (obs_frontend_is_theme_dark()) {
+			if (!obs_source_get_dark_icon_func_initialized) {
+#ifdef _WIN32
+				void *dl = os_dlopen("obs");
+#else
+				void *dl = dlopen(nullptr, RTLD_LAZY);
+#endif
+				obs_source_get_dark_icon_func =
+					(const char *(*)(const char *))os_dlsym(dl, "obs_source_get_dark_icon");
+				os_dlclose(dl);
+				obs_source_get_dark_icon_func_initialized = true;
+			}
+			if (obs_source_get_dark_icon_func) {
+				const char *path = obs_source_get_dark_icon_func(id);
+				if (path && *path) {
+					QIcon icon(path);
+					bfree((void *)path);
+					return icon;
+				} else if (path) {
+					bfree((void *)path);
+				}
+			}
+		} else {
+			if (!obs_source_get_light_icon_func_initialized) {
+#ifdef _WIN32
+				void *dl = os_dlopen("obs");
+#else
+				void *dl = dlopen(nullptr, RTLD_LAZY);
+#endif
+				obs_source_get_light_icon_func =
+					(const char *(*)(const char *))os_dlsym(dl, "obs_source_get_light_icon");
+				os_dlclose(dl);
+				obs_source_get_light_icon_func_initialized = true;
+			}
+			if (obs_source_get_light_icon_func) {
+				const char *path = obs_source_get_light_icon_func(id);
+				if (path && *path) {
+					QIcon icon(path);
+					bfree((void *)path);
+					return icon;
+				} else if (path) {
+					bfree((void *)path);
+				}
+			}
+		}
 		return main_window->property("defaultIcon").value<QIcon>();
 	case OBS_ICON_TYPE_PROCESS_AUDIO_OUTPUT:
 		return main_window->property("audioProcessOutputIcon").value<QIcon>();
