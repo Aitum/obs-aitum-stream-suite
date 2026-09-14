@@ -1490,6 +1490,31 @@ void load_current_profile_config()
 		}
 	}
 	obs_data_item_release(&dsm);
+	for (int i = 0; i < modesTabBar->count(); i++) {
+		auto d = modesTabBar->tabData(i);
+		if (d.isNull() || !d.isValid() || d.toString().isEmpty()) {
+			continue;
+		}
+		for (auto it : fixed_tabs) {
+			if (std::get<0>(it) != d.toString().toUtf8().constData()) {
+				continue;
+			}
+			std::string ss = "tab_show_" + std::get<0>(it);
+			auto show = obs_data_get_int(current_profile_config, ss.c_str());
+			if (show == 1) {
+				modesTabBar->setTabText(i, std::get<2>(it));
+				modesTabBar->setTabIcon(i, QIcon());
+			} else if (show == 2) {
+				modesTabBar->setTabText(i, QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
+				modesTabBar->setTabIcon(i, QIcon());
+			} else {
+				modesTabBar->setTabText(i, QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
+				modesTabBar->setTabIcon(i, generateEmojiQIcon(std::get<2>(it),
+									      modesTabBar->palette().color(QPalette::Text)));
+			}
+			break;
+		}
+	}
 	load_canvas(first_create);
 	if (first_create) {
 		create_new_dock_mode("Main");
@@ -2081,6 +2106,59 @@ bool obs_module_load(void)
 		int tab = modesTabBar->tabAt(QCursor::pos() - modesTabBar->mapToGlobal(QPoint(0, 0)));
 		QMenu menu;
 		auto index = modesTabBar->currentIndex();
+		if (tab >= 0) {
+			auto d = modesTabBar->tabData(tab);
+			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
+				auto sm = menu.addMenu(QString::fromUtf8(obs_module_text("TabShow")));
+				auto a = sm->addAction(QString::fromUtf8(obs_module_text("IconOnly")), [tab, d] {
+					for (auto it : fixed_tabs) {
+						if (std::get<0>(it) == d.toString().toUtf8().constData()) {
+							modesTabBar->setTabIcon(tab, QIcon());
+							modesTabBar->setTabText(tab, std::get<2>(it));
+							std::string ss = "tab_show_";
+							ss += std::get<0>(it);
+							obs_data_set_int(current_profile_config, ss.c_str(), 1);
+							return;
+						}
+					}
+				});
+				a->setCheckable(true);
+				a->setChecked(modesTabBar->tabIcon(tab).isNull() && modesTabBar->tabText(tab).length() <= 2);
+				a = sm->addAction(QString::fromUtf8(obs_module_text("TextOnly")), [tab, d] {
+					for (auto it : fixed_tabs) {
+						if (std::get<0>(it) == d.toString().toUtf8().constData()) {
+							modesTabBar->setTabText(
+								tab, QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
+							modesTabBar->setTabIcon(tab, QIcon());
+							std::string ss = "tab_show_";
+							ss += std::get<0>(it);
+							obs_data_set_int(current_profile_config, ss.c_str(), 2);
+							return;
+						}
+					}
+				});
+				a->setCheckable(true);
+				a->setChecked(modesTabBar->tabIcon(tab).isNull() && modesTabBar->tabText(tab).length() > 2);
+				a = sm->addAction(QString::fromUtf8(obs_module_text("IconAndText")), [tab, d] {
+					for (auto it : fixed_tabs) {
+						if (std::get<0>(it) == d.toString().toUtf8().constData()) {
+							modesTabBar->setTabText(
+								tab, QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
+							modesTabBar->setTabIcon(
+								tab,
+								generateEmojiQIcon(std::get<2>(it),
+										   modesTabBar->palette().color(QPalette::Text)));
+							std::string ss = "tab_show_";
+							ss += std::get<0>(it);
+							obs_data_set_int(current_profile_config, ss.c_str(), 0);
+							return;
+						}
+					}
+				});
+				a->setCheckable(true);
+				a->setChecked(!modesTabBar->tabIcon(tab).isNull());
+			}
+		}
 		if (tab == index || tab == -1) {
 			auto d = modesTabBar->tabData(index);
 			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
