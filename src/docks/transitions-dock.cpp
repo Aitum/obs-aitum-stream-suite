@@ -293,7 +293,9 @@ TransitionsDock::TransitionsDock(QWidget *parent) : QFrame(parent)
 			//canvasDock->SwapTransition(t);
 			for (auto idx = 0; idx < canvasDock->transition->count(); ++idx) {
 				if (canvasDock->transition->itemText(idx) == transition->currentText()) {
-					canvasDock->transition->setCurrentIndex(idx);
+					if (canvasDock->transition->currentIndex() != idx) {
+						canvasDock->transition->setCurrentIndex(idx);
+					}
 					break;
 				}
 			}

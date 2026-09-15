@@ -34,6 +34,7 @@ private slots:
 	void handleTabifiedDockWidgetActivated(QDockWidget *dockWidget);
 	void FinishedLoading();
 	void UpdateCanvasFromDockList(QList<QDockWidget *> visible_canvas_docks);
+	void MainSceneChanged();
 
 public:
 	ScenesDock(QWidget *parent = nullptr);

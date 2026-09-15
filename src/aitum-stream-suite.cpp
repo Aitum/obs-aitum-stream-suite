@@ -1789,9 +1789,12 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		if (output_dock) {
 			output_dock->UpdateMainBacktrackStatus(false);
 		}
-	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED || event == OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED) {
 		if (live_scenes_dock) {
 			QMetaObject::invokeMethod(live_scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
+		}
+		if (scenes_dock) {
+			QMetaObject::invokeMethod(scenes_dock, "MainSceneChanged", Qt::QueuedConnection);
 		}
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
@@ -2039,6 +2042,7 @@ bool obs_module_load(void)
 		modesTabBar->setTabData(index, QString::fromUtf8(std::get<0>(it).c_str()));
 		modesTabBar->setTabIcon(index, generateEmojiQIcon(std::get<2>(it), modesTabBar->palette().color(QPalette::Text)));
 		modesTabBar->setTabVisible(index, !std::get<3>(it) || QString::fromUtf8("Overlays") == modesTabBar->tabData(index));
+		modesTabBar->setTabToolTip(index, QString::fromUtf8(obs_module_text(std::get<0>(it).c_str())));
 	}
 	toolbar->addWidget(modesTabBar);
 	auto addModeAction =

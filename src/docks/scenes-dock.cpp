@@ -60,7 +60,18 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 		if (!scene) {
 			scene = obs_canvas_get_source_by_name(c, item->text().toUtf8().constData());
 		}
-		auto current = obs_canvas_get_channel(c, 0);
+		auto mc = obs_get_main_canvas();
+		obs_canvas_release(mc);
+		obs_source_t *current = nullptr;
+		if (mc == c) {
+			if (obs_frontend_preview_program_mode_active()) {
+				current = obs_frontend_get_current_preview_scene();
+			} else {
+				current = obs_frontend_get_current_scene();
+			}
+		} else {
+			current = obs_canvas_get_channel(c, 0);
+		}
 		obs_source_t *parent = nullptr;
 		while (obs_source_get_type(current) == OBS_SOURCE_TYPE_TRANSITION) {
 			obs_source_release(parent);
@@ -84,7 +95,6 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 					canvasDock->SwitchScene(QString::fromUtf8(obs_source_get_name(scene)));
 				}
 			} else {
-				auto mc = obs_get_main_canvas();
 				if (c == mc) {
 					if (obs_frontend_preview_program_mode_active()) {
 						obs_frontend_set_current_preview_scene(scene);
@@ -96,8 +106,6 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 				} else {
 					obs_canvas_set_channel(c, 0, scene);
 				}
-
-				obs_canvas_release(mc);
 			}
 		}
 		obs_source_release(current);
@@ -933,7 +941,18 @@ void ScenesDock::UpdateCurrentScene()
 	if (!c) {
 		return;
 	}
-	auto current_scene = obs_canvas_get_channel(c, 0);
+	auto mc = obs_get_main_canvas();
+	obs_canvas_release(mc);
+	obs_source_t *current_scene = nullptr;
+	if (mc == c) {
+		if (obs_frontend_preview_program_mode_active()) {
+			current_scene = obs_frontend_get_current_preview_scene();
+		} else {
+			current_scene = obs_frontend_get_current_scene();
+		}
+	} else {
+		current_scene = obs_canvas_get_channel(c, 0);
+	}
 	obs_canvas_release(c);
 
 	obs_source_t *parent = nullptr;
@@ -1043,4 +1062,9 @@ void ScenesDock::UpdateCanvasFromDockList(QList<QDockWidget *> visible_canvas_do
 	if (!visible_canvas_docks.contains(main_dock)) {
 		handleFocusChange(nullptr, visible_canvas_docks.first()->widget());
 	}
+}
+
+void ScenesDock::MainSceneChanged()
+{
+	UpdateCurrentScene();
 }
