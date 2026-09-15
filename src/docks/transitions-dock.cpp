@@ -352,6 +352,7 @@ void TransitionsDock::SetCanvas(obs_canvas_t *new_canvas, CanvasDock *new_canvas
 		for (auto &t : canvasDock->transitions) {
 			transition->addItem(QString::fromUtf8(obs_source_get_name(t)));
 		}
+		transition->setCurrentText(canvasDock->transition->currentText());
 	} else {
 		auto mc = obs_get_main_canvas();
 		if (new_canvas == mc) {
