@@ -1,7 +1,8 @@
 #include "browser-dock.hpp"
 #include <QVBoxLayout>
 #include <obs-frontend-api.h>
-
+#include <QEventLoop>
+#include <QThread>
 #include <random>
 
 QCef *cef = nullptr;
@@ -9,8 +10,9 @@ QCefCookieManager *panel_cookies = nullptr;
 
 bool load_cef()
 {
-	if (cef)
+	if (cef) {
 		return true;
+	}
 
 	obs_module_t *browserModule = obs_get_module("obs-browser");
 	QCef *(*create_qcef)(void) = nullptr;
@@ -36,6 +38,16 @@ static std::string GenId()
 	return std::string(id_str);
 }
 
+class QuickThread : public QThread {
+public:
+	explicit inline QuickThread(std::function<void()> func_) : func(func_) {}
+
+private:
+	virtual void run() override { func(); }
+
+	std::function<void()> func;
+};
+
 BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : QWidget(parent), url(url_)
 {
 	setMinimumSize(200, 100);
@@ -43,6 +55,17 @@ BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : 
 
 	load_cef();
 	if (!panel_cookies && cef) {
+		if (!cef->init_browser()) {
+			QEventLoop eventLoop;
+			auto t = new QuickThread([&] {
+				cef->wait_for_browser_init();
+				QMetaObject::invokeMethod(&eventLoop, &QEventLoop::quit, Qt::QueuedConnection);
+			});
+			t->start();
+			eventLoop.exec();
+			t->wait();
+			t->deleteLater();
+		}
 		const char *cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
 		if (!cookie_id || cookie_id[0] == '\0') {
 			config_set_string(obs_frontend_get_profile_config(), "Panels", "CookieId", GenId().c_str());
@@ -74,20 +97,23 @@ BrowserDock::~BrowserDock()
 
 void BrowserDock::Refresh()
 {
-	if (cefWidget)
+	if (cefWidget) {
 		cefWidget->reloadPage();
+	}
 }
 
 void BrowserDock::Reset()
 {
-	if (cefWidget)
+	if (cefWidget) {
 		cefWidget->setURL(url);
+	}
 }
 
 void DestroyPanelCookieManager()
 {
-	if (!panel_cookies)
+	if (!panel_cookies) {
 		return;
+	}
 	panel_cookies->FlushStore();
 	delete panel_cookies;
 	panel_cookies = nullptr;
