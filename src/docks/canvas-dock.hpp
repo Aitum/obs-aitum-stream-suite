@@ -197,7 +197,7 @@ private:
 
 	void LogScenes();
 
-	void AddDropSource(obs_data_t* settings, const char *type, const QString &name = QString());
+	void AddDropSource(obs_data_t *settings, const char *type, const QString &name = QString());
 	void AddDropURL(QUrl url);
 	void ConfirmDropUrl(const QString &url);
 	void dragEnterEvent(QDragEnterEvent *event) override;

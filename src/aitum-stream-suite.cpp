@@ -2101,8 +2101,11 @@ bool obs_module_load(void)
 		}
 		const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		if (main_window && main_window->isMaximized()) {
-			main_window->showNormal();
-			main_window->showMaximized();
+			auto geo = main_window->screen()->availableGeometry();
+			if (main_window->geometry() != geo) {
+				main_window->setGeometry(geo);
+				main_window->showMaximized();
+			}
 		}
 	});
 
