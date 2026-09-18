@@ -29,23 +29,28 @@ FiltersDock::FiltersDock(QWidget *parent) : QFrame(parent)
 
 	connect(filtersList, &QListWidget::currentItemChanged, [this]() {
 		const auto item = filtersList->currentItem();
-		if (!item)
+		if (!item) {
 			return;
+		}
 
 		auto f = item->data(Qt::UserRole).value<OBSSource>();
-		if (!f)
+		if (!f) {
 			return;
+		}
 
 		QMetaObject::invokeMethod(properties_dock, "LoadProperties", Qt::QueuedConnection, Q_ARG(OBSSource, f));
-		if (!item->isSelected())
+		if (!item->isSelected()) {
 			item->setSelected(true);
+		}
 	});
 	connect(filtersList, &QListWidget::itemSelectionChanged, [this] {
 		const auto item = filtersList->currentItem();
-		if (!item)
+		if (!item) {
 			return;
-		if (!item->isSelected())
+		}
+		if (!item->isSelected()) {
 			item->setSelected(true);
+		}
 	});
 
 	QAction *renameAction = new QAction(filtersList);
@@ -121,12 +126,14 @@ FiltersDock::~FiltersDock()
 
 void FiltersDock::ChangeFilterIndex(QListWidgetItem *item, enum obs_order_movement movement)
 {
-	if (!item)
+	if (!item) {
 		return;
+	}
 
 	auto filter = item->data(Qt::UserRole).value<OBSSource>();
-	if (!filter)
+	if (!filter) {
 		return;
+	}
 
 	auto s = obs_weak_source_get_source(source);
 	obs_source_filter_set_order(s, filter, movement);
@@ -148,16 +155,19 @@ void FiltersDock::ShowFiltersContextMenu(QListWidgetItem *widget_item)
 	menu.addSeparator();
 	menu.addAction(QString::fromUtf8(obs_frontend_get_locale_string("Duplicate")), [this] {
 		const auto item = filtersList->currentItem();
-		if (!item)
+		if (!item) {
 			return;
+		}
 
 		auto f = item->data(Qt::UserRole).value<OBSSource>();
-		if (!f)
+		if (!f) {
 			return;
+		}
 
 		auto s = obs_filter_get_parent(f);
-		if (!s)
+		if (!s) {
 			return;
+		}
 
 		std::string name = obs_source_get_name(f);
 		int i = 2;
@@ -173,8 +183,9 @@ void FiltersDock::ShowFiltersContextMenu(QListWidgetItem *widget_item)
 		} while (existing);
 
 		OBSSourceAutoRelease df = obs_source_duplicate(f, name.c_str(), true);
-		if (!df)
+		if (!df) {
 			return;
+		}
 
 		obs_source_filter_add(s, df);
 
@@ -207,27 +218,33 @@ bool FiltersDock::filter_compatible(uint32_t sourceFlags, uint32_t filterFlags)
 	bool audioOnly = (sourceFlags & OBS_SOURCE_VIDEO) == 0;
 	bool asyncSource = (sourceFlags & OBS_SOURCE_ASYNC) != 0;
 
-	if (!audio && filterAudio)
+	if (filterAudio && !audio) {
 		return false;
-	if (!asyncSource && filterAsync)
+	}
+	if (filterVideo && !asyncSource && filterAsync) {
 		return false;
-	if (audioOnly && filterVideo)
+	}
+	if (filterVideo && audioOnly) {
 		return false;
+	}
 	return true;
 }
 
 void FiltersDock::RemoveFilter(QListWidgetItem *item)
 {
-	if (!item)
+	if (!item) {
 		return;
+	}
 
 	auto f = item->data(Qt::UserRole).value<OBSSource>();
-	if (!f)
+	if (!f) {
 		return;
+	}
 
 	auto s = obs_weak_source_get_source(source);
-	if (!s)
+	if (!s) {
 		return;
+	}
 
 	OBSDataAutoRelease wrapper = obs_save_source(f);
 	obs_data_set_string(wrapper, "undo_uuid", obs_source_get_uuid(s));
@@ -253,11 +270,13 @@ void FiltersDock::restore_filter(const char *json)
 	OBSDataAutoRelease data = obs_data_create_from_json(json);
 	const char *filter_uuid = obs_data_get_string(data, "uuid");
 	OBSSourceAutoRelease existing_filter = obs_get_source_by_uuid(filter_uuid);
-	if (existing_filter)
+	if (existing_filter) {
 		return;
+	}
 	OBSSourceAutoRelease source = obs_get_source_by_uuid(obs_data_get_string(data, "undo_uuid"));
-	if (!source)
+	if (!source) {
 		return;
+	}
 	OBSSourceAutoRelease filter = obs_load_source(data);
 	obs_source_filter_add(source, filter);
 }
@@ -266,22 +285,26 @@ void FiltersDock::remove_filter(const char *json)
 {
 	OBSDataAutoRelease data = obs_data_create_from_json(json);
 	OBSSourceAutoRelease source = obs_get_source_by_uuid(obs_data_get_string(data, "suuid"));
-	if (!source)
+	if (!source) {
 		return;
+	}
 	OBSSourceAutoRelease filter = obs_source_get_filter_by_name(source, obs_data_get_string(data, "fname"));
-	if (!filter)
+	if (!filter) {
 		return;
+	}
 	obs_source_filter_remove(source, filter);
 }
 
 void FiltersDock::RenameFilter(QListWidgetItem *item)
 {
-	if (!item)
+	if (!item) {
 		return;
+	}
 
 	auto filter = item->data(Qt::UserRole).value<OBSSource>();
-	if (!filter)
+	if (!filter) {
 		return;
+	}
 
 	std::string name = obs_source_get_name(filter);
 	obs_source_t *f = nullptr;
@@ -291,12 +314,14 @@ void FiltersDock::RenameFilter(QListWidgetItem *item)
 			break;
 		}
 		auto s = obs_weak_source_get_source(source);
-		if (!s)
+		if (!s) {
 			break;
+		}
 		f = obs_source_get_filter_by_name(s, name.c_str());
 		obs_source_release(s);
-		if (f)
+		if (f) {
 			continue;
+		}
 		obs_source_set_name(filter, name.c_str());
 	} while (f);
 }
@@ -315,15 +340,19 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 	const char *type_str;
 	while (obs_enum_filter_types(idx++, &type_str)) {
 		uint32_t caps = obs_get_source_output_flags(type_str);
-		if ((caps & OBS_SOURCE_DEPRECATED) != 0)
+		if ((caps & OBS_SOURCE_DEPRECATED) != 0) {
 			continue;
-		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0)
+		}
+		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0) {
 			continue;
-		if ((caps & OBS_SOURCE_CAP_OBSOLETE) != 0)
+		}
+		if ((caps & OBS_SOURCE_CAP_OBSOLETE) != 0) {
 			continue;
+		}
 
-		if (!filter_compatible(sf, caps))
+		if (!filter_compatible(sf, caps)) {
 			continue;
+		}
 
 		auto name = QString::fromUtf8(obs_source_get_display_name(type_str));
 
@@ -337,11 +366,13 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 		}
 		auto na = new QAction(name, addFilterMenu);
 		connect(na, &QAction::triggered, [this, name, type_str] {
-			if (!source)
+			if (!source) {
 				return;
+			}
 			auto s = obs_weak_source_get_source(source);
-			if (!s)
+			if (!s) {
 				return;
+			}
 			QString filter_name = name;
 			int i = 2;
 			OBSSourceAutoRelease f = nullptr;
@@ -363,8 +394,9 @@ void FiltersDock::AddFilterMenu(QMenu *addFilterMenu)
 void FiltersDock::SourceChanged(OBSSource s)
 {
 	if (source) {
-		if (obs_weak_source_references_source(source, s))
+		if (obs_weak_source_references_source(source, s)) {
 			return;
+		}
 		auto prev_source = obs_weak_source_get_source(source);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "remove", source_remove, this);
 		signal_handler_disconnect(obs_source_get_signal_handler(prev_source), "destroy", source_remove, this);
@@ -403,8 +435,9 @@ void FiltersDock::SourceChanged(OBSSource s)
 
 void FiltersDock::SourceDeselected(OBSSource s)
 {
-	if (obs_weak_source_references_source(source, s))
+	if (obs_weak_source_references_source(source, s)) {
 		SourceChanged(nullptr);
+	}
 }
 
 void FiltersDock::filter_add(void *param, calldata_t *cd)
@@ -431,11 +464,13 @@ void FiltersDock::filter_remove(void *param, calldata_t *cd)
 	QMetaObject::invokeMethod(this_, [this_, f] {
 		for (int i = 0; i < this_->filtersList->count(); i++) {
 			auto item = this_->filtersList->item(i);
-			if (!item)
+			if (!item) {
 				continue;
+			}
 			auto filter_ = item->data(Qt::UserRole).value<OBSSource>();
-			if (filter_ != f)
+			if (filter_ != f) {
 				continue;
+			}
 			delete this_->filtersList->takeItem(i);
 			break;
 		}
@@ -446,8 +481,9 @@ void FiltersDock::filter_reorder(void *param, calldata_t *cd)
 {
 	auto this_ = static_cast<FiltersDock *>(param);
 	auto source = (obs_source_t *)calldata_ptr(cd, "source");
-	if (!obs_weak_source_references_source(this_->source, source))
+	if (!obs_weak_source_references_source(this_->source, source)) {
 		return;
+	}
 	QMetaObject::invokeMethod(this_, "Reorder", Qt::QueuedConnection);
 }
 
@@ -455,13 +491,15 @@ void FiltersDock::Reorder()
 {
 	const auto item = filtersList->currentItem();
 	QString currentItem;
-	if (item)
+	if (item) {
 		currentItem = item->text();
+	}
 	filtersList->clear();
 
 	obs_source_t *s = obs_weak_source_get_source(source);
-	if (!s)
+	if (!s) {
 		return;
+	}
 	obs_source_enum_filters(
 		s,
 		[](obs_source_t *parent, obs_source_t *filter, void *param) {
