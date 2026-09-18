@@ -262,6 +262,32 @@ void ScenesDock::ChangeSceneIndex(bool relative, int offset, int invalidIdx)
 	sceneList->blockSignals(false);
 	if (canvasDock) {
 		canvasDock->ChangeSceneIndex(relative, offset, invalidIdx);
+	} else {
+		auto c = obs_weak_canvas_get_canvas(canvas);
+		if (obs_canvas_get_flags(c) & MAIN) {
+			auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+			if (main_window) {
+				auto sd = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
+				if (sd) {
+					auto sl = sd->findChild<QListWidget *>(QStringLiteral("scenes"));
+					if (sl) {
+						sl->blockSignals(true);
+						auto item = sl->takeItem(idx);
+						if (relative) {
+							sl->insertItem(idx + offset, item);
+							sl->setCurrentRow(idx + offset);
+						} else if (offset == 0) {
+							sl->insertItem(offset, item);
+						} else {
+							sl->insertItem(sl->count(), item);
+						}
+						item->setSelected(true);
+						sl->blockSignals(false);
+					}
+				}
+			}
+		}
+		obs_canvas_release(c);
 	}
 }
 
