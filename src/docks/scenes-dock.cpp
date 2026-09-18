@@ -123,6 +123,44 @@ ScenesDock::ScenesDock(QWidget *parent) : QFrame(parent)
 			item->setSelected(true);
 		}
 	});
+	QAction *renameAction = new QAction(sceneList);
+#ifdef __APPLE__
+	renameAction->setShortcut({Qt::Key_Return});
+#else
+	renameAction->setShortcut({Qt::Key_F2});
+#endif
+	renameAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+	connect(renameAction, &QAction::triggered, [this]() {
+		const auto item = sceneList->currentItem();
+		if (!item) {
+			return;
+		}
+		auto c = obs_weak_canvas_get_canvas(canvas);
+		if (!c) {
+			return;
+		}
+		obs_source_t *source = obs_canvas_get_source_by_name(c, item->text().toUtf8().constData());
+		if (!source) {
+			obs_canvas_release(c);
+			return;
+		}
+		std::string name = obs_source_get_name(source);
+		obs_source_t *s = nullptr;
+		do {
+			obs_source_release(s);
+			if (!NameDialog::AskForName(this, QString::fromUtf8(obs_module_text("SceneName")), name)) {
+				break;
+			}
+			s = obs_canvas_get_source_by_name(c, name.c_str());
+			if (s) {
+				continue;
+			}
+			obs_source_set_name(source, name.c_str());
+		} while (s);
+		obs_source_release(source);
+		obs_canvas_release(c);
+	});
+	sceneList->addAction(renameAction);
 
 	mainLayout->addWidget(sceneList, 1);
 
