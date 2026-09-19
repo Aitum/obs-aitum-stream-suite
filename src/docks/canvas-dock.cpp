@@ -3681,12 +3681,13 @@ void CanvasDock::AddGroupMenuItems(SourceTree * sl, QMenu * popup)
 	if (sl->MultipleBaseSelected()) {
 		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.GroupItems")), sl,
 				 &SourceTree::GroupSelectedItems);
-		popup->addSeparator();
 	} else if (sl->GroupsSelected()) {
 		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Ungroup")), sl,
 				&SourceTree::UngroupSelectedGroups);
-		popup->addSeparator();
 	}
+	popup->addAction(QString::fromUtf8(obs_module_text("SourceDock.NewGroup")), sl,
+			 &SourceTree::AddGroup);
+	popup->addSeparator();
 }
 
 bool CanvasDock::RotateSelectedSources(obs_scene_t *scene, obs_sceneitem_t *item, void *param)

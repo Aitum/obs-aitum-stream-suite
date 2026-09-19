@@ -869,6 +869,10 @@ QToolBar::separator {
     qproperty-icon: url(theme:Aitum/plus.svg);
 }
 
+* [themeID="groupIconSmall"] {
+    qproperty-icon: url(theme:Aitum/sources/group.svg);
+}
+
 * [themeID="removeIconSmall"] {
     qproperty-icon: url(theme:Aitum/trash.svg);
 }
