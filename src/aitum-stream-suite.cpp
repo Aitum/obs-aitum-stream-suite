@@ -2099,6 +2099,7 @@ bool obs_module_load(void)
 				obs_data_release(d2);
 			}
 		}
+#ifdef WIN32
 		const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		if (main_window && main_window->isMaximized()) {
 			auto geo = main_window->screen()->availableGeometry();
@@ -2107,6 +2108,7 @@ bool obs_module_load(void)
 				main_window->showMaximized();
 			}
 		}
+#endif // WIN32
 	});
 
 	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
