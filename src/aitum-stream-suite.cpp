@@ -830,9 +830,118 @@ std::vector<std::tuple<std::string, void (*)(void), QString, bool>> fixed_tabs =
 //,{"Design", reset_design_dock_state, QString::fromUtf8("🎨"), false}};
 
 static bool scene_collection_changing = false;
+static bool applying_dock_layout = false;
+
+struct SavedDockFeatures {
+	QDockWidget *dock;
+	QDockWidget::DockWidgetFeatures features;
+};
+
+struct DockLayoutApplyGuard {
+	bool previous;
+	DockLayoutApplyGuard() : previous(applying_dock_layout) { applying_dock_layout = true; }
+	~DockLayoutApplyGuard() { applying_dock_layout = previous; }
+};
+
+static bool main_window_docks_locked(QMainWindow *main_window)
+{
+	auto scenes = main_window->findChild<QDockWidget *>(QStringLiteral("scenesDock"));
+	if (!scenes) {
+		return false;
+	}
+	return !(scenes->features() & QDockWidget::DockWidgetClosable);
+}
+
+static quint32 read_be32(const char *p)
+{
+	const auto *b = reinterpret_cast<const unsigned char *>(p);
+	return (quint32(b[0]) << 24) | (quint32(b[1]) << 16) | (quint32(b[2]) << 8) | quint32(b[3]);
+}
+
+static int saved_dock_flags(const QByteArray &state, const QString &name)
+{
+	QByteArray pat;
+	pat.reserve(name.size() * 2);
+	for (const QChar c : name) {
+		const ushort u = c.unicode();
+		pat.append(char(u >> 8));
+		pat.append(char(u & 0xff));
+	}
+	int flags = -1;
+	int from = 0;
+	while (from < state.size()) {
+		const int i = state.indexOf(pat, from);
+		if (i < 0) {
+			break;
+		}
+		if (i >= 4) {
+			const quint32 len = read_be32(state.constData() + i - 4);
+			if (len == (quint32)pat.size() && i + pat.size() < state.size()) {
+				flags = (unsigned char)state.at(i + pat.size());
+			}
+		}
+		from = i + pat.size();
+	}
+	return flags;
+}
+
+static QByteArray dock_state_bytes(const QString &mode)
+{
+	if (!current_profile_config || mode.isEmpty()) {
+		return {};
+	}
+	std::string key = "dock_state_" + mode.toStdString();
+	std::string state = obs_data_get_string(current_profile_config, key.c_str());
+	if (state.empty()) {
+		key = "dock_state_" + mode.toLower().toStdString();
+		state = obs_data_get_string(current_profile_config, key.c_str());
+	}
+	if (state.empty()) {
+		return {};
+	}
+	return QByteArray::fromBase64(state.c_str());
+}
+
+/* Qt QDockAreaLayout::StateFlag values from the saved dock state. */
+static const int DockStateVisible = 0x01;
+static const int DockStateClosed = 0x08;
+
+static void apply_saved_dock_visibility(QMainWindow *main_window, const QByteArray &state)
+{
+	if (!main_window || state.isEmpty()) {
+		return;
+	}
+	const auto docks = main_window->findChildren<QDockWidget *>();
+	for (auto *dock : docks) {
+		const int flags = saved_dock_flags(state, dock->objectName());
+		if (flags < 0) {
+			continue;
+		}
+		const bool show = (flags & DockStateVisible) && !(flags & DockStateClosed);
+		if (dock->isVisible() != show) {
+			dock->setVisible(show);
+		}
+	}
+}
+
+static void remember_visible_docks(QMainWindow *main_window)
+{
+	loaded_docks.clear();
+	if (!main_window) {
+		return;
+	}
+	const auto docks = main_window->findChildren<QDockWidget *>();
+	for (auto *dock : docks) {
+		if (dock->isVisible()) {
+			loaded_docks.append(dock->objectName());
+		}
+	}
+}
 
 void load_dock_state(QString mode)
 {
+	DockLayoutApplyGuard guard;
+	UNUSED_PARAMETER(guard);
 	if (!current_profile_config) {
 		return;
 	}
@@ -869,7 +978,23 @@ void load_dock_state(QString mode)
 		if (!main_window) {
 			return;
 		}
-		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
+		const bool docks_locked = main_window_docks_locked(main_window);
+		QList<SavedDockFeatures> saved_features;
+		if (docks_locked) {
+			const auto docks = main_window->findChildren<QDockWidget *>();
+			for (auto *dock : docks) {
+				saved_features.append({dock, dock->features()});
+				dock->setFeatures(dock->features() | QDockWidget::DockWidgetClosable);
+			}
+		}
+		const QByteArray state_bytes = QByteArray::fromBase64(state.c_str());
+		main_window->restoreState(state_bytes);
+		if (docks_locked) {
+			for (const auto &it : saved_features) {
+				it.dock->setFeatures(it.features);
+			}
+		}
+		apply_saved_dock_visibility(main_window, state_bytes);
 
 		auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
 		if (!d) {
@@ -905,12 +1030,7 @@ void load_dock_state(QString mode)
 			}
 		}
 
-		auto docks = main_window->findChildren<QDockWidget *>();
-		for (auto &dock : docks) {
-			if (dock->isVisible()) {
-				loaded_docks.append(dock->objectName());
-			}
-		}
+		remember_visible_docks(main_window);
 	}
 	for (const auto &it : canvas_docks) {
 		auto dw = qobject_cast<QDockWidget *>(it->parentWidget());
@@ -2074,6 +2194,7 @@ bool obs_module_load(void)
 	toolbar->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
+		applying_dock_layout = true;
 		if (!current_profile_config || !obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
 			save_dock_state(modesTab);
 		}
@@ -2108,7 +2229,14 @@ bool obs_module_load(void)
 				main_window->showMaximized();
 			}
 		}
+		apply_saved_dock_visibility(main_window, dock_state_bytes(modesTab));
+		remember_visible_docks(main_window);
+#else
+		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		apply_saved_dock_visibility(main_window, dock_state_bytes(modesTab));
+		remember_visible_docks(main_window);
 #endif // WIN32
+		applying_dock_layout = false;
 	});
 
 	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
@@ -2439,7 +2567,7 @@ void TabToolBar::checkOrientation() const
 void TabToolBar::resizeEvent(QResizeEvent *event)
 {
 	load_dock_state_timer.stop();
-	if (!isFloating()) {
+	if (!applying_dock_layout && !isFloating()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		if (!main_window) {
 			return;
