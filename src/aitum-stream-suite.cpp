@@ -830,6 +830,7 @@ std::vector<std::tuple<std::string, void (*)(void), QString, bool>> fixed_tabs =
 //,{"Design", reset_design_dock_state, QString::fromUtf8("🎨"), false}};
 
 static bool scene_collection_changing = false;
+static bool applying_dock_layout = false;
 
 void load_dock_state(QString mode)
 {
@@ -1525,14 +1526,19 @@ void load_current_profile_config()
 	QMetaObject::invokeMethod(
 		modesTabBar,
 		[] {
+			if (applying_dock_layout) {
+				return;
+			}
 			auto index = modesTabBar->currentIndex();
 			if (index >= 0) {
+				applying_dock_layout = true;
 				auto d = modesTabBar->tabData(index);
 				if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 					load_dock_state(d.toString());
 				} else {
 					load_dock_state(modesTabBar->tabText(index));
 				}
+				applying_dock_layout = false;
 			}
 		},
 		Qt::QueuedConnection);
@@ -2074,6 +2080,7 @@ bool obs_module_load(void)
 	toolbar->addSeparator();
 
 	QObject::connect(modesTabBar, &QTabBar::currentChanged, [](int index) {
+		applying_dock_layout = true;
 		if (!current_profile_config || !obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
 			save_dock_state(modesTab);
 		}
@@ -2109,6 +2116,7 @@ bool obs_module_load(void)
 			}
 		}
 #endif // WIN32
+		applying_dock_layout = false;
 	});
 
 	QObject::connect(modesTabBar, &QTabBar::customContextMenuRequested, [] {
@@ -2439,7 +2447,7 @@ void TabToolBar::checkOrientation() const
 void TabToolBar::resizeEvent(QResizeEvent *event)
 {
 	load_dock_state_timer.stop();
-	if (!isFloating()) {
+	if (!applying_dock_layout && !isFloating()) {
 		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 		if (!main_window) {
 			return;
@@ -2506,14 +2514,19 @@ void obs_module_post_load()
 	load_dock_state_timer.setInterval(100);
 	load_dock_state_timer.setSingleShot(true);
 	QObject::connect(&load_dock_state_timer, &QTimer::timeout, []() {
+		if (applying_dock_layout) {
+			return;
+		}
 		auto index = modesTabBar->currentIndex();
 		if (index >= 0) {
+			applying_dock_layout = true;
 			auto d = modesTabBar->tabData(index);
 			if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
 				load_dock_state(d.toString());
 			} else {
 				load_dock_state(modesTabBar->tabText(index));
 			}
+			applying_dock_layout = false;
 		}
 	});
 
