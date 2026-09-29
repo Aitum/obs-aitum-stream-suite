@@ -97,6 +97,13 @@ SourcesDock::SourcesDock(QWidget *parent) : QFrame(parent)
 	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("addIconSmall")));
 	toolbar->widgetForAction(a)->setProperty("class", "icon-plus");
 
+	a = toolbar->addAction(QIcon(":/res/images/group.svg"),
+			       QString::fromUtf8(obs_module_text("SourceDock.NewGroup")), [this] {
+				       sourceList->AddGroup();
+			       });
+	toolbar->widgetForAction(a)->setProperty("themeID", QVariant(QString::fromUtf8("groupIconSmall")));
+	toolbar->widgetForAction(a)->setProperty("class", "icon-group");
+
 	a = toolbar->addAction(
 		QIcon(":/res/images/minus.svg"), QString::fromUtf8(obs_frontend_get_locale_string("RemoveSource")), [this] {
 			auto scene_source = obs_weak_source_get_source(scene);
