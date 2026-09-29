@@ -279,8 +279,6 @@ typedef struct _cef_resource_read_callback_t {
 	void(CEF_CALLBACK *cont)(struct _cef_resource_read_callback_t *self, int bytes_read);
 } cef_resource_read_callback_t;
 
-cef_string_t scheme{};
-cef_string_t domain{};
 cef_scheme_handler_factory_t factory{};
 
 int (*cef_parse_url)(const cef_string_t *url, struct _cef_urlparts_t *parts) = nullptr;
@@ -662,52 +660,6 @@ bool load_cef()
 		create_qcef = (decltype(create_qcef))os_dlsym(lib, "obs_browser_create_qcef");
 		if (create_qcef) {
 			cef = create_qcef();
-
-			auto libcef = os_dlopen("libcef");
-			if (libcef) {
-				cef_parse_url = (decltype(cef_parse_url))os_dlsym(libcef, "cef_parse_url");
-				cef_string_userfree_free =
-					(decltype(cef_string_userfree_free))os_dlsym(libcef, "cef_string_userfree_utf16_free");
-				cef_string_userfree_utf8_alloc = (decltype(cef_string_userfree_utf8_alloc))os_dlsym(
-					libcef, "cef_string_userfree_utf8_alloc");
-				cef_string_utf16_to_utf8 =
-					(decltype(cef_string_utf16_to_utf8))os_dlsym(libcef, "cef_string_utf16_to_utf8");
-				cef_string_userfree_utf8_free =
-					(decltype(cef_string_userfree_utf8_free))os_dlsym(libcef, "cef_string_userfree_utf8_free");
-				cef_uridecode = (decltype(cef_uridecode))os_dlsym(libcef, "cef_uridecode");
-				cef_stream_reader_create_for_file = (decltype(cef_stream_reader_create_for_file))os_dlsym(
-					libcef, "cef_stream_reader_create_for_file");
-				cef_get_mime_type = (decltype(cef_get_mime_type))os_dlsym(libcef, "cef_get_mime_type");
-				cef_string_set = (decltype(cef_string_set))os_dlsym(libcef, "cef_string_utf16_set");
-				cef_string_utf8_to_utf16 =
-					(decltype(cef_string_utf8_to_utf16))os_dlsym(libcef, "cef_string_utf8_to_utf16");
-				cef_string_userfree_utf16_alloc = (decltype(cef_string_userfree_utf16_alloc))os_dlsym(
-					libcef, "cef_string_userfree_utf16_alloc");
-
-				cef_string_set(u"https", 5, &scheme);
-				cef_string_set(u"local.aitumsuite.tv", 19, &domain);
-				auto t = (int (*)(const cef_string_t *, const cef_string_t *,
-						  cef_scheme_handler_factory_t *))os_dlsym(libcef,
-											   "cef_register_scheme_handler_factory");
-				factory.create = scheme_factory;
-				factory.base.size = sizeof(cef_scheme_handler_factory_t);
-				factory.base.add_ref = [](cef_base_ref_counted_t *self) {
-					UNUSED_PARAMETER(self);
-				};
-				factory.base.release = [](cef_base_ref_counted_t *self) -> int {
-					UNUSED_PARAMETER(self);
-					return 1;
-				};
-				factory.base.has_at_least_one_ref = [](cef_base_ref_counted_t *self) -> int {
-					UNUSED_PARAMETER(self);
-					return 1;
-				};
-				factory.base.has_one_ref = [](cef_base_ref_counted_t *self) -> int {
-					UNUSED_PARAMETER(self);
-					return 1;
-				};
-				t(&scheme, &domain, &factory);
-			}
 		}
 	}
 	return cef != nullptr;
@@ -736,13 +688,68 @@ private:
 	std::function<void()> func;
 };
 
+static bool loaded_scheme_handler = false;
+
+static void load_scheme_handler()
+{
+	if (loaded_scheme_handler) {
+		return;
+	}
+	auto libcef = os_dlopen("libcef");
+	if (!libcef) {
+		return;
+	}
+	loaded_scheme_handler = true;
+	cef_parse_url = (decltype(cef_parse_url))os_dlsym(libcef, "cef_parse_url");
+	cef_string_userfree_free = (decltype(cef_string_userfree_free))os_dlsym(libcef, "cef_string_userfree_utf16_free");
+	cef_string_userfree_utf8_alloc =
+		(decltype(cef_string_userfree_utf8_alloc))os_dlsym(libcef, "cef_string_userfree_utf8_alloc");
+	cef_string_utf16_to_utf8 = (decltype(cef_string_utf16_to_utf8))os_dlsym(libcef, "cef_string_utf16_to_utf8");
+	cef_string_userfree_utf8_free = (decltype(cef_string_userfree_utf8_free))os_dlsym(libcef, "cef_string_userfree_utf8_free");
+	cef_uridecode = (decltype(cef_uridecode))os_dlsym(libcef, "cef_uridecode");
+	cef_stream_reader_create_for_file =
+		(decltype(cef_stream_reader_create_for_file))os_dlsym(libcef, "cef_stream_reader_create_for_file");
+	cef_get_mime_type = (decltype(cef_get_mime_type))os_dlsym(libcef, "cef_get_mime_type");
+	cef_string_set = (decltype(cef_string_set))os_dlsym(libcef, "cef_string_utf16_set");
+	cef_string_utf8_to_utf16 = (decltype(cef_string_utf8_to_utf16))os_dlsym(libcef, "cef_string_utf8_to_utf16");
+	cef_string_userfree_utf16_alloc =
+		(decltype(cef_string_userfree_utf16_alloc))os_dlsym(libcef, "cef_string_userfree_utf16_alloc");
+
+	auto scheme = cef_string_userfree_utf16_alloc();
+	auto domain = cef_string_userfree_utf16_alloc();
+
+	cef_string_set(u"https", 5, scheme);
+	cef_string_set(u"local.aitumsuite.tv", 19, domain);
+	auto t = (int (*)(const cef_string_t *, const cef_string_t *,
+			  cef_scheme_handler_factory_t *))os_dlsym(libcef, "cef_register_scheme_handler_factory");
+	factory.create = scheme_factory;
+	factory.base.size = sizeof(cef_scheme_handler_factory_t);
+	factory.base.add_ref = [](cef_base_ref_counted_t *self) {
+		UNUSED_PARAMETER(self);
+	};
+	factory.base.release = [](cef_base_ref_counted_t *self) -> int {
+		UNUSED_PARAMETER(self);
+		return 1;
+	};
+	factory.base.has_at_least_one_ref = [](cef_base_ref_counted_t *self) -> int {
+		UNUSED_PARAMETER(self);
+		return 1;
+	};
+	factory.base.has_one_ref = [](cef_base_ref_counted_t *self) -> int {
+		UNUSED_PARAMETER(self);
+		return 1;
+	};
+
+	t(scheme, domain, &factory);
+}
+
 BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : QWidget(parent), url(url_)
 {
 	setMinimumSize(200, 100);
 	setObjectName(QString::fromUtf8(name));
 
 	load_cef();
-	if (!panel_cookies && cef) {
+	if ((!panel_cookies || !loaded_scheme_handler) && cef) {
 		if (!cef->init_browser()) {
 			QEventLoop eventLoop;
 			auto t = new QuickThread([&] {
@@ -754,6 +761,11 @@ BrowserDock::BrowserDock(const char *name, const char *url_, QWidget *parent) : 
 			t->wait();
 			t->deleteLater();
 		}
+	}
+	if (!loaded_scheme_handler && cef) {
+		load_scheme_handler();
+	}
+	if (!panel_cookies && cef) {
 		const char *cookie_id = config_get_string(obs_frontend_get_profile_config(), "Panels", "CookieId");
 		if (!cookie_id || cookie_id[0] == '\0') {
 			config_set_string(obs_frontend_get_profile_config(), "Panels", "CookieId", GenId().c_str());
