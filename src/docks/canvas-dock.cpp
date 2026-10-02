@@ -4117,11 +4117,14 @@ void CanvasDock::LoadScenes()
 	if (sceneList) {
 		QListWidgetItem *selectedItem = nullptr;
 		sceneList->blockSignals(true);
-		for (int idx = 0; idx < sceneList->count(); idx++) {
+		for (int idx = 0; idx < sceneList->count();) {
 			auto item = sceneList->takeItem(idx);
 			auto scene = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 			auto settings = obs_source_get_settings(scene);
 			const int order = (int)obs_data_get_int(settings, "order");
+			if (order <= idx) {
+				idx++;
+			}
 			sceneList->insertItem(order, item);
 			if (obs_data_get_bool(settings, "canvas_active")) {
 				selectedItem = item;
