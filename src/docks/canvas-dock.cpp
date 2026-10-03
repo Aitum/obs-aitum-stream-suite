@@ -3676,7 +3676,7 @@ void CanvasDock::AddCopyPasteMenuItems(QMenu *popup, OBSSceneItem sceneItem, OBS
 	}
 }
 
-void CanvasDock::AddGroupMenuItems(SourceTree * sl, QMenu * popup)
+void CanvasDock::AddGroupMenuItems(SourceTree *sl, QMenu *popup)
 {
 	if (sl->MultipleBaseSelected()) {
 		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.GroupItems")), sl,
@@ -3684,7 +3684,7 @@ void CanvasDock::AddGroupMenuItems(SourceTree * sl, QMenu * popup)
 		popup->addSeparator();
 	} else if (sl->GroupsSelected()) {
 		popup->addAction(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Main.Ungroup")), sl,
-				&SourceTree::UngroupSelectedGroups);
+				 &SourceTree::UngroupSelectedGroups);
 		popup->addSeparator();
 	}
 }
@@ -4117,11 +4117,14 @@ void CanvasDock::LoadScenes()
 	if (sceneList) {
 		QListWidgetItem *selectedItem = nullptr;
 		sceneList->blockSignals(true);
-		for (int idx = 0; idx < sceneList->count(); idx++) {
+		for (int idx = 0; idx < sceneList->count();) {
 			auto item = sceneList->takeItem(idx);
 			auto scene = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
 			auto settings = obs_source_get_settings(scene);
 			const int order = (int)obs_data_get_int(settings, "order");
+			if (order <= idx) {
+				idx++;
+			}
 			sceneList->insertItem(order, item);
 			if (obs_data_get_bool(settings, "canvas_active")) {
 				selectedItem = item;
@@ -6315,14 +6318,19 @@ bool CanvasDock::LogSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *v_val)
 			blog(LOG_INFO, "    %s- audio tracks:%s", indent.c_str(), tracks.c_str());
 		}
 
+#if LIBOBS_API_VER >= MAKE_SEMANTIC_VERSION(33, 0, 0)
+		bool monitoring = obs_source_get_monitoring_enabled(source);
+		if (monitoring) {
+			blog(LOG_INFO, "    %s- monitoring: enabled", indent.c_str());
+		}
+#else
 		obs_monitoring_type monitoring_type = obs_source_get_monitoring_type(source);
-
 		if (monitoring_type != OBS_MONITORING_TYPE_NONE) {
 			const char *type = (monitoring_type == OBS_MONITORING_TYPE_MONITOR_ONLY) ? "monitor only"
 												 : "monitor and output";
-
 			blog(LOG_INFO, "    %s- monitoring: %s", indent.c_str(), type);
 		}
+#endif
 	}
 	int child_indent = 1 + indent_count;
 	obs_source_enum_filters(source, LogFilter, (void *)(intptr_t)child_indent);
