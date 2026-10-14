@@ -78,10 +78,39 @@ function PackagePlugin {
 
     $plugins = @('advanced-masks.1856','move.913','retro-effects.1972','composite-blur.1780','svg-source.2174','noise.1916','stroke-glow-shadow.1800','freeze-filter.950','3d-effect.1692','scene-notes-dock.1398','source-clone.1632','gradient-source.1172')
     foreach ($plugin in $plugins) {
-        $relPath = [regex]::Matches(((Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""), '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*windows(-x64)?.zip').Groups[1].Value
-        Invoke-WebRequest -OutFile "temp.zip" "https://obsproject.com${relPath}"
-        Expand-Archive -Path "temp.zip" -DestinationPath "${ProjectRoot}/release/Package/" -Force
-        Remove-Item -Path "temp.zip"
+        $content = (Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""
+        $legacyPath = [regex]::Match($content, '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*windows(-legacy|.OBS30-32)(-x64)?\.zip').Groups[1].Value
+        if ($legacyPath) {
+            $relPath = $legacyPath
+        }else {
+            $relPath = [regex]::Match($content, '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*windows(-x64)?\.zip').Groups[1].Value
+        }
+        if ($relPath) {
+            Invoke-WebRequest -OutFile "temp.zip" "https://obsproject.com${relPath}"
+            $shortName = $plugin.Split('.')[0]
+            Expand-Archive -Path "temp.zip" -DestinationPath "${ProjectRoot}/${shortName}/" -Force
+            Remove-Item -Path "temp.zip"
+            if ((Test-Path "${ProjectRoot}/${shortName}/obs-plugins") -and (Test-Path "${ProjectRoot}/${shortName}/data")) {
+                Copy-Item -Path "${ProjectRoot}/${shortName}/obs-plugins" -Destination "${ProjectRoot}/release/Package" -Recurse -Force
+                Copy-Item -Path "${ProjectRoot}/${shortName}/data" -Destination "${ProjectRoot}/release/Package" -Recurse -Force
+            }else{
+                $dllPaths = Get-ChildItem -Path "${ProjectRoot}/${shortName}/" -Recurse -Filter "*.dll"
+                if ($dllPaths) {
+                    foreach ($dllPath in $dllPaths) {
+                        $dirName = Split-Path -Path $dllPath.FullName -Parent
+                        if(Test-Path -Path "$dirName/../../data"){
+                            Copy-Item -Path "$dirName" -Destination "${ProjectRoot}/release/Package/obs-plugins" -Recurse -Force
+                            Copy-Item -Path "$dirName/../../data" -Destination "${ProjectRoot}/release/Package/" -Recurse -Force
+                        }                       
+                    }
+                }else{
+                    Write-Warning "No obs-plugins or data folder found for ${plugin}"
+                }
+            }
+            Remove-Item -Path "${ProjectRoot}/${shortName}/" -Recurse -Force
+        } else {
+            Write-Warning "No Windows download found for ${plugin}"
+        }
     }
 
     Copy-Item -Path "${ProjectRoot}/theme" -Destination "${ProjectRoot}/release/Package/data/obs-studio/themes" -Recurse
