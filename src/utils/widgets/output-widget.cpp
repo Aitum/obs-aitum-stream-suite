@@ -1252,6 +1252,13 @@ obs_encoder_t *OutputWidget::GetVideoEncoder(obs_data_t *settings, bool advanced
 			},
 			&d);
 
+		if (venc) {
+			// The encoder is owned by another output, so take our own reference like the other branches do.
+			// The caller releases one reference after obs_output_set_video_encoder2() (which takes its own),
+			// otherwise the shared encoder is destroyed while another output is still using it.
+			obs_encoder_get_ref(venc);
+		}
+
 		if (!venc && main) {
 			obs_output_t *main_output = nullptr;
 			if (is_record) {
