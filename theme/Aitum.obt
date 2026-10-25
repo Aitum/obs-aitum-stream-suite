@@ -277,7 +277,199 @@
     */
 }
 
-/* Default widget style, we override only what is needed. */
+/* --------------------- */
+/* General Styling Hints */
+
+/* Backgrounds */
+
+.bg_window {
+    background-color: var(--bg_window);
+}
+
+.bg-base {
+    background-color: var(--bg_base);
+}
+
+.bg-primary {
+    background-color: var(--primary);
+}
+
+.bg-secondary {
+    background-color: var(--teal3);
+}
+
+.bg-info {
+    background-color: var(--grey8);
+}
+
+.bg-warning {
+    background-color: var(--yellow6);
+}
+
+.bg-danger {
+    background-color: var(--red6);
+}
+
+.bg-success {
+    background-color: var(--green6);
+}
+
+.text-title {
+    font-size: var(--font_large);
+    font-weight: bold;
+}
+
+.text-small {
+    font-size: var(--font_small);
+}
+
+.text-tiny {
+    font-size: var(--font_xsmall);
+}
+
+.text-heading {
+    font-size: var(--font_heading);
+    font-weight: bold;
+}
+
+.text-large {
+    font-size: var(--font_large);
+}
+
+.text-bold {
+    font-weight: bold;
+}
+
+.text-italic {
+    font-style: italic;
+}
+
+.text-bright {
+    color: var(--primary_light);
+}
+
+.text-muted {
+    color: var(--text_muted);
+}
+
+.text-warning {
+    color: var(--yellow3);
+}
+
+.text-danger {
+    color: var(--red3);
+}
+
+.text-success {
+    color: var(--green3);
+}
+
+.bg-secondary.text-secondary {
+    color: var(--teal1);
+}
+
+.bg-info.text-info {
+    color: var(--text_light);
+}
+
+.bg-warning.text-warning {
+    color: var(--yellow1);
+}
+
+.bg-danger.text-danger {
+    color: var(--red1);
+}
+
+.bg-success.text-success {
+    color: var(--green1);
+}
+
+.frame-notice {
+    background: var(--grey8);
+    border: 1px solid var(--grey6);
+    border-radius: var(--border_radius);
+    padding: var(--padding_xlarge) var(--padding_large);
+}
+
+.frame-notice QLabel {
+    padding: var(--padding_large) 0px;
+}
+
+.dialog-container {
+    padding: var(--padding_large) var(--padding_xlarge);
+}
+
+.dialog-frame {
+    background-color: var(--grey6);
+    border-radius: var(--border_radius);
+    border: 1px solid var(--border_color);
+    margin: var(--spacing_base);
+}
+
+.dialog-frame > QWidget {
+    margin: var(--spacing_base) 0;
+}
+
+.subtitle {
+    font-size: var(--font_small);
+    font-weight: bold;
+    color: var(--text_muted);
+}
+
+.button-primary {
+    background-color: var(--primary_dark);
+    border-color: var(--primary);
+    outline: none;
+}
+
+.button-primary:hover,
+.button-primary:focus {
+    background-color: var(--primary);
+    border-color: var(--white3);
+}
+
+.button-primary:hover {
+    border-color: var(--primary_light);
+}
+
+.toolbar-button {
+    background: transparent;
+    font-weight: bold;
+    padding: 0 var(--padding_xlarge);
+    margin: var(--spacing_small) var(--spacing_small) 0px;
+    border: var(--highlight_width) solid transparent;
+    border-radius: var(--border_radius);
+}
+
+.margin {
+    margin: var(--spacing_base);
+}
+
+.margin-x {
+    margin-left: var(--spacing_base);
+    margin-right: var(--spacing_base);
+}
+
+.margin-left {
+    margin-left: var(--spacing_base);
+}
+
+.margin-right {
+    margin-right: var(--spacing_base);
+}
+
+.margin-y {
+    margin-top: var(--spacing_base);
+    margin-bottom: var(--spacing_base);
+}
+
+.margin-top {
+    margin-top: var(--spacing_base);
+}
+
+.margin-bottom {
+    margin-bottom: var(--spacing_base);
+}
 
 /* Icon Overrides */
 
@@ -2529,6 +2721,13 @@ SourceSelectButton:pressed:hover {
     border-color: var(--button_border);
 }
 
+InfoChip {
+    font-size: var(--font_small);
+    font-weight: bold;
+    padding: 0 var(--padding_large);
+    border-radius: var(--border_radius);
+}
+
 /* Top Toolbar */
 QMainWindow>QToolBar{
     background:var(--blueMed);
@@ -2687,25 +2886,26 @@ QMainWindow>QToolBar QTabBar::tab::right {
 }
 
 /* Idian Widgets */
-idian--Group {
+idian--ListHeader {
     border-radius: var(--border_radius);
     font-weight: bold;
     margin: 0 0 var(--spacing_base);
+    padding: 0 var(--padding_base);
     min-width: 300px;
-    max-width: 600px;
 }
 
-idian--Group .header .title {
+idian--RowList .title {
     font-weight: bold;
-    padding: var(--padding_large) 0;
+    padding: 0;
 }
 
-idian--Group .header .description {
+idian--RowList .description {
+    font-size: var(--font_small);
     color: var(--text_muted);
-    padding: var(--spacing_small) 0;
+    padding: 0;
 }
 
-idian--PropertiesList {
+idian--RowList {
     border-width: 0;
     padding: 0;
     margin: var(--spacing_base) 0;
@@ -2713,13 +2913,14 @@ idian--PropertiesList {
 
 idian--Row {
     background: var(--grey5);
-    margin: 0;
     padding: var(--action_row_padding) var(--action_row_padding_x);
+    border-radius: var(--border_radius);
+    border: var(--input_border_width) solid var(--border_color);
 }
 
 idian--Row.keyFocus {
     background: var(--grey4);
-    border: var(--highlight_width) solid var(--grey4);
+    border: var(--highlight_width) solid var(--highlight_color);
 }
 
 idian--Row.cursor-pointer.hover {
@@ -2727,19 +2928,18 @@ idian--Row.cursor-pointer.hover {
     border: var(--highlight_width) solid var(--grey1);
 }
 
-idian--Row.first {
+idian--RowList idian--Row {
+    border-radius: 0;
+}
+
+idian--RowList idian--Row.first {
     border-top-left-radius: var(--border_radius);
     border-top-right-radius: var(--border_radius);
 }
 
-idian--Row.last {
+idian--RowList idian--Row.last {
     border-bottom-left-radius: var(--border_radius);
     border-bottom-right-radius: var(--border_radius);
-}
-
-idian--Row > QLabel.description {
-    font-size: var(--font_small);
-    color: var(--text_muted);
 }
 
 idian--ToggleSwitch {
@@ -2834,7 +3034,7 @@ idian--Row QDoubleSpinBox {
     padding: var(--padding_base) var(--action_row_padding_x);
 }
 
-idian--PropertiesListSpacer {
+idian--RowListSpacer {
     max-height: var(--spacing_small);
     min-height: var(--spacing_small);
     background-color: var(--bg_window);
@@ -2871,88 +3071,99 @@ idian--CheckBox.keyFocus.checked::indicator {
     border-color: var(--highlight_color);
 }
 
-idian--CollapsibleRow {
+idian--CollapsibleGroup {
     margin: 0;
     padding: 0;
     border: none;
 }
 
-idian--CollapsibleRow.keyFocus {
+idian--CollapsibleGroup.expanded > idian--Row {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+idian--CollapsibleGroup idian--Row.keyFocus {
     border: var(--highlight_width) solid var(--highlight_color);
 }
 
-idian--CollapsibleRow idian--PropertiesList {
+idian--CollapsibleGroup idian--RowList {
     border-radius: 0;
     border-left: 1px solid var(--grey5);
     border-right: 1px solid var(--grey5);
     border-bottom: 1px solid var(--grey5);
+    border-bottom: 1px solid var(--grey5);
     margin: var(--spacing_small) 0px 0px;
 }
 
-idian--CollapsibleRow idian--PropertiesList idian--Row {
+idian--CollapsibleGroup idian--RowList idian--Row {
     background-color: var(--grey6);
     padding-left: var(--action_row_padding_nested);
 }
 
-idian--CollapsibleRow idian--Row.first,
-idian--CollapsibleRow idian--Row.last {
+idian--CollapsibleGroup idian--RowList idian--Row.first {
     border-radius: 0;
 }
 
-idian--CollapsibleRow idian--PropertiesList idian--ToggleSwitch {
+idian--CollapsibleGroup idian--RowList idian--Row.last {
+    border-bottom-left-radius: var(--border_radius);
+    border-bottom-right-radius: var(--border_radius);
+}
+
+idian--RowList idian--CollapsibleGroup idian--Row.last {
+    border-radius: 0;
+}
+
+idian--RowList idian--CollapsibleGroup.last idian--Row.last {
+    border-bottom-left-radius: var(--border_radius);
+    border-bottom-right-radius: var(--border_radius);
+}
+
+idian--CollapsibleGroup idian--RowList idian--ToggleSwitch {
     qproperty-background: var(--grey7);
     qproperty-background_hover: var(--grey6);
 }
 
-idian--ExpandButton {
+idian--InlineButton,
+idian--Row idian--InlineButton {
     background: transparent;
-    min-width: var(--action_row_collapse);
-    max-width: var(--action_row_collapse);
-    min-height: var(--action_row_collapse);
-    max-height: var(--action_row_collapse);
-    border: none;
+    min-width: var(--input_height);
+    min-height: var(--input_height);
+    border-radius: var(--border_radius);
+    padding: var(--padding_base);
+    margin: 0 var(--spacing_base);
+    
+    border: var(--highlight_width) solid transparent;
 }
 
-idian--ExpandButton::indicator {
-    background: var(--grey5);
-    border-radius: var(--action_row_collapse_radius);
-    padding: var(--padding_large);
-    image: url(theme:Dark/down.svg);
-    border: var(--highlight_width) solid var(--grey5);
+idian--InlineButton:hover {
+    background-color: var(--button_bg_hover);
+    border-color: var(--input_border_hover);
 }
 
-idian--ExpandButton::indicator:checked {
-    image: url(theme:Dark/up.svg);
+idian--InlineButton:hover,
+idian--Row.hover idian--InlineButton.row-buddy {
+    border-color: var(--input_border_hover);
 }
 
-idian--ExpandButton.keyFocus,
-idian--ExpandButton.keyFocus::indicator {
+idian--InlineButton:pressed {
+    background-color: var(--button_bg_down);
+}
+
+idian--InlineButton:focus,
+idian--InlineButton.keyFocus,
+idian--Row.keyFocus idian--InlineButton,
+idian--Row.keyFocus idian--InlineButton.checked {
     border-color: var(--highlight_color);
 }
 
-idian--RowFrame .btn-frame {
-    background: var(--grey5);
-    padding: var(--action_row_padding) var(--action_row_padding_x);
+idian--ExpandButton {
+    qproperty-icon: url(theme:Dark/down.svg);
 }
 
-idian--RowFrame.hover .btn-frame {
-    background: var(--grey4);
-}
-
-idian--RowFrame.hover idian--Row {
-    background: var(--grey4);
-    border: var(--highlight_width) solid var(--grey1);
-    border-right: none;
-}
-
-idian--RowFrame.hover .row-buddy {
-    background: var(--grey4);
-    border: var(--highlight_width) solid var(--grey1);
-    border-left: none;
-}
-
-idian--RowFrame.hover idian--ExpandButton::indicator {
-    border-color: var(--grey1);
+idian--ExpandButton.checked {
+    qproperty-icon: url(theme:Dark/up.svg);
+    background: transparent;
+    border-color: transparent;
 }
 
 AlignmentSelector {
