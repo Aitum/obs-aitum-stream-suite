@@ -80,6 +80,9 @@ function PackagePlugin {
     foreach ($plugin in $plugins) {
         $content = (Invoke-WebRequest "https://obsproject.com/forum/resources/${plugin}/download").Content -replace "\s",""
         $legacyPath = [regex]::Match($content, '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*windows(-legacy|.OBS30-32)(-x64)?\.zip').Groups[1].Value
+        if(!$legacyPath){
+            $legacyPath = [regex]::Match($content, '<ahref="(/forum/resources/[^"]+)"((?!forum/resources).)*-OBS30-32-windows(-x64)?\.zip').Groups[1].Value
+        }
         if ($legacyPath) {
             $relPath = $legacyPath
         }else {
