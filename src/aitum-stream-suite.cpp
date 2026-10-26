@@ -1554,19 +1554,49 @@ void load_browser_panels()
 	}
 
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-
+	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
+	std::string url = "https://chat.aitumsuite.tv/chat";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
-				    new BrowserDock("chat", "https://chat.aitumsuite.tv/chat", main_window));
+				    new BrowserDock("chat", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/activity";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),
-				    new BrowserDock("activity", "https://chat.aitumsuite.tv/activity", main_window));
+				    new BrowserDock("activity", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/info";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteInfo", obs_module_text("AitumStreamSuiteInfo"),
-				    new BrowserDock("info", "https://chat.aitumsuite.tv/info", main_window));
+				    new BrowserDock("info", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/portal";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
-				    new BrowserDock("portal", "https://chat.aitumsuite.tv/portal", main_window));
+				    new BrowserDock("portal", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/overlays";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOverlays", obs_module_text("AitumStreamSuiteOverlays"),
-				    new BrowserDock("overlays", "https://chat.aitumsuite.tv/overlays", main_window));
+				    new BrowserDock("overlays", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/overlays/select";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteSelect", obs_module_text("AitumStreamSuiteSelect"),
-				    new BrowserDock("select", "https://chat.aitumsuite.tv/overlays/select", main_window));
+				    new BrowserDock("select", url.c_str(), main_window));
 }
 
 void unload_browser_panels()
