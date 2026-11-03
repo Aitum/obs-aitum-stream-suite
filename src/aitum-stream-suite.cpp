@@ -1,5 +1,6 @@
 #include "dialogs/config-dialog.hpp"
 #include "dialogs/name-dialog.hpp"
+#include "dialogs/scene-collection-wizard.hpp"
 #include "docks/browser-dock.hpp"
 #include "docks/canvas-clone-dock.hpp"
 #include "docks/canvas-dock.hpp"
@@ -1697,19 +1698,49 @@ void load_browser_panels()
 	}
 
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-
+	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
+	std::string url = "https://chat.aitumsuite.tv/chat";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteChat", obs_module_text("AitumStreamSuiteChat"),
-				    new BrowserDock("chat", "https://chat.aitumsuite.tv/chat", main_window));
+				    new BrowserDock("chat", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/activity";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteActivity", obs_module_text("AitumStreamSuiteActivity"),
-				    new BrowserDock("activity", "https://chat.aitumsuite.tv/activity", main_window));
+				    new BrowserDock("activity", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/info";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteInfo", obs_module_text("AitumStreamSuiteInfo"),
-				    new BrowserDock("info", "https://chat.aitumsuite.tv/info", main_window));
+				    new BrowserDock("info", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/portal";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuitePortal", obs_module_text("AitumStreamSuitePortal"),
-				    new BrowserDock("portal", "https://chat.aitumsuite.tv/portal", main_window));
+				    new BrowserDock("portal", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/overlays";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteOverlays", obs_module_text("AitumStreamSuiteOverlays"),
-				    new BrowserDock("overlays", "https://chat.aitumsuite.tv/overlays", main_window));
+				    new BrowserDock("overlays", url.c_str(), main_window));
+	url = "https://chat.aitumsuite.tv/overlays/select";
+	if (pguid) {
+		url += "?uuid=";
+		url += pguid;
+	}
 	obs_frontend_add_dock_by_id("AitumStreamSuiteSelect", obs_module_text("AitumStreamSuiteSelect"),
-				    new BrowserDock("select", "https://chat.aitumsuite.tv/overlays/select", main_window));
+				    new BrowserDock("select", url.c_str(), main_window));
 }
 
 void unload_browser_panels()
@@ -1810,6 +1841,40 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 		}
 		log_same_sources();
 		load_browser_panels();
+		size_t scene_count = 0;
+		obs_enum_scenes(
+			[](void *param, obs_source_t *) {
+				size_t *scene_count = (size_t *)param;
+				(*scene_count)++;
+				return true;
+			},
+			&scene_count);
+		if (scene_count <= 1) {
+			obs_source_t *ss = obs_frontend_get_current_scene();
+			obs_scene_t *scene = obs_scene_from_source(ss);
+			bool has_items = false;
+			obs_scene_enum_items(
+				scene,
+				[](obs_scene_t *, obs_sceneitem_t *, void *param) {
+					bool *has_items = (bool *)param;
+					*has_items = true;
+					return false;
+				},
+				&has_items);
+			if (!has_items) {
+				std::string path = obs_get_module_data_path(obs_current_module());
+				if (path.back() != '/')
+					path += '/';
+				path += "scenecollections";
+				if (os_file_exists(path.c_str())) {
+					const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+					SceneCollectionWizard wizard(main_window);
+					wizard.exec();
+					QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
+				}
+			}
+			obs_source_release(ss);
+		}
 		struct obs_frontend_source_list transitions = {};
 		obs_frontend_get_transitions(&transitions);
 		for (size_t i = 0; i < transitions.sources.num; i++) {
@@ -2150,6 +2215,14 @@ bool obs_module_load(void)
 	QFontDatabase::addApplicationFont(":/aitum/media/Roboto-Italic.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed.ttf");
 	QFontDatabase::addApplicationFont(":/aitum/media/RobotoCondensed-Italic.ttf");
+
+	obs_frontend_add_tools_menu_item(
+		obs_module_text("SceneCollectionWizard"),
+		[](void *) {
+			SceneCollectionWizard wizard;
+			wizard.exec();
+		},
+		nullptr);
 
 	obs_frontend_add_event_callback(frontend_event, nullptr);
 
@@ -2549,10 +2622,10 @@ bool obs_module_load(void)
 	obs_frontend_add_dock_by_id("AitumStreamSuiteTransitions", obs_module_text("AitumStreamSuiteTransitions"),
 				    transitions_dock);
 
-	std::string url = "https://api.aitum.tv/plugin/streamsuite";
+	std::string url = "https://api.aitum.tv/plugin/streamsuite?version=" PROJECT_VERSION;
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
 	if (pguid) {
-		url += "?uuid=";
+		url += "&uuid=";
 		url += pguid;
 	}
 
