@@ -507,6 +507,7 @@ void vendor_request_dock_show(obs_data_t *request_data, obs_data_t *response_dat
 }
 
 void fill_central_widget();
+void schedule_fill_central_widget();
 
 void vendor_request_dock_hide(obs_data_t *request_data, obs_data_t *response_data, void *)
 {
@@ -529,6 +530,7 @@ void vendor_request_dock_hide(obs_data_t *request_data, obs_data_t *response_dat
 			QMetaObject::invokeMethod(dock, [dock] {
 				dock->hide();
 				fill_central_widget();
+				schedule_fill_central_widget();
 			});
 
 			obs_data_set_bool(response_data, "success", true);

@@ -416,6 +416,20 @@ void fill_central_widget()
 	}
 }
 
+// QMainWindow applies a restored dock layout asynchronously. fill_central_widget() right after
+// restoreState() still sees the old size and position of the central widget, gives up, and the
+// empty central area with the "Resize docks" placeholder stays visible. Run it again once the
+// layout has settled, so the dock widgets take the empty space over.
+void schedule_fill_central_widget()
+{
+	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
+		return;
+	}
+	QTimer::singleShot(0, main_window, [] { fill_central_widget(); });
+	QTimer::singleShot(200, main_window, [] { fill_central_widget(); });
+}
+
 void reset_dock_corners()
 {
 	auto uc = obs_frontend_get_user_config();
@@ -540,6 +554,7 @@ void reset_live_dock_state()
 	main_window->resizeDocks(right_docks, right_dock_sizes, Qt::Vertical);
 
 	fill_central_widget();
+	schedule_fill_central_widget();
 	save_dock_state(QString::fromStdString("Live"));
 }
 
@@ -634,6 +649,7 @@ void reset_build_dock_state()
 	}
 
 	fill_central_widget();
+	schedule_fill_central_widget();
 
 	save_dock_state(QString::fromStdString("Build"));
 }
@@ -745,6 +761,7 @@ void reset_overlays_dock_state()
 			main_window->resizeDocks({od}, {main_window->height()}, Qt::Vertical);
 		},
 		Qt::QueuedConnection);
+	schedule_fill_central_widget();
 }
 
 void reset_extensions_dock_state()
@@ -821,6 +838,7 @@ void reset_extensions_dock_state()
 			main_window->resizeDocks(extension_docks, extension_dock_sizes, Qt::Vertical);
 		},
 		Qt::QueuedConnection);
+	schedule_fill_central_widget();
 }
 
 std::vector<std::tuple<std::string, void (*)(void), QString, bool>> fixed_tabs = {
@@ -925,7 +943,7 @@ void load_dock_state(QString mode)
 			}
 
 			if (finished_loading) {
-				QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
+				schedule_fill_central_widget();
 			}
 		}
 
@@ -969,7 +987,7 @@ void load_dock_state(QString mode)
 				d->setVisible(false);
 			}
 		}
-		QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
+		schedule_fill_central_widget();
 	}
 }
 
