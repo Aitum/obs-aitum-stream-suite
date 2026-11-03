@@ -64,7 +64,6 @@ TransitionsDock *transitions_dock = nullptr;
 QString newer_version_available;
 
 QTimer load_dock_state_timer;
-QTimer dock_state_watchdog_timer;
 QList<QString> loaded_docks;
 
 extern std::list<CanvasDock *> canvas_docks;
@@ -269,38 +268,6 @@ void transition_start(void *, calldata_t *)
 	}
 }
 
-// The dock widgets that belong to the main window layout, in a stable order
-static QStringList main_window_docks(QMainWindow *main_window)
-{
-	QStringList names;
-	if (!main_window) {
-		return names;
-	}
-	for (auto &dock : main_window->findChildren<QDockWidget *>()) {
-		if (dock->isFloating() || main_window->dockWidgetArea(dock) != Qt::NoDockWidgetArea) {
-			names.append(dock->objectName());
-		}
-	}
-	names.sort();
-	return names;
-}
-
-static QStringList visible_main_window_docks(QMainWindow *main_window)
-{
-	QStringList names;
-	if (!main_window) {
-		return names;
-	}
-	for (auto &dock : main_window->findChildren<QDockWidget *>()) {
-		if ((dock->isFloating() || main_window->dockWidgetArea(dock) != Qt::NoDockWidgetArea) &&
-		    dock->isVisible()) {
-			names.append(dock->objectName());
-		}
-	}
-	names.sort();
-	return names;
-}
-
 void save_dock_state(QString mode)
 {
 	if (mode.isEmpty()) {
@@ -317,26 +284,6 @@ void save_dock_state(QString mode)
 	auto b64 = state.toBase64();
 	std::string setting_name = "dock_state_" + mode.toStdString();
 	obs_data_set_string(current_profile_config, setting_name.c_str(), b64.constData());
-	// QMainWindow::saveState() stores the dock widget visibility as part of the layout, but which
-	// dock widgets a user closed is not reliable across Qt versions: Qt 6.11 writes a dedicated
-	// "Closed" state flag that QMainWindow::restoreState() replays through QDockWidget::close(),
-	// and that close is rejected while the dock widget has no QDockWidget::DockWidgetClosable
-	// feature, which is what OBS's View > Docks > Lock Docks does to every dock widget. Store the
-	// closed dock widgets per mode on the side and apply them again after every restore, so a
-	// closed dock widget stays closed no matter which Qt version wrote the layout.
-	auto closed_docks = obs_data_array_create();
-	for (auto &name : main_window_docks(main_window)) {
-		auto dock = main_window->findChild<QDockWidget *>(name);
-		if (dock && !dock->isVisible()) {
-			auto item = obs_data_create();
-			obs_data_set_string(item, "name", name.toUtf8().constData());
-			obs_data_array_push_back(closed_docks, item);
-			obs_data_release(item);
-		}
-	}
-	setting_name = "dock_closed_" + mode.toStdString();
-	obs_data_set_array(current_profile_config, setting_name.c_str(), closed_docks);
-	obs_data_array_release(closed_docks);
 	b64 = main_window->saveGeometry().toBase64();
 	obs_data_set_string(current_profile_config, "main_geometry", b64.constData());
 	auto maximized = main_window->isMaximized();
@@ -800,44 +747,6 @@ void reset_overlays_dock_state()
 		Qt::QueuedConnection);
 }
 
-QDockWidget *create_extension_dock(const std::string &id, const std::string &title, const std::string &url)
-{
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main_window) {
-		return nullptr;
-	}
-	auto d = new QDockWidget(QString::fromStdString(title), main_window);
-	d->setObjectName(QString::fromStdString(id));
-	auto bd = new BrowserDock(id.c_str(), url.c_str(), d);
-	d->setWidget(bd);
-	//obs_frontend_add_dock_by_id(id.c_str(), title.c_str(), bd);
-	obs_frontend_add_custom_qdock(id.c_str(), d);
-	d->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
-	return d;
-}
-
-// The extension dock widgets are created on demand, so they have to exist before a stored layout
-// is restored. They are added hidden: QMainWindow::restoreState() only touches the dock widgets
-// the stored layout knows about, so a dock widget the user never opened stays closed.
-void create_missing_extension_docks()
-{
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main_window) {
-		return;
-	}
-	for (auto &e : extensions) {
-		if (main_window->findChild<QDockWidget *>(QString::fromStdString(std::get<0>(e)))) {
-			continue;
-		}
-		auto d = create_extension_dock(std::get<0>(e), std::get<1>(e), std::get<2>(e));
-		if (!d) {
-			continue;
-		}
-		main_window->addDockWidget(Qt::TopDockWidgetArea, d);
-		d->setVisible(false);
-	}
-}
-
 void reset_extensions_dock_state()
 {
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -860,12 +769,17 @@ void reset_extensions_dock_state()
 	QList<int> extension_dock_sizes;
 	for (auto &e : extensions) {
 		auto name = QString::fromStdString(std::get<0>(e));
+		auto title = QString::fromStdString(std::get<1>(e));
 		auto d = main_window->findChild<QDockWidget *>(name);
 		if (!d) {
-			d = create_extension_dock(std::get<0>(e), std::get<1>(e), std::get<2>(e));
-			if (!d) {
-				continue;
-			}
+			d = new QDockWidget(title, main_window);
+			d->setObjectName(name);
+			auto bd = new BrowserDock(std::get<0>(e).c_str(), std::get<2>(e).c_str(), d);
+			d->setWidget(bd);
+			//obs_frontend_add_dock_by_id(std::get<0>(e).c_str(), std::get<1>(e).c_str(), bd);
+			obs_frontend_add_custom_qdock(std::get<0>(e).c_str(), d);
+			//d = main_window->findChild<QDockWidget *>(name);
+			d->setFeatures(QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
 		}
 		d->setVisible(true);
 		d->setFloating(false);
@@ -919,39 +833,26 @@ std::vector<std::tuple<std::string, void (*)(void), QString, bool>> fixed_tabs =
 static bool scene_collection_changing = false;
 static bool applying_dock_layout = false;
 
-// Re-applies the dock widgets the user closed for this mode after the layout was restored, so
-// the stored layout can never bring a closed dock widget back
-static void apply_saved_closed_docks(QString mode)
+// OBS View > Docks > Lock Docks clears QDockWidget::DockWidgetClosable on every dock widget. Qt 6.11
+// saves a dock widget that was closed with a dedicated state flag and QMainWindow::restoreState()
+// replays that flag through QDockWidget::close(), which QDockWidget::closeEvent() rejects while the
+// dock widget is not closable. A closed dock widget would then be restored as visible and saved
+// again as open, so it comes back on every mode switch. Lend the feature for the duration of the
+// restore and take it back afterwards, so Lock Docks still holds once the layout is applied.
+static void restore_dock_state(QMainWindow *main_window, const QByteArray &state)
 {
-	if (!current_profile_config) {
-		return;
-	}
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main_window) {
-		return;
-	}
-	std::string setting_name = "dock_closed_" + mode.toStdString();
-	auto closed_docks = obs_data_get_array(current_profile_config, setting_name.c_str());
-	if (!closed_docks) {
-		setting_name = "dock_closed_" + mode.toLower().toStdString();
-		closed_docks = obs_data_get_array(current_profile_config, setting_name.c_str());
-	}
-	if (!closed_docks) {
-		return;
-	}
-	auto count = obs_data_array_count(closed_docks);
-	for (size_t i = 0; i < count; i++) {
-		auto item = obs_data_array_item(closed_docks, i);
-		auto name = obs_data_get_string(item, "name");
-		if (name && *name) {
-			auto dock = main_window->findChild<QDockWidget *>(QString::fromUtf8(name));
-			if (dock) {
-				dock->setVisible(false);
-			}
+	QList<QDockWidget *> locked;
+	auto docks = main_window->findChildren<QDockWidget *>();
+	for (auto &dock : docks) {
+		if (!(dock->features() & QDockWidget::DockWidgetClosable)) {
+			locked.append(dock);
+			dock->setFeatures(dock->features() | QDockWidget::DockWidgetClosable);
 		}
-		obs_data_release(item);
 	}
-	obs_data_array_release(closed_docks);
+	main_window->restoreState(state);
+	for (auto &dock : locked) {
+		dock->setFeatures(dock->features() & ~QDockWidget::DockWidgetClosable);
+	}
 }
 
 void load_dock_state(QString mode)
@@ -972,22 +873,15 @@ void load_dock_state(QString mode)
 		main_restored = obs_data_get_bool(current_profile_config, setting_name.c_str());
 	}
 	void (*reset_func)(void) = nullptr;
-	bool extensions_mode = false;
 	for (auto it = fixed_tabs.begin(); it != fixed_tabs.end(); ++it) {
 		auto name = std::get<0>(*it);
 		auto translated = obs_module_text(name.c_str());
 		if ((translated && mode == translated) || mode == QString::fromStdString(name)) {
-			extensions_mode = name == "Extensions";
-			// A stored layout is the source of truth for this mode. The default layout only sets
-			// the visibility of every dock widget it knows about, so running it on top of a
-			// restored layout brings back the dock widgets the user closed, and the next mode
-			// switch stores that layout again, losing those closed docks for good.
-			if (state.empty()) {
-				if (!std::get<3>(*it)) {
-					std::get<1>(*it)();
-					return;
-				}
+			if (std::get<3>(*it)) {
 				reset_func = std::get<1>(*it);
+			} else if (state.empty()) {
+				std::get<1> (*it)();
+				return;
 			}
 			break;
 		}
@@ -995,15 +889,11 @@ void load_dock_state(QString mode)
 	QList<QDockWidget *> visible_canvas_docks;
 	loaded_docks.clear();
 	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	bool has_saved_state = !state.empty();
-	if (has_saved_state) {
+	if (!state.empty()) {
 		if (!main_window) {
 			return;
 		}
-		if (extensions_mode) {
-			create_missing_extension_docks();
-		}
-		main_window->restoreState(QByteArray::fromBase64(state.c_str()));
+		restore_dock_state(main_window, QByteArray::fromBase64(state.c_str()));
 
 		auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
 		if (!d) {
@@ -1012,6 +902,26 @@ void load_dock_state(QString mode)
 		if (d) {
 			if (d->isVisible()) {
 				visible_canvas_docks.append(d);
+			}
+			if (!main_restored && !d->isVisibleTo(main_window)) {
+				bool canvas_mode = false;
+				for (auto it : canvas_docks) {
+					if (it->parentWidget()->objectName() == mode) {
+						canvas_mode = true;
+						break;
+					}
+				}
+				for (auto it : canvas_clone_docks) {
+					if (it->parentWidget()->objectName() == mode) {
+						canvas_mode = true;
+						break;
+					}
+				}
+				if (!canvas_mode) {
+					d->setVisible(true);
+					d->setFloating(false);
+					main_window->addDockWidget(Qt::TopDockWidgetArea, d);
+				}
 			}
 
 			if (finished_loading) {
@@ -1050,49 +960,17 @@ void load_dock_state(QString mode)
 		QMetaObject::invokeMethod(scenes_dock, "UpdateCanvasFromDockList",
 					  Q_ARG(QList<QDockWidget *>, visible_canvas_docks));
 	}
-	if (!has_saved_state && !main_restored && main_window) {
-		// first time this mode is loaded: the main canvas dock has to be there before the
-		// default layout is applied, otherwise the mode would start without any canvas
-		auto d = main_window->findChild<QDockWidget *>(QStringLiteral("AitumStreamSuiteMainCanvas"));
-		if (!d) {
-			d = main_window->findChild<QDockWidget *>(QStringLiteral("previewDock"));
-		}
-		if (d && !d->isVisibleTo(main_window)) {
-			bool canvas_mode = false;
-			for (auto it : canvas_docks) {
-				if (it->parentWidget()->objectName() == mode) {
-					canvas_mode = true;
-					break;
-				}
-			}
-			for (auto it : canvas_clone_docks) {
-				if (it->parentWidget()->objectName() == mode) {
-					canvas_mode = true;
-					break;
-				}
-			}
-			if (!canvas_mode) {
-				d->setVisible(true);
-				d->setFloating(false);
-				main_window->addDockWidget(Qt::TopDockWidgetArea, d);
-			}
-		}
-	}
 	if (reset_func) {
 		reset_func();
 	} else {
-		if (!has_saved_state) {
-			for (auto &e : extensions) {
-				auto d = main_window->findChild<QDockWidget *>(QString::fromStdString(std::get<0>(e).c_str()));
-				if (d && d->isVisible()) {
-					d->setVisible(false);
-				}
+		for (auto &e : extensions) {
+			auto d = main_window->findChild<QDockWidget *>(QString::fromStdString(std::get<0>(e).c_str()));
+			if (d && d->isVisible()) {
+				d->setVisible(false);
 			}
 		}
 		QMetaObject::invokeMethod(main_window, [] { fill_central_widget(); }, Qt::QueuedConnection);
 	}
-	apply_saved_closed_docks(mode);
-	loaded_docks = visible_main_window_docks(main_window);
 }
 
 void load_outputs()
@@ -2669,7 +2547,13 @@ void TabToolBar::resizeEvent(QResizeEvent *event)
 		if (!main_window) {
 			return;
 		}
-		auto current_docks = visible_main_window_docks(main_window);
+		auto docks = main_window->findChildren<QDockWidget *>();
+		QList<QString> current_docks;
+		for (auto &dock : docks) {
+			if (dock->isVisible()) {
+				current_docks.append(dock->objectName());
+			}
+		}
 		if (current_docks == loaded_docks) {
 			if (finished_loading) {
 				load_dock_state_timer.start();
@@ -2741,40 +2625,6 @@ void obs_module_post_load()
 		}
 	});
 
-	dock_state_watchdog_timer.setInterval(750);
-	QObject::connect(&dock_state_watchdog_timer, &QTimer::timeout, [] {
-		// Closing a dock widget does not always resize the mode tab bar, so the layout can change
-		// without TabToolBar::resizeEvent() noticing it. Watch the visible dock widgets and store
-		// the layout of the current mode as soon as they change, otherwise a closed dock widget is
-		// missing from the stored layout and shows up again on the next mode switch.
-		if (applying_dock_layout || !finished_loading || !current_profile_config) {
-			return;
-		}
-		if (obs_data_get_bool(current_profile_config, "dock_mode_manual_save")) {
-			return;
-		}
-		auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-		if (!main_window || !main_window->isVisible()) {
-			return;
-		}
-		auto index = modesTabBar->currentIndex();
-		if (index < 0) {
-			return;
-		}
-		auto current_docks = visible_main_window_docks(main_window);
-		if (current_docks == loaded_docks) {
-			return;
-		}
-		loaded_docks = current_docks;
-		auto d = modesTabBar->tabData(index);
-		if (!d.isNull() && d.isValid() && !d.toString().isEmpty()) {
-			save_dock_state(d.toString());
-		} else {
-			save_dock_state(modesTabBar->tabText(index));
-		}
-	});
-	dock_state_watchdog_timer.start();
-
 	obs_frontend_add_save_callback(save_load, nullptr);
 
 	load_obs_websocket();
@@ -2785,7 +2635,6 @@ void unload_obs_websocket();
 void obs_module_unload()
 {
 	unload_obs_websocket();
-	dock_state_watchdog_timer.stop();
 	obs_frontend_remove_save_callback(save_load, nullptr);
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
 	if (version_download_info) {
