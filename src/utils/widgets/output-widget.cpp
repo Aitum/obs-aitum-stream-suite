@@ -442,9 +442,15 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 			last_error = error;
 		}
 		auto code = calldata_int(calldata, "code");
+		auto stopped = static_cast<obs_output_t *>(calldata_ptr(calldata, "output"));
 		QMetaObject::invokeMethod(
 			this_->outputButton,
-			[this_, last_error, code] {
+			[this_, stopped, last_error, code] {
+				// libobs can signal "stop" twice for one stop. Only the first may
+				// act, and never on an output started since. Compared, not used.
+				if (this_->output != stopped) {
+					return;
+				}
 				if (this_->output && strcmp(obs_output_get_id(this_->output), "virtualcam_output") == 0) {
 					obs_output_set_media(this_->output, obs_get_video(), obs_get_audio());
 				}
