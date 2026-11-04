@@ -6,6 +6,8 @@
 #include <QPushButton>
 #include <QTimer>
 #include <QDateTime>
+#include <string>
+#include <vector>
 
 class OutputWidget : public QFrame {
 	Q_OBJECT
@@ -55,4 +57,11 @@ public:
 	bool IsStream() const;
 	bool IsRecord() const;
 	const char* GetOutputType() const;
+	std::vector<std::string> GetCanvasNames() const;
+
+	// Remote control. UI thread only. Return nullptr when the request was
+	// accepted, otherwise a vendor error code. Unlike the button they never
+	// open a dialog, because nobody may be at the machine to answer it.
+	const char *RemoteStart();
+	const char *RemoteStop();
 };

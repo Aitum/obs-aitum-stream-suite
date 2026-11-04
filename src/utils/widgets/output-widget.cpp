@@ -9,9 +9,11 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QTime>
+#include <algorithm>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
 #include <src/utils/obs-websocket-api.h>
+#include <src/utils/obs-websocket.hpp>
 #include <util/config-file.h>
 #include <util/platform.h>
 
@@ -374,10 +376,13 @@ void OutputWidget::output_start(void *data, calldata_t *calldata)
 		this_->onStarted();
 		this_->onStarted = nullptr;
 	}
-	if (this_->outputButton->isChecked()) {
-		return;
-	}
-	QMetaObject::invokeMethod(this_->outputButton, [this_] { this_->outputButton->setChecked(true); }, Qt::QueuedConnection);
+	QMetaObject::invokeMethod(
+		this_->outputButton,
+		[this_] {
+			this_->outputButton->setChecked(true);
+			vendor_emit_output_state(this_->objectName().toUtf8().constData(), true);
+		},
+		Qt::QueuedConnection);
 }
 
 void OutputWidget::replay_saved(void *data, calldata_t *calldata)
@@ -427,10 +432,8 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 		this_->onStarted();
 		this_->onStarted = nullptr;
 	}
-	if (this_->outputButton->isChecked()) {
-		QMetaObject::invokeMethod(
-			this_->outputButton, [this_] { this_->outputButton->setChecked(false); }, Qt::QueuedConnection);
-	}
+	QMetaObject::invokeMethod(
+		this_->outputButton, [this_] { this_->outputButton->setChecked(false); }, Qt::QueuedConnection);
 
 	if (this_->output) {
 		const char *error = (const char *)calldata_ptr(calldata, "last_error");
@@ -447,9 +450,12 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 				}
 				obs_output_release(this_->output);
 				this_->output = nullptr;
+				const auto name = this_->objectName().toUtf8();
+				vendor_emit_output_state(name.constData(), false, last_error.empty() ? nullptr : last_error.c_str(),
+							 code);
 				if (vendor) {
 					const auto d = obs_data_create();
-					obs_data_set_string(d, "output", obs_output_get_name(this_->output));
+					obs_data_set_string(d, "output", name.constData());
 					if (!last_error.empty()) {
 						obs_data_set_string(d, "last_error", last_error.c_str());
 					}
@@ -1492,6 +1498,73 @@ void OutputWidget::StopOutput()
 	} else {
 		obs_output_force_stop(output);
 	}
+}
+
+const char *OutputWidget::RemoteStart()
+{
+	// A non-null output is either live or still connecting. StartOutput() would
+	// tear that one down and start over, which a repeated request must not do.
+	if (output) {
+		return "already_starting_or_active";
+	}
+	outputButton->setChecked(true);
+	if (!StartOutput(true)) {
+		outputButton->setChecked(false);
+		return "start_failed";
+	}
+	return nullptr;
+}
+
+const char *OutputWidget::RemoteStop()
+{
+	// Same route as the button, which also covers an output still connecting.
+	// The task holds its own reference because output_stop may release ours first.
+	auto ref = output ? obs_output_get_ref(output) : nullptr;
+	if (!ref) {
+		return "output_not_running";
+	}
+	obs_queue_task(
+		OBS_TASK_GRAPHICS,
+		[](void *param) {
+			auto o = static_cast<obs_output_t *>(param);
+			obs_output_stop(o);
+			obs_output_release(o);
+		},
+		ref, false);
+	return nullptr;
+}
+
+std::vector<std::string> OutputWidget::GetCanvasNames() const
+{
+	std::vector<std::string> names;
+	auto add = [&names](const char *name) {
+		std::string n = name ? name : "";
+		if (n.empty()) {
+			auto main_canvas = obs_get_main_canvas();
+			n = obs_canvas_get_name(main_canvas);
+			obs_canvas_release(main_canvas);
+		}
+		if (std::find(names.begin(), names.end(), n) == names.end()) {
+			names.push_back(n);
+		}
+	};
+
+	// Same precedence as UpdateCanvas(): per-encoder canvases win when present.
+	auto video_encoders = obs_data_get_array(settings, "video_encoders");
+	auto count = obs_data_array_count(video_encoders);
+	for (size_t i = 0; i < count; i++) {
+		auto item = obs_data_array_item(video_encoders, i);
+		if (!item) {
+			continue;
+		}
+		add(obs_data_get_string(item, "canvas"));
+		obs_data_release(item);
+	}
+	obs_data_array_release(video_encoders);
+	if (names.empty()) {
+		add(obs_data_get_string(settings, "canvas"));
+	}
+	return names;
 }
 
 bool OutputWidget::IsStream() const
