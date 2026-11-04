@@ -362,10 +362,20 @@ OutputWidget::~OutputWidget()
 		if (strcmp(obs_output_get_id(output), "virtualcam_output") == 0) {
 			obs_output_set_media(output, obs_get_video(), obs_get_audio());
 		}
-		obs_output_release(output);
-		output = nullptr;
+		ReleaseOutput();
 	}
 	obs_data_release(settings);
+}
+
+void OutputWidget::ReleaseOutput()
+{
+	// An output does not own its service, so nothing else frees the one
+	// StartOutput() created. Output first: destroying it waits for the thread
+	// that deactivates the service.
+	auto service = obs_output_get_service(output);
+	obs_output_release(output);
+	obs_service_release(service);
+	output = nullptr;
 }
 
 void OutputWidget::output_start(void *data, calldata_t *calldata)
@@ -454,8 +464,7 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 				if (this_->output && strcmp(obs_output_get_id(this_->output), "virtualcam_output") == 0) {
 					obs_output_set_media(this_->output, obs_get_video(), obs_get_audio());
 				}
-				obs_output_release(this_->output);
-				this_->output = nullptr;
+				this_->ReleaseOutput();
 				const auto name = this_->objectName().toUtf8();
 				vendor_emit_output_state(name.constData(), false, last_error.empty() ? nullptr : last_error.c_str(),
 							 code);
@@ -499,13 +508,10 @@ bool OutputWidget::StartOutput(bool automated)
 
 	const char *name = obs_data_get_string(settings, "name");
 	if (output) {
-		auto service = obs_output_get_service(output);
 		if (obs_output_active(output)) {
 			obs_output_force_stop(output);
 		}
-		obs_output_release(output);
-		obs_service_release(service);
-		output = nullptr;
+		ReleaseOutput();
 	}
 
 	if (strcmp(output_type, "virtual_cam") == 0) {
@@ -1040,8 +1046,7 @@ bool OutputWidget::StartOutput(bool automated)
 	}
 
 	if (!obs_output_start(output)) {
-		obs_output_release(output);
-		output = nullptr;
+		ReleaseOutput();
 		return false;
 	}
 	if (vendor) {

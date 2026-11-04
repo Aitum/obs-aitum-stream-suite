@@ -32,6 +32,7 @@ private:
 	obs_hotkey_id chapterHotkey = OBS_INVALID_HOTKEY_ID;
 
 	bool StartOutput(bool automated = false);
+	void ReleaseOutput();
 	void UpdateCanvas();
 	obs_encoder_t *GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char *output_name,
 				       bool automated);
