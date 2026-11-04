@@ -707,7 +707,12 @@ obs_data_array_t *OutputDock::GetOutputsArray()
 		auto data = obs_data_create();
 		obs_data_set_string(data, "name", (*it)->objectName().toUtf8().constData());
 		obs_data_set_string(data, "type", (*it)->GetOutputType());
-		obs_data_set_bool(data, "active", obs_output_active((*it)->GetOutput()));
+		auto o = (*it)->GetOutput();
+		obs_data_set_bool(data, "active", o ? obs_output_active(o) : false);
+		obs_data_set_bool(data, "reconnecting", o ? obs_output_reconnecting(o) : false);
+		obs_data_set_int(data, "total_frames", o ? obs_output_get_total_frames(o) : 0);
+		obs_data_set_int(data, "dropped_frames", o ? obs_output_get_frames_dropped(o) : 0);
+		obs_data_set_int(data, "total_bytes", o ? obs_output_get_total_bytes(o) : 0);
 		obs_data_array_push_back(outputs2, data);
 		obs_data_release(data);
 	}
