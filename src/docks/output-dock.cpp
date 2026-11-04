@@ -15,6 +15,7 @@
 #include <QScrollArea>
 #include <QToolBar>
 #include <QToolButton>
+#include <algorithm>
 #include <src/utils/color.hpp>
 #include <src/utils/icon.hpp>
 #include <util/config-file.h>
@@ -399,6 +400,7 @@ OutputDock::OutputDock(QWidget *parent) : QFrame(parent)
 		for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
 			(*it)->CheckActive();
 		}
+		EmitVendorStats();
 	});
 	videoCheckTimer.start(500);
 	obs_frontend_add_event_callback(frontend_event, this);
@@ -700,18 +702,79 @@ void OutputDock::UpdateMainVirtualCameraStatus(bool active)
 	}
 }
 
-obs_data_array_t *OutputDock::GetOutputsArray()
+obs_data_array_t *OutputDock::GetOutputsArray(const char *canvas_name)
 {
 	auto outputs2 = obs_data_array_create();
 	for (auto it = outputWidgets.begin(); it != outputWidgets.end(); it++) {
+		const auto canvases = (*it)->GetCanvasNames();
+		if (canvas_name && std::find(canvases.begin(), canvases.end(), canvas_name) == canvases.end()) {
+			continue;
+		}
 		auto data = obs_data_create();
 		obs_data_set_string(data, "name", (*it)->objectName().toUtf8().constData());
 		obs_data_set_string(data, "type", (*it)->GetOutputType());
 		obs_data_set_bool(data, "active", obs_output_active((*it)->GetOutput()));
+		obs_data_set_bool(data, "reconnecting", obs_output_reconnecting((*it)->GetOutput()));
+		// obs_data arrays only hold objects, so each canvas name needs a wrapper.
+		auto canvas_array = obs_data_array_create();
+		for (const auto &canvas : canvases) {
+			auto entry = obs_data_create();
+			obs_data_set_string(entry, "name", canvas.c_str());
+			obs_data_array_push_back(canvas_array, entry);
+			obs_data_release(entry);
+		}
+		obs_data_set_array(data, "canvases", canvas_array);
+		obs_data_array_release(canvas_array);
 		obs_data_array_push_back(outputs2, data);
 		obs_data_release(data);
 	}
 	return outputs2;
+}
+
+obs_data_array_t *OutputDock::GetStatsArray(const char *output_name)
+{
+	auto stats = obs_data_array_create();
+	for (auto ow : outputWidgets) {
+		const auto name = ow->objectName().toUtf8();
+		if (!ow->GetOutput() || (output_name && name != output_name)) {
+			continue;
+		}
+		auto data = obs_data_create();
+		vendor_fill_output_stats(data, name.constData(), ow->GetOutput(), nullptr);
+		obs_data_array_push_back(stats, data);
+		obs_data_release(data);
+	}
+	return stats;
+}
+
+OutputWidget *OutputDock::FindOutput(const char *output_name)
+{
+	const auto name = QString::fromUtf8(output_name);
+	for (auto ow : outputWidgets) {
+		if (ow->objectName() == name) {
+			return ow;
+		}
+	}
+	return nullptr;
+}
+
+void OutputDock::EmitVendorStats()
+{
+	if (!vendor_stats_due()) {
+		return;
+	}
+	for (auto ow : outputWidgets) {
+		const std::string name = ow->objectName().toUtf8().constData();
+		auto output = ow->GetOutput();
+		if (!output || !obs_output_active(output)) {
+			vendorStatsSamples.erase(name);
+			continue;
+		}
+		auto data = obs_data_create();
+		vendor_fill_output_stats(data, name.c_str(), output, &vendorStatsSamples);
+		vendor_emit_output_stats(data);
+		obs_data_release(data);
+	}
 }
 
 bool OutputDock::AddChapterToOutput(const char *output_name, const char *chapter_name)

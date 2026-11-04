@@ -137,6 +137,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/accessible-alignment-cell.hpp
   src/utils/widgets/accessible-alignment-selector.hpp
   src/utils/widgets/alignment-selector.hpp
+  src/utils/obs-websocket.hpp
   src/utils/widgets/capture-widget.hpp
   src/utils/widgets/double-slider.hpp
   src/utils/widgets/focus-scroll-spinbox.hpp

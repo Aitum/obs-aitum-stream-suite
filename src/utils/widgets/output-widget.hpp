@@ -6,6 +6,8 @@
 #include <QPushButton>
 #include <QTimer>
 #include <QDateTime>
+#include <string>
+#include <vector>
 
 class OutputWidget : public QFrame {
 	Q_OBJECT
@@ -30,6 +32,7 @@ private:
 	obs_hotkey_id chapterHotkey = OBS_INVALID_HOTKEY_ID;
 
 	bool StartOutput(bool automated = false);
+	void ReleaseOutput();
 	void UpdateCanvas();
 	obs_encoder_t *GetVideoEncoder(obs_data_t *settings, bool advanced, bool is_record, const char *output_name,
 				       bool automated);
@@ -55,4 +58,11 @@ public:
 	bool IsStream() const;
 	bool IsRecord() const;
 	const char* GetOutputType() const;
+	std::vector<std::string> GetCanvasNames() const;
+
+	// Remote control. UI thread only. Return nullptr when the request was
+	// accepted, otherwise a vendor error code. Unlike the button they never
+	// open a dialog, because nobody may be at the machine to answer it.
+	const char *RemoteStart();
+	const char *RemoteStop();
 };
