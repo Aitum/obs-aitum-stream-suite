@@ -377,6 +377,28 @@ async def wait_state(obs, name, active):
                                 lambda d: d.get("name") == name and d.get("active") is active)
 
 
+async def test_quick_restart(obs, name):
+    """Stop then start at once: a late stop must not release the new output."""
+    r = await obs.vendor("stop_output", {"output": name})
+    check("stop_output for the quick restart is accepted", r.get("success") is True, dump(r))
+
+    # A start during the stop may be refused, which is fine, so keep asking.
+    loop = asyncio.get_running_loop()
+    end = loop.time() + 10
+    while True:
+        r = await obs.vendor("start_output", {"output": name})
+        if r.get("error_code") != "already_starting_or_active" or loop.time() > end:
+            break
+        await asyncio.sleep(0.1)
+    check("start_output right after a stop is accepted", r.get("success") is True, dump(r))
+
+    await asyncio.sleep(5)
+    outputs = await obs.vendor("get_outputs")
+    item = next((o for o in outputs.get("outputs", []) if o["name"] == name), {})
+    check("the output is still active after the quick restart", item.get("active") is True, dump(item))
+    obs.events.clear()
+
+
 async def test_live(obs, name):
     r = await obs.vendor("get_stats", {"output": name})
     check("get_stats on a stopped output returns an empty list",
@@ -432,12 +454,22 @@ async def test_live(obs, name):
     legacy = await obs.wait_event("stop_output", lambda d: d.get("output") == name, timeout=2)
     check("the stop_output event carries the output name", legacy is not None, dump(legacy))
 
+    # The events above were consumed, so anything still arriving is a duplicate.
+    await asyncio.sleep(2)
+    repeats = [e for e in obs.events if e.get("eventType") in ("output_state_changed", "stop_output")
+               and (e.get("eventData") or {}).get("active") is not True]
+    check("a stop emits exactly one output_state_changed and one stop_output", not repeats, dump(repeats))
+
     r = await obs.vendor("start_output", {"output": name})
     check("the output starts again after a stop", r.get("success") is True, dump(r))
-    if r.get("success") is True:
-        check("it reaches active again", await wait_state(obs, name, True) is not None, "")
-        await obs.vendor("stop_output", {"output": name})
-        check("and stops again", await wait_state(obs, name, False) is not None, "")
+    if r.get("success") is not True:
+        return
+    check("it reaches active again", await wait_state(obs, name, True) is not None, "")
+
+    await test_quick_restart(obs, name)
+
+    await obs.vendor("stop_output", {"output": name})
+    check("and stops at the end", await wait_state(obs, name, False) is not None, "")
 
 
 async def run(args):
