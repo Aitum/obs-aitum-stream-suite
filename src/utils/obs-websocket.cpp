@@ -110,6 +110,7 @@ void vendor_request_current_scene(obs_data_t *request_data, obs_data_t *response
 		obs_data_set_bool(response_data, "success", true);
 		return;
 	}
+	obs_data_set_string(response_data, "error", "'canvas' not found");
 	obs_data_set_bool(response_data, "success", false);
 }
 

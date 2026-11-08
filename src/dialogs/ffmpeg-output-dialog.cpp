@@ -689,7 +689,7 @@ void FfmpegOutputDialog::validateOutputs(QPushButton *confirmButton)
 		confirmButton->setEnabled(false);
 		return;
 	}
-	if (formatName.empty() || mimeType.empty()) {
+	if (formatName.empty()) {
 		confirmButton->setEnabled(false);
 		return;
 	}

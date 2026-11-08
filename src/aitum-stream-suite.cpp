@@ -1725,8 +1725,9 @@ static void frontend_event(enum obs_frontend_event event, void *private_data)
 				if (os_file_exists(path.c_str())) {
 					const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 					SceneCollectionWizard wizard(main_window);
-					wizard.exec();
-					QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
+					if(wizard.exec() == QDialog::Accepted) {
+						QMetaObject::invokeMethod(main_window, "on_autoConfigure_triggered", Qt::QueuedConnection);
+					}
 				}
 			}
 			obs_source_release(ss);

@@ -92,16 +92,38 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			}
 		}
 	}
+	auto vf = VIDEO_FORMAT_NONE;
+	std::string cf = obs_data_get_string(settings, "color_format");
+	if (cf == "NV12") {
+		vf = VIDEO_FORMAT_NV12;
+	} else if (cf == "I420") {
+		vf = VIDEO_FORMAT_I420;
+	} else if (cf == "I444") {
+		vf = VIDEO_FORMAT_I444;
+	} else if (cf == "P010") {
+		vf = VIDEO_FORMAT_P010;
+	} else if (cf == "I010") {
+		vf = VIDEO_FORMAT_I010;
+	} else if (cf == "P216") {
+		vf = VIDEO_FORMAT_P216;
+	} else if (cf == "P416") {
+		vf = VIDEO_FORMAT_P416;
+	} else if (cf == "BGRA" || cf == "RGBA") {
+		vf = VIDEO_FORMAT_BGRA;
+	}
 	if (canvas) {
 		obs_video_info ovi;
 		if (!obs_canvas_get_video_info(canvas, &ovi) ||
 		    (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
-		     ovi.output_height != canvas_height)) {
+		     ovi.output_height != canvas_height || (vf != VIDEO_FORMAT_NONE && ovi.output_format != vf))) {
 			obs_get_video_info(&ovi);
 			ovi.base_height = canvas_height;
 			ovi.base_width = canvas_width;
 			ovi.output_height = canvas_height;
 			ovi.output_width = canvas_width;
+			if (vf != VIDEO_FORMAT_NONE) {
+				ovi.output_format = vf;
+			}
 			if (obs_canvas_reset_video(canvas, &ovi)) {
 				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
 				     canvas_width, canvas_height);
@@ -120,6 +142,9 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 		ovi.base_width = canvas_width;
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
+		if (vf != VIDEO_FORMAT_NONE) {
+			ovi.output_format = vf;
+		}
 		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, PROGRAM);
 		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u", canvas_name.c_str(), canvas_width,
 		     canvas_height);
