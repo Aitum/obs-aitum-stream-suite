@@ -98,9 +98,9 @@ typedef struct AVCodec {
 	int capabilities;
 	uint8_t max_lowres;                                          ///< maximum value for lowres supported by the decoder
 	attribute_deprecated const AVRational *supported_framerates; ///< @deprecated use avcodec_get_supported_config()
-	attribute_deprecated const void *pix_fmts;     ///< @deprecated use avcodec_get_supported_config()
+	attribute_deprecated const void *pix_fmts;                   ///< @deprecated use avcodec_get_supported_config()
 	attribute_deprecated const int *supported_samplerates;       ///< @deprecated use avcodec_get_supported_config()
-	attribute_deprecated const void *sample_fmts; ///< @deprecated use avcodec_get_supported_config()
+	attribute_deprecated const void *sample_fmts;                ///< @deprecated use avcodec_get_supported_config()
 	const AVClass *priv_class;                                   ///< AVClass for the private context
 	const AVProfile *profiles; ///< array of recognized profiles, or NULL if unknown, array is terminated by {AV_PROFILE_UNKNOWN}
 	const char *wrapper_name;
@@ -434,7 +434,8 @@ FfmpegOutputDialog::FfmpegOutputDialog(QDialog *parent, QStringList _otherNames,
 					if (!av_codec_is_encoder(codec))
 						continue;
 					// check if codec is compatible with the selected format
-					if (!ignoreCompat && !av_codec_get_tag(codec_tag, codec->id))
+					if (!ignoreCompat && !av_codec_get_tag(codec_tag, codec->id) &&
+					    codec->id != default_video_codec && codec->id != default_audio_codec)
 						continue;
 
 					if (codec->type == AVMEDIA_TYPE_VIDEO) {
