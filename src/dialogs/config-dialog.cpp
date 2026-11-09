@@ -962,7 +962,7 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 	}
 	hotkeys.clear();
 	main_settings = settings;
-	auto canvas = obs_data_get_array(settings, "canvas");
+	auto canvas = settings ? obs_data_get_array(settings, "canvas") : nullptr;
 
 	obs_data_array_enum(
 		canvas,
@@ -971,6 +971,9 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 				return;
 			}
 			auto d = (OBSBasicSettings *)param;
+			if (!d->main_settings) {
+				return;
+			}
 			auto canvas2 = obs_data_get_array(d->main_settings, "canvas");
 			//auto c = obs_get_canvas_by_name(obs_data_get_string(data2, "name"));
 			d->AddCanvas(d->canvasLayout, data2, canvas2);
@@ -1022,14 +1025,14 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		RemoveLayoutItem(i);
 		outputsLayout->removeRow(2);
 	}
-	mainStream->setChecked(obs_data_get_bool(settings, "main_stream_output_show"));
-	mainRecord->setChecked(obs_data_get_bool(settings, "main_record_output_show"));
-	mainBacktrack->setChecked(obs_data_get_bool(settings, "main_backtrack_output_show"));
-	mainVirtualCam->setChecked(obs_data_get_bool(settings, "main_virtual_cam_output_show"));
+	mainStream->setChecked(settings ? obs_data_get_bool(settings, "main_stream_output_show") : true);
+	mainRecord->setChecked(settings ? obs_data_get_bool(settings, "main_record_output_show") : true);
+	mainBacktrack->setChecked(settings ? obs_data_get_bool(settings, "main_backtrack_output_show") : true);
+	mainVirtualCam->setChecked(settings ? obs_data_get_bool(settings, "main_virtual_cam_output_show") : true);
 
 	obs_data_array_release(extra_outputs);
-	extra_outputs = obs_data_get_array(settings, "outputs");
-	if (!extra_outputs) {
+	extra_outputs = settings ? obs_data_get_array(settings, "outputs") : nullptr;
+	if (!extra_outputs && settings) {
 		extra_outputs = obs_data_array_create();
 		obs_data_set_array(settings, "outputs", extra_outputs);
 	}
@@ -1037,6 +1040,9 @@ void OBSBasicSettings::LoadSettings(obs_data_t *settings)
 		extra_outputs,
 		[](obs_data_t *data2, void *param) {
 			auto d = (OBSBasicSettings *)param;
+			if (!d->main_settings) {
+				return;
+			}
 			auto outputs2 = obs_data_get_array(d->main_settings, "outputs");
 			d->AddOutput(d->outputsLayout, data2, outputs2);
 			obs_data_array_release(outputs2);
