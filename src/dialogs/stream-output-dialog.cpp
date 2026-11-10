@@ -44,7 +44,9 @@ void StreamOutputDialog::validateOutputs(QPushButton *confirmButton)
 		confirmButton->setEnabled(false);
 	} else if (outputServer.isEmpty()) {
 		confirmButton->setEnabled(false);
-	} else if (outputKey.isEmpty()) {
+	} else if (outputKey.isEmpty() && !outputServer.contains("whip", Qt::CaseInsensitive) &&
+		   !outputServer.startsWith("srt://", Qt::CaseInsensitive) &&
+		   !outputServer.startsWith("rist://", Qt::CaseInsensitive)) {
 		confirmButton->setEnabled(false);
 	} else {
 		confirmButton->setEnabled(true);
@@ -1046,8 +1048,9 @@ QWidget *StreamOutputDialog::WizardInfoFacebook(bool edit)
 
 	// Server field
 	auto serverSelection = generateOutputServerField(confirmButton, false, edit);
-	if (!edit)
+	if (!edit) {
 		serverSelection->setText("rtmps://rtmp-api.facebook.com:443/rtmp/");
+	}
 
 	formLayout->addRow(generateFormLabel("FacebookServer"), serverSelection);
 
