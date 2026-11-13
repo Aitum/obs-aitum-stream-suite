@@ -2,6 +2,7 @@
 #include "../utils/color.hpp"
 #include "../utils/icon.hpp"
 #include "../utils/widgets/focus-scroll-spinbox.hpp"
+#include "../utils/widgets/scene-list-widget-item.hpp"
 #include "../utils/widgets/source-tree.hpp"
 #include "canvas-dock.hpp"
 #include "sources-dock.hpp"
@@ -4111,9 +4112,9 @@ void CanvasDock::LoadScenes()
 			QString name = QString::fromUtf8(obs_source_get_name(src));
 			obs_data_t *settings = obs_source_get_settings(src);
 			if (t->sceneList) {
-				auto sli = new QListWidgetItem(name, t->sceneList);
-				sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 				const int order = (int)obs_data_get_int(settings, "order");
+				auto sli = new SceneListWidgetItem(name, t->sceneList, order);
+				sli->setIcon(QIcon(":/aitum/media/unlinked.svg"));
 				t->sceneList->insertItem(order, sli);
 				if ((t->currentSceneName.isEmpty() && obs_data_get_bool(settings, "canvas_active")) ||
 				    name == t->currentSceneName) {
@@ -4140,28 +4141,7 @@ void CanvasDock::LoadScenes()
 		this);
 
 	if (sceneList) {
-		QListWidgetItem *selectedItem = nullptr;
-		sceneList->blockSignals(true);
-		for (int idx = 0; idx < sceneList->count();) {
-			auto item = sceneList->takeItem(idx);
-			auto scene = obs_canvas_get_source_by_name(canvas, item->text().toUtf8().constData());
-			auto settings = obs_source_get_settings(scene);
-			const int order = (int)obs_data_get_int(settings, "order");
-			if (order <= idx) {
-				idx++;
-			}
-			sceneList->insertItem(order, item);
-			if (obs_data_get_bool(settings, "canvas_active")) {
-				selectedItem = item;
-			}
-			obs_data_release(settings);
-			obs_source_release(scene);
-		}
-		sceneList->blockSignals(false);
-		if (selectedItem) {
-			sceneList->setCurrentItem(selectedItem);
-		}
-
+		sceneList->sortItems(Qt::AscendingOrder);
 		UpdateLinkedScenes();
 
 		if (sceneList->count() == 0) {

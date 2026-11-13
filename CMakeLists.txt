@@ -122,6 +122,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/locked-checkbox.cpp
   src/utils/widgets/output-widget.cpp
   src/utils/widgets/pixmap-label.cpp
+  src/utils/widgets/scene-list-widget-item.cpp
   src/utils/widgets/slider-ignore-scroll.cpp
   src/utils/widgets/source-tree.cpp
   src/utils/widgets/stream-key-input.cpp
@@ -144,6 +145,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   src/utils/widgets/locked-checkbox.hpp
   src/utils/widgets/output-widget.hpp
   src/utils/widgets/pixmap-label.hpp
+  src/utils/widgets/scene-list-widget-item.hpp
   src/utils/widgets/slider-ignore-scroll.hpp
   src/utils/widgets/source-tree.hpp
   src/utils/widgets/stream-key-input.hpp

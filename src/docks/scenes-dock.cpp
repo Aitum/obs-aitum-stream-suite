@@ -18,6 +18,7 @@
 #include <QWidgetAction>
 #include <src/utils/obs-websocket-api.h>
 #include <src/utils/widgets/focus-scroll-spinbox.hpp>
+#include <src/utils/widgets/scene-list-widget-item.hpp>
 
 extern obs_websocket_vendor vendor;
 extern SourcesDock *sources_dock;
@@ -403,25 +404,17 @@ void ScenesDock::SwitchToCanvas(obs_canvas_t *c)
 				signal_handler_connect(sh, "rename", scene_rename, param);
 				auto self = (ScenesDock *)param;
 				auto sn = QString::fromUtf8(obs_source_get_name(scene));
-				auto sli = new QListWidgetItem(sn, self->sceneList);
-				sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
 				obs_data_t *settings = obs_source_get_settings(scene);
 				const int order = (int)obs_data_get_int(settings, "order");
+				auto sli = new SceneListWidgetItem(sn, self->sceneList, order);
+				sli->setData(Qt::UserRole, QString::fromUtf8(obs_source_get_uuid(scene)));
+				
 				obs_data_release(settings);
 				self->sceneList->insertItem(order, sli);
 				return true;
 			},
 			this);
-
-		for (int idx = 0; idx < sceneList->count(); idx++) {
-			auto item = sceneList->takeItem(idx);
-			auto scene = obs_canvas_get_source_by_name(c, item->text().toUtf8().constData());
-			auto settings = obs_source_get_settings(scene);
-			const int order = (int)obs_data_get_int(settings, "order");
-			sceneList->insertItem(order, item);
-			obs_data_release(settings);
-			obs_source_release(scene);
-		}
+		sceneList->sortItems();
 		UpdateLinkedScenes();
 		sceneList->blockSignals(false);
 	}
