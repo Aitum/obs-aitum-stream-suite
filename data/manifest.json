@@ -1,7 +1,7 @@
 {
     "display_name": "Aitum Stream Suite",
     "id": "98cc1d34-1e54-4641-8f72-d462ed6eaf9f",
-    "version": "1.2.5",
+    "version": "1.2.6",
     "authors": ["Aitum", "Exeldro"],
     "name": "aitum-stream-suite",
     "description": "Plugin for OBS Studio to add Aitum",
