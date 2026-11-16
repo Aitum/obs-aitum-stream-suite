@@ -1,6 +1,6 @@
 {
-    "current_scene": "▶️  Presenter (Single Cam)",
-    "current_program_scene": "▶️  Presenter (Single Cam)",
+    "current_scene": "▶️  Chatting",
+    "current_program_scene": "▶️  Chatting",
     "scene_order": [
         {
             "name": "🔸🔸🔸🔸STANDBY SCENES 🔸🔸🔸🔸"
@@ -18,22 +18,19 @@
             "name": "🔸🔸🔸🔸MAIN SCENES 🔸🔸🔸🔸"
         },
         {
-            "name": "▶️  Presenter (Single Cam)"
+            "name": "▶️  Chatting"
         },
         {
-            "name": "▶️  Presenter + Guest (Dual Cam)"
+            "name": "▶️  Screen Share"
         },
         {
             "name": "🔸🔸🔸🔸ASSETS 🔸🔸🔸🔸"
         },
         {
             "name": "🎥 Main Camera"
-        },
-        {
-            "name": "🎥 Guest Camera"
         }
     ],
-    "name": "Podcast",
+    "name": "IRL & Vlogging",
     "groups": [],
     "quick_transitions": [
         {
@@ -135,11 +132,11 @@
                 "uuid": "0f7c029d-9430-4811-ad00-0ec884e78b10"
             },
             {
-                "name": "▶️  Presenter (Single Cam)",
+                "name": "▶️  Chatting",
                 "uuid": "70f4f084-640f-4000-83ad-09fd9def4f81"
             },
             {
-                "name": "▶️  Presenter + Guest (Dual Cam)",
+                "name": "▶️  Screen Share",
                 "uuid": "ca716e07-e932-4abe-95ee-1565cd58a195"
             }
         ],
@@ -1428,7 +1425,7 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "▶️  Presenter (Single Cam)",
+            "name": "▶️  Chatting",
             "uuid": "70f4f084-640f-4000-83ad-09fd9def4f81",
             "id": "scene",
             "versioned_id": "scene",
@@ -1603,7 +1600,7 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Presenter  Mic",
+                        "name": "Streamer Mic",
                         "source_uuid": "199fad44-e9ad-482d-9007-d90af7f005ac",
                         "visible": true,
                         "locked": true,
@@ -1663,7 +1660,7 @@
                         "name": "Vertical",
                         "width": 1080,
                         "height": 1920,
-                        "scene": "▶️  Presenter (Single Cam) (V)"
+                        "scene": "▶️  Chatting (V)"
                     }
                 ]
             },
@@ -1731,7 +1728,7 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "▶️  Presenter (Single Cam) (V)",
+            "name": "▶️  Chatting (V)",
             "uuid": "b2dc55ab-aab5-4d38-9434-922737ee6392",
             "id": "scene",
             "versioned_id": "scene",
@@ -1911,13 +1908,13 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "▶️  Presenter + Guest (Dual Cam)",
+            "name": "▶️  Screen Share",
             "uuid": "ca716e07-e932-4abe-95ee-1565cd58a195",
             "id": "scene",
             "versioned_id": "scene",
             "settings": {
                 "notes": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\nhr { height: 1px; border-width: 0; }\nli.unchecked::marker { content: \"\\2610\"; }\nli.checked::marker { content: \"\\2612\"; }\n</style></head><body style=\" font-family:'Roboto','.AppleSystemUIFont','Helvetica','Arial','MS Shell Dlg','sans-serif'; font-size:10pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
-                "id_counter": 9,
+                "id_counter": 8,
                 "custom_size": false,
                 "items": [
                     {
@@ -1976,7 +1973,62 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Main Camera Dual",
+                        "name": "Display Capture",
+                        "source_uuid": "a8c822b3-4e80-45e6-9ad3-6659653cf342",
+                        "visible": true,
+                        "locked": true,
+                        "rot": 0.0,
+                        "scale_ref": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "align": 0,
+                        "bounds_type": 1,
+                        "bounds_align": 0,
+                        "bounds_crop": false,
+                        "crop_left": 0,
+                        "crop_top": 0,
+                        "crop_right": 0,
+                        "crop_bottom": 0,
+                        "id": 8,
+                        "group_item_backup": false,
+                        "pos": {
+                            "x": 960.0,
+                            "y": 540.0
+                        },
+                        "pos_rel": {
+                            "x": 0.0,
+                            "y": 0.0
+                        },
+                        "scale": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "scale_rel": {
+                            "x": 1.0,
+                            "y": 1.0
+                        },
+                        "bounds": {
+                            "x": 1920.0,
+                            "y": 1080.0
+                        },
+                        "bounds_rel": {
+                            "x": 3.555555582046509,
+                            "y": 2.0
+                        },
+                        "scale_filter": "disable",
+                        "blend_method": "default",
+                        "blend_type": "normal",
+                        "show_transition": {
+                            "duration": 0
+                        },
+                        "hide_transition": {
+                            "duration": 0
+                        },
+                        "private_settings": {}
+                    },
+                    {
+                        "name": "Main Camera Screen Share",
                         "source_uuid": "87688ff9-a38a-4ec0-9155-66fde68089dd",
                         "visible": true,
                         "locked": true,
@@ -1996,75 +2048,20 @@
                         "id": 5,
                         "group_item_backup": false,
                         "pos": {
-                            "x": -477.0,
-                            "y": 0.0
+                            "x": -146.0,
+                            "y": 310.0
                         },
                         "pos_rel": {
-                            "x": -2.6611111164093018,
-                            "y": -1.0
+                            "x": -2.0481481552124023,
+                            "y": -0.4259259104728699
                         },
                         "scale": {
-                            "x": 1.0,
-                            "y": 1.0
+                            "x": 0.42395833134651184,
+                            "y": 0.42407408356666565
                         },
                         "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "bounds": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "bounds_rel": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    },
-                    {
-                        "name": "Guest Camera Dual",
-                        "source_uuid": "cffb86bc-a3b7-45a8-a7c9-d9f7e10fa59b",
-                        "visible": true,
-                        "locked": true,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 5,
-                        "bounds_type": 0,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 8,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": 477.0,
-                            "y": 0.0
-                        },
-                        "pos_rel": {
-                            "x": -0.894444465637207,
-                            "y": -1.0
-                        },
-                        "scale": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
+                            "x": 0.42395833134651184,
+                            "y": 0.42407408356666565
                         },
                         "bounds": {
                             "x": 0.0,
@@ -2141,62 +2138,7 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Guest Mic",
-                        "source_uuid": "12132134-cc35-4e6a-8ea3-67a5f4b07de8",
-                        "visible": true,
-                        "locked": false,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 5,
-                        "bounds_type": 0,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 9,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "pos_rel": {
-                            "x": -1.7777777910232544,
-                            "y": -1.0
-                        },
-                        "scale": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "bounds": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "bounds_rel": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    },
-                    {
-                        "name": "Presenter  Mic",
+                        "name": "Streamer Mic",
                         "source_uuid": "199fad44-e9ad-482d-9007-d90af7f005ac",
                         "visible": true,
                         "locked": true,
@@ -2256,7 +2198,7 @@
                         "name": "Vertical",
                         "width": 1080,
                         "height": 1920,
-                        "scene": "▶️  Presenter + Guest (Dual Cam) (V)"
+                        "scene": "▶️  Screen Share (V)"
                     }
                 ]
             },
@@ -2275,16 +2217,14 @@
                 "OBSBasic.SelectScene": [],
                 "libobs.show_scene_item.1": [],
                 "libobs.hide_scene_item.1": [],
+                "libobs.show_scene_item.8": [],
+                "libobs.hide_scene_item.8": [],
                 "libobs.show_scene_item.5": [],
                 "libobs.hide_scene_item.5": [],
                 "libobs.show_scene_item.7": [],
                 "libobs.hide_scene_item.7": [],
                 "libobs.show_scene_item.6": [],
-                "libobs.hide_scene_item.6": [],
-                "libobs.show_scene_item.8": [],
-                "libobs.hide_scene_item.8": [],
-                "libobs.show_scene_item.9": [],
-                "libobs.hide_scene_item.9": []
+                "libobs.hide_scene_item.6": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
@@ -2294,14 +2234,15 @@
             "filters": [
                 {
                     "prev_ver": 536870913,
-                    "name": "Cam Override",
-                    "uuid": "f8bfa3a6-e6aa-43c4-9853-a26bc461ecb6",
+                    "name": "Screen Share Override",
+                    "uuid": "43bf8366-23d1-4f7c-a3e2-ced186215771",
                     "id": "move_transition_override_filter",
                     "versioned_id": "move_transition_override_filter",
                     "settings": {
+                        "transition_match": "Fade",
                         "transition_in": "Fade",
                         "transition_out": "Fade",
-                        "source": "Main Camera Dual",
+                        "source": "Display Capture",
                         "position_in": 0,
                         "zoom_in": 0,
                         "position_out": 0,
@@ -2326,18 +2267,18 @@
                 },
                 {
                     "prev_ver": 536870913,
-                    "name": "Guest Cam Override",
-                    "uuid": "e5ca2ccf-9907-4167-99a6-264a2ee58865",
+                    "name": "Cam Override",
+                    "uuid": "f8bfa3a6-e6aa-43c4-9853-a26bc461ecb6",
                     "id": "move_transition_override_filter",
                     "versioned_id": "move_transition_override_filter",
                     "settings": {
-                        "source": "Guest Camera Dual",
-                        "zoom_in": 0,
-                        "position_in": 10,
                         "transition_in": "Fade",
+                        "transition_out": "Fade",
+                        "position_in": 0,
+                        "zoom_in": 0,
+                        "position_out": 0,
                         "zoom_out": 0,
-                        "position_out": 10,
-                        "transition_out": "Fade"
+                        "source": "Main Camera Screen Share"
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -2360,12 +2301,12 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "▶️  Presenter + Guest (Dual Cam) (V)",
+            "name": "▶️  Screen Share (V)",
             "uuid": "3734f998-a071-475a-b7aa-a67c9d287a3c",
             "id": "scene",
             "versioned_id": "scene",
             "settings": {
-                "id_counter": 7,
+                "id_counter": 6,
                 "custom_size": false,
                 "items": [
                     {
@@ -2424,8 +2365,8 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Guest Camera Dual (V)",
-                        "source_uuid": "0e58f38d-a10e-4f3a-8d67-dd3de2df0ddb",
+                        "name": "Display Capture",
+                        "source_uuid": "a8c822b3-4e80-45e6-9ad3-6659653cf342",
                         "visible": true,
                         "locked": true,
                         "rot": 0.0,
@@ -2444,20 +2385,20 @@
                         "id": 6,
                         "group_item_backup": false,
                         "pos": {
-                            "x": -309.0,
-                            "y": 965.0
+                            "x": -621.0,
+                            "y": 609.0
                         },
                         "pos_rel": {
-                            "x": -0.8843749761581421,
-                            "y": 0.005208373069763184
+                            "x": -1.209375023841858,
+                            "y": -0.3656250238418579
                         },
                         "scale": {
-                            "x": 0.8843749761581421,
-                            "y": 0.8842592835426331
+                            "x": 0.907031238079071,
+                            "y": 0.9069444537162781
                         },
                         "scale_rel": {
-                            "x": 0.8843749761581421,
-                            "y": 0.8842592835426331
+                            "x": 0.907031238079071,
+                            "y": 0.9069444537162781
                         },
                         "bounds": {
                             "x": 0.0,
@@ -2479,7 +2420,7 @@
                         "private_settings": {}
                     },
                     {
-                        "name": "Main Camera Gaming (V)",
+                        "name": "Main Camera Screen Share (V)",
                         "source_uuid": "98ed1bbb-e7b1-46fc-bff4-d1e76536f79c",
                         "visible": true,
                         "locked": true,
@@ -2499,20 +2440,20 @@
                         "id": 5,
                         "group_item_backup": false,
                         "pos": {
-                            "x": -311.5,
+                            "x": -1.5,
                             "y": 0.0
                         },
                         "pos_rel": {
-                            "x": -0.8869791626930237,
+                            "x": -0.5640624761581421,
                             "y": -1.0
                         },
                         "scale": {
-                            "x": 0.8869791626930237,
-                            "y": 0.8870370388031006
+                            "x": 0.5640624761581421,
+                            "y": 0.5638889074325562
                         },
                         "scale_rel": {
-                            "x": 0.8869791626930237,
-                            "y": 0.8870370388031006
+                            "x": 0.5640624761581421,
+                            "y": 0.5638889074325562
                         },
                         "bounds": {
                             "x": 0.0,
@@ -2550,10 +2491,10 @@
             "hotkeys": {
                 "libobs.show_scene_item.1": [],
                 "libobs.hide_scene_item.1": [],
-                "libobs.show_scene_item.5": [],
-                "libobs.hide_scene_item.5": [],
                 "libobs.show_scene_item.6": [],
-                "libobs.hide_scene_item.6": []
+                "libobs.hide_scene_item.6": [],
+                "libobs.show_scene_item.5": [],
+                "libobs.hide_scene_item.5": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
@@ -2563,14 +2504,14 @@
             "filters": [
                 {
                     "prev_ver": 536870913,
-                    "name": "Cam Override",
-                    "uuid": "5bba67a9-a1e2-4103-85c7-0b6a12e6bb99",
+                    "name": "Screen Capture Override",
+                    "uuid": "bb3cd88e-9110-477c-8618-aa7012adc6a5",
                     "id": "move_transition_override_filter",
                     "versioned_id": "move_transition_override_filter",
                     "settings": {
                         "transition_in": "Fade",
                         "transition_out": "Fade",
-                        "source": "Main Camera Gaming (V)",
+                        "source": "Display Capture",
                         "position_in": 0,
                         "zoom_in": 0,
                         "position_out": 0,
@@ -2595,18 +2536,18 @@
                 },
                 {
                     "prev_ver": 536870913,
-                    "name": "Guest Override",
-                    "uuid": "cefe4035-66f2-49a4-b173-8be8be9888d5",
+                    "name": "Cam Override",
+                    "uuid": "5bba67a9-a1e2-4103-85c7-0b6a12e6bb99",
                     "id": "move_transition_override_filter",
                     "versioned_id": "move_transition_override_filter",
                     "settings": {
-                        "source": "Guest Camera Dual (V)",
-                        "zoom_in": 0,
-                        "position_in": 34,
                         "transition_in": "Fade",
+                        "transition_out": "Fade",
+                        "position_in": 0,
+                        "zoom_in": 0,
+                        "position_out": 0,
                         "zoom_out": 0,
-                        "position_out": 34,
-                        "transition_out": "Fade"
+                        "source": "Main Camera Screen Share (V)"
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -2626,210 +2567,6 @@
                     "private_settings": {}
                 }
             ]
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "🎥 Guest Camera",
-            "uuid": "f6f95a11-b51e-4fb0-9e17-7807ad350f6f",
-            "id": "scene",
-            "versioned_id": "scene",
-            "settings": {
-                "notes": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\nhr { height: 1px; border-width: 0; }\nli.unchecked::marker { content: \"\\2610\"; }\nli.checked::marker { content: \"\\2612\"; }\n</style></head><body style=\" font-family:'Roboto','.AppleSystemUIFont','Helvetica','Arial','MS Shell Dlg','sans-serif'; font-size:10pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
-                "id_counter": 4,
-                "custom_size": false,
-                "items": [
-                    {
-                        "name": "Guest Camera",
-                        "source_uuid": "10866c2d-5b98-4baa-ab5c-1df7dda14145",
-                        "visible": true,
-                        "locked": true,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 0,
-                        "bounds_type": 1,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 1,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": 960.0,
-                            "y": 540.0
-                        },
-                        "pos_rel": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "scale": {
-                            "x": 0.6411458253860474,
-                            "y": 0.6412037014961243
-                        },
-                        "scale_rel": {
-                            "x": 0.6411458253860474,
-                            "y": 0.6412037014961243
-                        },
-                        "bounds": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "bounds_rel": {
-                            "x": 3.555555582046509,
-                            "y": 2.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    },
-                    {
-                        "name": "Guest (Discord)",
-                        "source_uuid": "dc16c005-a65b-491d-8d39-928758310386",
-                        "visible": false,
-                        "locked": true,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 0,
-                        "bounds_type": 1,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 2,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": 959.0,
-                            "y": 540.0
-                        },
-                        "pos_rel": {
-                            "x": -0.0018518518190830946,
-                            "y": 0.0
-                        },
-                        "scale": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "bounds": {
-                            "x": 1923.0,
-                            "y": 1080.0
-                        },
-                        "bounds_rel": {
-                            "x": 3.5611112117767334,
-                            "y": 2.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    },
-                    {
-                        "name": "Guest (Browser)",
-                        "source_uuid": "e12eb644-5639-44ca-9132-95d1b30d303c",
-                        "visible": false,
-                        "locked": true,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 0,
-                        "bounds_type": 1,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 3,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": 960.0,
-                            "y": 540.0
-                        },
-                        "pos_rel": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "scale": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "bounds": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "bounds_rel": {
-                            "x": 3.555555582046509,
-                            "y": 2.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    }
-                ]
-            },
-            "mixers": 0,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "OBSBasic.SelectScene": [],
-                "libobs.show_scene_item.1": [],
-                "libobs.hide_scene_item.1": [],
-                "libobs.show_scene_item.2": [],
-                "libobs.hide_scene_item.2": [],
-                "libobs.show_scene_item.3": [],
-                "libobs.hide_scene_item.3": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
-            "private_settings": {}
         },
         {
             "prev_ver": 536870913,
@@ -3107,10 +2844,10 @@
             "id": "gradient_source",
             "versioned_id": "gradient_source",
             "settings": {
-                "from_color": 4291905187,
+                "from_color": 4290025812,
                 "steps": 2,
-                "to_color_1": 4294921086,
-                "to_color_2": 4291905187
+                "to_color_1": 4289771609,
+                "to_color_2": 4290025812
             },
             "mixers": 0,
             "sync": 0,
@@ -3192,16 +2929,14 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "Guest (Browser)",
-            "uuid": "e12eb644-5639-44ca-9132-95d1b30d303c",
-            "id": "browser_source",
-            "versioned_id": "browser_source",
+            "name": "Display Capture",
+            "uuid": "a8c822b3-4e80-45e6-9ad3-6659653cf342",
+            "id": "monitor_capture",
+            "versioned_id": "monitor_capture",
             "settings": {
-                "width": 1920,
-                "height": 1080,
-                "reroute_audio": true
+                "monitor_id": "\\\\?\\DISPLAY#AUS2768#5&160bd113&0&UID266501#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}"
             },
-            "mixers": 255,
+            "mixers": 0,
             "sync": 0,
             "flags": 0,
             "volume": 1.0,
@@ -3212,113 +2947,7 @@
             "push-to-mute-delay": 0,
             "push-to-talk": false,
             "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": [],
-                "ObsBrowser.Refresh": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {}
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "Guest (Discord)",
-            "uuid": "dc16c005-a65b-491d-8d39-928758310386",
-            "id": "window_capture",
-            "versioned_id": "window_capture",
-            "settings": {
-                "cursor": false,
-                "capture_audio": true,
-                "priority": 2,
-                "window": "Friends - Discord:Chrome_WidgetWin_1:Discord.exe"
-            },
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {}
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "Guest Camera",
-            "uuid": "10866c2d-5b98-4baa-ab5c-1df7dda14145",
-            "id": "dshow_input",
-            "versioned_id": "dshow_input",
-            "settings": {
-                "video_device_id": "Elgato Facecam Pro:\\\\?\\usb#22vid_0fd9&pid_0079&mi_00#229&2ead5be&0&0000#22{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
-                "last_video_device_id": "Elgato Facecam Pro:\\\\?\\usb#22vid_0fd9&pid_0079&mi_00#229&2ead5be&0&0000#22{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
-                "active": true
-            },
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {}
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "Guest Camera Dual",
-            "uuid": "cffb86bc-a3b7-45a8-a7c9-d9f7e10fa59b",
-            "id": "source-clone",
-            "versioned_id": "source-clone",
-            "settings": {
-                "clone": "🎥 Guest Camera",
-                "audio": true,
-                "same_clones": "Guest Camera Dual (V)"
-            },
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
+            "hotkeys": {},
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
@@ -3327,27 +2956,22 @@
                 {
                     "prev_ver": 536870913,
                     "name": "Advanced Mask",
-                    "uuid": "80416d28-7c39-4dc6-b8d9-53c740c10c40",
+                    "uuid": "0d8b2b6d-e870-4773-9895-7dd8edc5a85a",
                     "id": "advanced_masks_filter",
                     "versioned_id": "advanced_masks_filter_v2",
                     "settings": {
-                        "mask_source_height": 1080,
-                        "mask_source_width": 1920,
-                        "rectangle_corner_radius_bl": 100,
-                        "rectangle_corner_radius_br": 100,
-                        "rectangle_corner_radius_tl": 100,
-                        "rectangle_corner_radius_tr": 100,
-                        "rectangle_corner_type": 2,
-                        "shape_feather_amount": 0,
+                        "rectangle_corner_type": 1,
                         "shape_feather_type": 1,
-                        "shape_invert": false,
-                        "shape_center_x": 960,
-                        "shape_center_y": 540,
-                        "rectangle_width": 850.0,
-                        "rectangle_height": 972,
-                        "position_x": 960,
-                        "position_y": 540,
-                        "mask_gradient_position": 960
+                        "mask_source_width": 2560,
+                        "mask_source_height": 1440,
+                        "rectangle_corner_radius": 31.0,
+                        "shape_center_x": 1280.0,
+                        "shape_center_y": 720.0,
+                        "rectangle_width": 2554.0,
+                        "rectangle_height": 1433.0,
+                        "position_x": 1280.0,
+                        "position_y": 720.0,
+                        "mask_gradient_position": 1280.0
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -3369,16 +2993,16 @@
                 {
                     "prev_ver": 536870913,
                     "name": "Stroke",
-                    "uuid": "8282e685-c786-411a-a5a6-f1234b620c73",
+                    "uuid": "7bb6ba70-f77e-4f93-8bfa-fc1e81910022",
                     "id": "obs_stroke_filter",
                     "versioned_id": "obs_stroke_filter",
                     "settings": {
-                        "stroke_size": 9,
-                        "stroke_offset": 7,
-                        "stroke_position": 3,
-                        "contour_spacing": 8,
-                        "contour_falloff_start": 0,
-                        "contour_falloff_end": 54
+                        "stroke_size": 7.0,
+                        "stroke_offset": 0.0,
+                        "stroke_position": 4,
+                        "contour_offset": -264.26,
+                        "contour_spacing_power": 1.13,
+                        "contour_falloff_end": 39.0
                     },
                     "mixers": 0,
                     "sync": 0,
@@ -3398,143 +3022,6 @@
                     "private_settings": {}
                 }
             ]
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "Guest Camera Dual (V)",
-            "uuid": "0e58f38d-a10e-4f3a-8d67-dd3de2df0ddb",
-            "id": "source-clone",
-            "versioned_id": "source-clone",
-            "settings": {
-                "clone": "🎥 Guest Camera",
-                "same_clones": "Guest Camera Dual",
-                "audio": false
-            },
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {},
-            "filters": [
-                {
-                    "prev_ver": 536870913,
-                    "name": "Advanced Mask",
-                    "uuid": "af100152-0fb6-4dc8-a07b-762add7ae29a",
-                    "id": "advanced_masks_filter",
-                    "versioned_id": "advanced_masks_filter_v2",
-                    "settings": {
-                        "mask_source_height": 1080,
-                        "mask_source_width": 1920,
-                        "rectangle_corner_radius_bl": 100,
-                        "rectangle_corner_radius_br": 100,
-                        "rectangle_corner_radius_tl": 100,
-                        "rectangle_corner_radius_tr": 100,
-                        "rectangle_corner_type": 2,
-                        "shape_feather_amount": 0,
-                        "shape_feather_type": 1,
-                        "shape_invert": false,
-                        "shape_center_x": 960,
-                        "shape_center_y": 540,
-                        "rectangle_width": 1120.0,
-                        "rectangle_height": 980.0,
-                        "position_x": 960,
-                        "position_y": 540,
-                        "mask_gradient_position": 960
-                    },
-                    "mixers": 0,
-                    "sync": 0,
-                    "flags": 0,
-                    "volume": 1.0,
-                    "balance": 0.5,
-                    "enabled": true,
-                    "muted": false,
-                    "push-to-mute": false,
-                    "push-to-mute-delay": 0,
-                    "push-to-talk": false,
-                    "push-to-talk-delay": 0,
-                    "hotkeys": {},
-                    "deinterlace_mode": 0,
-                    "deinterlace_field_order": 0,
-                    "monitoring_type": 0,
-                    "private_settings": {}
-                },
-                {
-                    "prev_ver": 536870913,
-                    "name": "Stroke",
-                    "uuid": "0b11d83c-2aee-41ae-9c72-5cea0d8d296d",
-                    "id": "obs_stroke_filter",
-                    "versioned_id": "obs_stroke_filter",
-                    "settings": {
-                        "stroke_size": 9,
-                        "stroke_offset": 7,
-                        "stroke_position": 3,
-                        "contour_spacing": 8,
-                        "contour_falloff_start": 0,
-                        "contour_falloff_end": 54
-                    },
-                    "mixers": 0,
-                    "sync": 0,
-                    "flags": 0,
-                    "volume": 1.0,
-                    "balance": 0.5,
-                    "enabled": true,
-                    "muted": false,
-                    "push-to-mute": false,
-                    "push-to-mute-delay": 0,
-                    "push-to-talk": false,
-                    "push-to-talk-delay": 0,
-                    "hotkeys": {},
-                    "deinterlace_mode": 0,
-                    "deinterlace_field_order": 0,
-                    "monitoring_type": 0,
-                    "private_settings": {}
-                }
-            ]
-        },
-        {
-            "prev_ver": 536870913,
-            "name": "Guest Mic",
-            "uuid": "12132134-cc35-4e6a-8ea3-67a5f4b07de8",
-            "id": "wasapi_input_capture",
-            "versioned_id": "wasapi_input_capture",
-            "settings": {},
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {}
         },
         {
             "prev_ver": 536870913,
@@ -3754,14 +3241,14 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "Main Camera Dual",
+            "name": "Main Camera Screen Share",
             "uuid": "87688ff9-a38a-4ec0-9155-66fde68089dd",
             "id": "source-clone",
             "versioned_id": "source-clone",
             "settings": {
-                "same_clones": "Main Camera Chatting\nMain Camera Chatting (V)\nMain Camera Gaming (V)",
                 "clone": "🎥 Main Camera",
-                "audio": false
+                "audio": false,
+                "same_clones": "Main Camera Chatting\nMain Camera Chatting (V)\nMain Camera Screen Share (V)"
             },
             "mixers": 255,
             "sync": 0,
@@ -3804,7 +3291,7 @@
                         "shape_invert": false,
                         "shape_center_x": 960,
                         "shape_center_y": 540,
-                        "rectangle_width": 850.0,
+                        "rectangle_width": 972.0,
                         "rectangle_height": 972,
                         "position_x": 960,
                         "position_y": 540,
@@ -3862,7 +3349,7 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "Main Camera Gaming (V)",
+            "name": "Main Camera Screen Share (V)",
             "uuid": "98ed1bbb-e7b1-46fc-bff4-d1e76536f79c",
             "id": "source-clone",
             "versioned_id": "source-clone",
@@ -3896,7 +3383,7 @@
                 {
                     "prev_ver": 536870913,
                     "name": "Advanced Mask",
-                    "uuid": "6ba11ead-4df5-457a-8c17-3077023fb354",
+                    "uuid": "57ca4144-f2ff-4be0-ba87-77173797f013",
                     "id": "advanced_masks_filter",
                     "versioned_id": "advanced_masks_filter_v2",
                     "settings": {
@@ -3912,8 +3399,8 @@
                         "shape_invert": false,
                         "shape_center_x": 960,
                         "shape_center_y": 540,
-                        "rectangle_width": 1120.0,
-                        "rectangle_height": 980.0,
+                        "rectangle_width": 1811,
+                        "rectangle_height": 972,
                         "position_x": 960,
                         "position_y": 540,
                         "mask_gradient_position": 960
@@ -4002,61 +3489,6 @@
         },
         {
             "prev_ver": 536870913,
-            "name": "Presenter  Mic",
-            "uuid": "199fad44-e9ad-482d-9007-d90af7f005ac",
-            "id": "wasapi_input_capture",
-            "versioned_id": "wasapi_input_capture",
-            "settings": {},
-            "mixers": 255,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {
-                "libobs.mute": [],
-                "libobs.unmute": [],
-                "libobs.push-to-mute": [],
-                "libobs.push-to-talk": []
-            },
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
-            "private_settings": {},
-            "filters": [
-                {
-                    "prev_ver": 536870913,
-                    "name": "Noise Suppression",
-                    "uuid": "20834b43-c3b3-4cc7-85a4-3e1332537d67",
-                    "id": "noise_suppress_filter",
-                    "versioned_id": "noise_suppress_filter_v2",
-                    "settings": {},
-                    "mixers": 255,
-                    "sync": 0,
-                    "flags": 0,
-                    "volume": 1.0,
-                    "balance": 0.5,
-                    "enabled": true,
-                    "muted": false,
-                    "push-to-mute": false,
-                    "push-to-mute-delay": 0,
-                    "push-to-talk": false,
-                    "push-to-talk-delay": 0,
-                    "hotkeys": {},
-                    "deinterlace_mode": 0,
-                    "deinterlace_field_order": 0,
-                    "monitoring_type": 0,
-                    "private_settings": {}
-                }
-            ]
-        },
-        {
-            "prev_ver": 536870913,
             "name": "Starting Soon (T)",
             "uuid": "1aee8d69-0910-4bb6-ace4-06b71aadc7d0",
             "id": "text_gdiplus",
@@ -4124,6 +3556,61 @@
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
             "private_settings": {}
+        },
+        {
+            "prev_ver": 536870913,
+            "name": "Streamer Mic",
+            "uuid": "199fad44-e9ad-482d-9007-d90af7f005ac",
+            "id": "wasapi_input_capture",
+            "versioned_id": "wasapi_input_capture",
+            "settings": {},
+            "mixers": 255,
+            "sync": 0,
+            "flags": 0,
+            "volume": 1.0,
+            "balance": 0.5,
+            "enabled": true,
+            "muted": false,
+            "push-to-mute": false,
+            "push-to-mute-delay": 0,
+            "push-to-talk": false,
+            "push-to-talk-delay": 0,
+            "hotkeys": {
+                "libobs.mute": [],
+                "libobs.unmute": [],
+                "libobs.push-to-mute": [],
+                "libobs.push-to-talk": []
+            },
+            "deinterlace_mode": 0,
+            "deinterlace_field_order": 0,
+            "monitoring_type": 0,
+            "private_settings": {},
+            "filters": [
+                {
+                    "prev_ver": 536870913,
+                    "name": "Noise Suppression",
+                    "uuid": "20834b43-c3b3-4cc7-85a4-3e1332537d67",
+                    "id": "noise_suppress_filter",
+                    "versioned_id": "noise_suppress_filter_v2",
+                    "settings": {},
+                    "mixers": 255,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": true,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                }
+            ]
         },
         {
             "prev_ver": 536870913,
