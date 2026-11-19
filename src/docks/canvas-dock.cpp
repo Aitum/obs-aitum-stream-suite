@@ -126,12 +126,15 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 				ovi.output_format = vf;
 			}
 			if (obs_canvas_reset_video(canvas, &ovi)) {
-				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
-				     canvas_width, canvas_height);
+				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u with color format %u", obs_canvas_get_name(canvas),
+				     canvas_width, canvas_height, ovi.output_format);
 			} else {
-				blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s'",
-				     obs_canvas_get_name(canvas));
+				blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s' to %ux%u with color format %u",
+				     obs_canvas_get_name(canvas), canvas_width, canvas_height, ovi.output_format);
 			}
+		} else {
+			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' already has correct video settings (%ux%u with color format %u)", obs_canvas_get_name(canvas),
+			     canvas_width, canvas_height, ovi.output_format);
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
@@ -147,8 +150,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			ovi.output_format = vf;
 		}
 		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, PROGRAM);
-		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u", canvas_name.c_str(), canvas_width,
-		     canvas_height);
+		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u with color format %u", canvas_name.c_str(), canvas_width,
+		     canvas_height, ovi.output_format);
 		if (canvas) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
 			obs_data_set_int(settings, "width", canvas_width);
