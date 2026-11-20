@@ -738,6 +738,16 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 		obs_data_set_string(settings, "color_format", text.toUtf8().constData());
 	});
 
+	auto drawSafeAreas =
+		new QCheckBox(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.General.Multiview.DrawSafeAreas")));
+	drawSafeAreas->setChecked(obs_data_get_bool(settings, "draw_safe_areas"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+	connect(drawSafeAreas, &QCheckBox::checkStateChanged,
+#else
+	connect(drawSafeAreas, &QCheckBox::stateChanged,
+#endif
+		[drawSafeAreas, settings] { obs_data_set_bool(settings, "draw_safe_areas", drawSafeAreas->isChecked()); });
+
 	auto resolution = new QComboBox;
 	resolution->setEditable(true);
 	resolution->addItem("720x1280");
@@ -859,6 +869,7 @@ void OBSBasicSettings::AddCanvas(QFormLayout *canvasesLayout, obs_data_t *settin
 	advancedGroupLayout->setRowVisible(cloneCombo, clone);
 	advancedGroupLayout->addRow(QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Advanced.Video.ColorFormat")),
 				    colorFormat);
+	advancedGroupLayout->addWidget(drawSafeAreas);
 	advancedGroupLayout->addRow(replaceLayout);
 	advancedGroupLayout->setRowVisible(replaceLayout, clone);
 

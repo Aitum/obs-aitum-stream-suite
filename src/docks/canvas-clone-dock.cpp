@@ -155,6 +155,8 @@ CanvasCloneDock::CanvasCloneDock(obs_data_t *settings_, QWidget *parent)
 	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
 	canvas_height = (uint32_t)obs_data_get_int(settings, "height");
 
+	drawSafeAreas = obs_data_get_bool(settings, "draw_safe_areas");
+
 	auto clone_name = obs_data_get_string(settings, "clone");
 	auto clone_canvas = clone_name[0] == '\0' ? obs_get_main_canvas() : obs_get_canvas_by_name(clone_name);
 	if (clone_canvas) {
@@ -329,6 +331,24 @@ CanvasCloneDock::~CanvasCloneDock()
 	obs_canvas_release(canvas);
 	obs_enter_graphics();
 	gs_vertexbuffer_destroy(box);
+	if (actionSafeMargin) {
+		gs_vertexbuffer_destroy(actionSafeMargin);
+	}
+	if (graphicsSafeMargin) {
+		gs_vertexbuffer_destroy(graphicsSafeMargin);
+	}
+	if (fourByThreeSafeMargin) {
+		gs_vertexbuffer_destroy(fourByThreeSafeMargin);
+	}
+	if (leftLine) {
+		gs_vertexbuffer_destroy(leftLine);
+	}
+	if (topLine) {
+		gs_vertexbuffer_destroy(topLine);
+	}
+	if (rightLine) {
+		gs_vertexbuffer_destroy(rightLine);
+	}
 	obs_leave_graphics();
 	pthread_mutex_lock(&replace_sources_mutex);
 	for (auto it = replace_sources.begin(); it != replace_sources.end(); it++) {
@@ -388,6 +408,22 @@ void CanvasCloneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 
 	gs_ortho(float(-x), newCX + float(x), float(-y), newCY + float(y), -100.0f, 100.0f);
 	gs_reset_viewport();
+
+	if (window->drawSafeAreas) {
+		if (!window->actionSafeMargin || !window->graphicsSafeMargin || !window->fourByThreeSafeMargin ||
+		    !window->leftLine || !window->topLine || !window->rightLine) {
+			CanvasDock::InitSafeAreas(&window->actionSafeMargin, &window->graphicsSafeMargin,
+						  &window->fourByThreeSafeMargin, &window->leftLine, &window->topLine,
+						  &window->rightLine);
+		}
+
+		CanvasDock::RenderSafeAreas(window->actionSafeMargin, newCX, newCY);
+		CanvasDock::RenderSafeAreas(window->graphicsSafeMargin, newCX, newCY);
+		CanvasDock::RenderSafeAreas(window->fourByThreeSafeMargin, newCX, newCY);
+		CanvasDock::RenderSafeAreas(window->leftLine, newCX, newCY);
+		CanvasDock::RenderSafeAreas(window->topLine, newCX, newCY);
+		CanvasDock::RenderSafeAreas(window->rightLine, newCX, newCY);
+	}
 
 	gs_projection_pop();
 	gs_viewport_pop();
@@ -919,19 +955,44 @@ void CanvasCloneDock::UpdateSettings(obs_data_t *s)
 		canvas_height = 1920;
 	}
 
+	auto vf = VIDEO_FORMAT_NONE;
+	std::string cf = obs_data_get_string(settings, "color_format");
+	if (cf == "NV12") {
+		vf = VIDEO_FORMAT_NV12;
+	} else if (cf == "I420") {
+		vf = VIDEO_FORMAT_I420;
+	} else if (cf == "I444") {
+		vf = VIDEO_FORMAT_I444;
+	} else if (cf == "P010") {
+		vf = VIDEO_FORMAT_P010;
+	} else if (cf == "I010") {
+		vf = VIDEO_FORMAT_I010;
+	} else if (cf == "P216") {
+		vf = VIDEO_FORMAT_P216;
+	} else if (cf == "P416") {
+		vf = VIDEO_FORMAT_P416;
+	} else if (cf == "BGRA" || cf == "RGBA") {
+		vf = VIDEO_FORMAT_BGRA;
+	}
+
 	obs_video_info ovi;
-	if (obs_canvas_get_video_info(canvas, &ovi) && (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
-							ovi.output_width != canvas_width || ovi.output_height != canvas_height)) {
+	if (obs_canvas_get_video_info(canvas, &ovi) &&
+	    (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+	     ovi.output_height != canvas_height || (vf != VIDEO_FORMAT_NONE && ovi.output_format != vf))) {
 		obs_get_video_info(&ovi);
 		ovi.base_height = canvas_height;
 		ovi.base_width = canvas_width;
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
+		if (vf != VIDEO_FORMAT_NONE) {
+			ovi.output_format = vf;
+		}
 		obs_canvas_reset_video(canvas, &ovi);
-		blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas), canvas_width,
-		     canvas_height);
+		blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u with color format %u", obs_canvas_get_name(canvas), canvas_width,
+		     canvas_height, ovi.output_format);
 	}
 	LoadReplacements();
+	drawSafeAreas = obs_data_get_bool(settings, "draw_safe_areas");
 }
 
 bool CanvasCloneDock::AddSourceToCombos(void *param, obs_source_t *source)
@@ -1130,6 +1191,7 @@ void CanvasCloneDock::SaveSettings(bool closing, QString mode)
 		setting_name += "_" + mode.toStdString();
 	}
 	obs_data_set_string(settings, setting_name.c_str(), canvas_split->savePanelOrder().toUtf8().constData());
+	obs_data_set_bool(settings, "draw_safe_areas", drawSafeAreas);
 }
 
 void CanvasCloneDock::LoadMode(QString mode)

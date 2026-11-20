@@ -126,15 +126,17 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 				ovi.output_format = vf;
 			}
 			if (obs_canvas_reset_video(canvas, &ovi)) {
-				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u with color format %u", obs_canvas_get_name(canvas),
-				     canvas_width, canvas_height, ovi.output_format);
+				blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u with color format %u",
+				     obs_canvas_get_name(canvas), canvas_width, canvas_height, ovi.output_format);
 			} else {
-				blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s' to %ux%u with color format %u",
+				blog(LOG_ERROR,
+				     "[Aitum Stream Suite] Failed to reset video on canvas '%s' to %ux%u with color format %u",
 				     obs_canvas_get_name(canvas), canvas_width, canvas_height, ovi.output_format);
 			}
 		} else {
-			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' already has correct video settings (%ux%u with color format %u)", obs_canvas_get_name(canvas),
-			     canvas_width, canvas_height, ovi.output_format);
+			blog(LOG_INFO,
+			     "[Aitum Stream Suite] Canvas '%s' already has correct video settings (%ux%u with color format %u)",
+			     obs_canvas_get_name(canvas), canvas_width, canvas_height, ovi.output_format);
 		}
 		if (strcmp(obs_data_get_string(settings, "uuid"), "") == 0) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
@@ -150,8 +152,8 @@ CanvasDock::CanvasDock(obs_data_t *settings_, QWidget *parent)
 			ovi.output_format = vf;
 		}
 		canvas = obs_frontend_add_canvas(canvas_name.c_str(), &ovi, PROGRAM);
-		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u with color format %u", canvas_name.c_str(), canvas_width,
-		     canvas_height, ovi.output_format);
+		blog(LOG_INFO, "[Aitum Stream Suite] Add frontend canvas '%s' %ux%u with color format %u", canvas_name.c_str(),
+		     canvas_width, canvas_height, ovi.output_format);
 		if (canvas) {
 			obs_data_set_string(settings, "uuid", obs_canvas_get_uuid(canvas));
 			obs_data_set_int(settings, "width", canvas_width);
@@ -1059,6 +1061,7 @@ void CanvasDock::LoadUI()
 		obs_data_array_release(pa);
 		preview_disabled = obs_data_get_bool(settings, "preview_disabled");
 		locked = obs_data_get_bool(settings, "preview_locked");
+		drawSafeAreas = obs_data_get_bool(settings, "draw_safe_areas");
 	}
 	obs_display_set_enabled(preview->GetDisplay(), !preview_disabled);
 	preview->setVisible(!preview_disabled);
@@ -1143,6 +1146,92 @@ void CanvasDock::GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int 
 	y = windowCY / 2 - newCY / 2;
 }
 
+#define OUTLINE_COLOR 0xFFD0D0D0
+#define LINE_LENGTH 0.1f
+
+// Rec. ITU-R BT.1848-1 / EBU R 95
+#define ACTION_SAFE_PERCENT 0.035f       // 3.5%
+#define GRAPHICS_SAFE_PERCENT 0.05f      // 5.0%
+#define FOURBYTHREE_SAFE_PERCENT 0.1625f // 16.25%
+
+void CanvasDock::InitSafeAreas(gs_vertbuffer_t **actionSafeMargin, gs_vertbuffer_t **graphicsSafeMargin,
+			       gs_vertbuffer_t **fourByThreeSafeMargin, gs_vertbuffer_t **leftLine, gs_vertbuffer_t **topLine,
+			       gs_vertbuffer_t **rightLine)
+{
+	obs_enter_graphics();
+
+	// All essential action should be placed inside this area
+	gs_render_start(true);
+	gs_vertex2f(ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	gs_vertex2f(ACTION_SAFE_PERCENT, 1 - ACTION_SAFE_PERCENT);
+	gs_vertex2f(1 - ACTION_SAFE_PERCENT, 1 - ACTION_SAFE_PERCENT);
+	gs_vertex2f(1 - ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	gs_vertex2f(ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	*actionSafeMargin = gs_render_save();
+
+	// All graphics should be placed inside this area
+	gs_render_start(true);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - GRAPHICS_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	*graphicsSafeMargin = gs_render_save();
+
+	// 4:3 safe area for widescreen
+	gs_render_start(true);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - FOURBYTHREE_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	*fourByThreeSafeMargin = gs_render_save();
+
+	gs_render_start(true);
+	gs_vertex2f(0.0f, 0.5f);
+	gs_vertex2f(LINE_LENGTH, 0.5f);
+	*leftLine = gs_render_save();
+
+	gs_render_start(true);
+	gs_vertex2f(0.5f, 0.0f);
+	gs_vertex2f(0.5f, LINE_LENGTH);
+	*topLine = gs_render_save();
+
+	gs_render_start(true);
+	gs_vertex2f(1.0f, 0.5f);
+	gs_vertex2f(1 - LINE_LENGTH, 0.5f);
+	*rightLine = gs_render_save();
+
+	obs_leave_graphics();
+}
+
+void CanvasDock::RenderSafeAreas(gs_vertbuffer_t *vb, int cx, int cy)
+{
+	if (!vb) {
+		return;
+	}
+
+	matrix4 transform;
+	matrix4_identity(&transform);
+	transform.x.x = (float)cx;
+	transform.y.y = (float)cy;
+
+	gs_load_vertexbuffer(vb);
+
+	gs_matrix_push();
+	gs_matrix_mul(&transform);
+
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_eparam_t *color = gs_effect_get_param_by_name(solid, "color");
+
+	gs_effect_set_color(color, OUTLINE_COLOR);
+	while (gs_effect_loop(solid, "Solid")) {
+		gs_draw(GS_LINESTRIP, 0, 0);
+	}
+
+	gs_matrix_pop();
+}
+
 void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 {
 	CanvasDock *window = static_cast<CanvasDock *>(data);
@@ -1206,6 +1295,21 @@ void CanvasDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 	gs_ortho(float(-x), newCX + float(x), float(-y), newCY + float(y), -100.0f, 100.0f);
 	gs_reset_viewport();
 
+	if (window->drawSafeAreas) {
+		if (!window->actionSafeMargin || !window->graphicsSafeMargin || !window->fourByThreeSafeMargin ||
+		    !window->leftLine || !window->topLine || !window->rightLine) {
+			InitSafeAreas(&window->actionSafeMargin, &window->graphicsSafeMargin, &window->fourByThreeSafeMargin,
+				      &window->leftLine, &window->topLine, &window->rightLine);
+		}
+
+		RenderSafeAreas(window->actionSafeMargin, newCX, newCY);
+		RenderSafeAreas(window->graphicsSafeMargin, newCX, newCY);
+		RenderSafeAreas(window->fourByThreeSafeMargin, newCX, newCY);
+		RenderSafeAreas(window->leftLine, newCX, newCY);
+		RenderSafeAreas(window->topLine, newCX, newCY);
+		RenderSafeAreas(window->rightLine, newCX, newCY);
+	}
+
 	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
 	gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
 
@@ -1262,6 +1366,26 @@ CanvasDock::~CanvasDock()
 	gs_vertexbuffer_destroy(box);
 	gs_vertexbuffer_destroy(rectFill);
 	gs_vertexbuffer_destroy(circleFill);
+
+	if (actionSafeMargin) {
+		gs_vertexbuffer_destroy(actionSafeMargin);
+	}
+	if (graphicsSafeMargin) {
+		gs_vertexbuffer_destroy(graphicsSafeMargin);
+	}
+	if (fourByThreeSafeMargin) {
+		gs_vertexbuffer_destroy(fourByThreeSafeMargin);
+	}
+	if (leftLine) {
+		gs_vertexbuffer_destroy(leftLine);
+	}
+	if (topLine) {
+		gs_vertexbuffer_destroy(topLine);
+	}
+	if (rightLine) {
+		gs_vertexbuffer_destroy(rightLine);
+	}
+
 	obs_leave_graphics();
 	if (canvas) {
 		auto sh = obs_canvas_get_signal_handler(canvas);
@@ -1407,6 +1531,7 @@ void CanvasDock::SaveSettings(bool closing, QString mode)
 
 		obs_data_set_bool(settings, "preview_disabled", preview_disabled);
 		obs_data_set_bool(settings, "preview_locked", locked);
+		obs_data_set_bool(settings, "draw_safe_areas", drawSafeAreas);
 	}
 
 	obs_data_array_t *transition_array = obs_data_array_create();
@@ -6229,22 +6354,46 @@ void CanvasDock::UpdateSettings(obs_data_t *s)
 	if (canvas_height < 1) {
 		canvas_height = 1920;
 	}
+	auto vf = VIDEO_FORMAT_NONE;
+	std::string cf = obs_data_get_string(settings, "color_format");
+	if (cf == "NV12") {
+		vf = VIDEO_FORMAT_NV12;
+	} else if (cf == "I420") {
+		vf = VIDEO_FORMAT_I420;
+	} else if (cf == "I444") {
+		vf = VIDEO_FORMAT_I444;
+	} else if (cf == "P010") {
+		vf = VIDEO_FORMAT_P010;
+	} else if (cf == "I010") {
+		vf = VIDEO_FORMAT_I010;
+	} else if (cf == "P216") {
+		vf = VIDEO_FORMAT_P216;
+	} else if (cf == "P416") {
+		vf = VIDEO_FORMAT_P416;
+	} else if (cf == "BGRA" || cf == "RGBA") {
+		vf = VIDEO_FORMAT_BGRA;
+	}
 
 	obs_video_info ovi;
-	if (obs_canvas_get_video_info(canvas, &ovi) && (ovi.base_width != canvas_width || ovi.base_height != canvas_height ||
-							ovi.output_width != canvas_width || ovi.output_height != canvas_height)) {
+	if (obs_canvas_get_video_info(canvas, &ovi) &&
+	    (ovi.base_width != canvas_width || ovi.base_height != canvas_height || ovi.output_width != canvas_width ||
+	     ovi.output_height != canvas_height || (vf != VIDEO_FORMAT_NONE && ovi.output_format != vf))) {
 		obs_get_video_info(&ovi);
 		ovi.base_height = canvas_height;
 		ovi.base_width = canvas_width;
 		ovi.output_height = canvas_height;
 		ovi.output_width = canvas_width;
+		if (vf != VIDEO_FORMAT_NONE) {
+			ovi.output_format = vf;
+		}
 		if (obs_canvas_reset_video(canvas, &ovi)) {
-			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u", obs_canvas_get_name(canvas),
-			     canvas_width, canvas_height);
+			blog(LOG_INFO, "[Aitum Stream Suite] Canvas '%s' reset video %ux%u with color format %u", obs_canvas_get_name(canvas),
+			     canvas_width, canvas_height, ovi.output_format);
 		} else {
 			blog(LOG_ERROR, "[Aitum Stream Suite] Failed to reset video on canvas '%s'", obs_canvas_get_name(canvas));
 		}
 	}
+	drawSafeAreas = obs_data_get_bool(settings, "draw_safe_areas");
 }
 
 void CanvasDock::reset_live_state()

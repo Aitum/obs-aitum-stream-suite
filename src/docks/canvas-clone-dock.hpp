@@ -30,6 +30,14 @@ private:
 	std::map<obs_source_t *, obs_weak_source_t *> replace_sources;
 	pthread_mutex_t replace_sources_mutex;
 
+	bool drawSafeAreas = false;
+	gs_vertbuffer_t *actionSafeMargin = nullptr;
+	gs_vertbuffer_t *graphicsSafeMargin = nullptr;
+	gs_vertbuffer_t *fourByThreeSafeMargin = nullptr;
+	gs_vertbuffer_t *leftLine = nullptr;
+	gs_vertbuffer_t *topLine = nullptr;
+	gs_vertbuffer_t *rightLine = nullptr;
+
 	obs_source_t *DuplicateSource(obs_source_t *source, obs_source_t *current);
 	void DuplicateSceneItem(obs_sceneitem_t *item, obs_sceneitem_t *item2);
 	void DrawBackdrop(float cx, float cy);

@@ -63,6 +63,13 @@ private:
 	gs_vertbuffer_t *rectFill = nullptr;
 	gs_vertbuffer_t *circleFill = nullptr;
 
+	gs_vertbuffer_t *actionSafeMargin = nullptr;
+	gs_vertbuffer_t *graphicsSafeMargin = nullptr;
+	gs_vertbuffer_t *fourByThreeSafeMargin = nullptr;
+	gs_vertbuffer_t *leftLine = nullptr;
+	gs_vertbuffer_t *topLine = nullptr;
+	gs_vertbuffer_t *rightLine = nullptr;
+
 	obs_scene_t *scene = nullptr;
 	//obs_view_t *view = nullptr;
 	obs_canvas_t *canvas = nullptr;
@@ -74,6 +81,7 @@ private:
 	std::vector<obs_sceneitem_t *> selectedItems;
 	std::mutex selectMutex;
 	bool drawSpacingHelpers = true;
+	bool drawSafeAreas = false;
 
 	vec2 startPos{};
 	vec2 mousePos{};
@@ -225,6 +233,10 @@ private:
 	static void DrawSquareAtPos(float x, float y, float pixelRatio);
 	static void DrawRotationHandle(gs_vertbuffer_t *circle, float rot, float pixelRatio);
 	static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale);
+	static void InitSafeAreas(gs_vertbuffer_t **actionSafeMargin, gs_vertbuffer_t **graphicsSafeMargin,
+				  gs_vertbuffer_t **fourByThreeSafeMargin, gs_vertbuffer_t **leftLine, gs_vertbuffer_t **topLine,
+				  gs_vertbuffer_t **rightLine);
+	static void RenderSafeAreas(gs_vertbuffer_t *vb, int cx, int cy);
 	static vec2 GetItemSize(obs_sceneitem_t *item);
 	static vec3 GetTransformedPos(float x, float y, const matrix4 &mat);
 	static obs_source_t *CreateLabel(float pixelRatio, int i);
