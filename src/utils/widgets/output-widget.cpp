@@ -445,8 +445,6 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 				if (this_->output && strcmp(obs_output_get_id(this_->output), "virtualcam_output") == 0) {
 					obs_output_set_media(this_->output, obs_get_video(), obs_get_audio());
 				}
-				obs_output_release(this_->output);
-				this_->output = nullptr;
 				if (vendor) {
 					const auto d = obs_data_create();
 					obs_data_set_string(d, "output", obs_output_get_name(this_->output));
@@ -458,6 +456,8 @@ void OutputWidget::output_stop(void *data, calldata_t *calldata)
 					obs_websocket_vendor_emit_event(vendor, "stop_output", d);
 					obs_data_release(d);
 				}
+				obs_output_release(this_->output);
+				this_->output = nullptr;
 			},
 			Qt::QueuedConnection);
 	}
